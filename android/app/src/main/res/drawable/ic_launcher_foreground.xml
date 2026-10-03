@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Droid Antennae -->
+    <path
+        android:strokeColor="#34D399"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M44,30 L36,18 M64,30 L72,18" />
+    <path
+        android:fillColor="#34D399"
+        android:pathData="M35,16 a2,2 0 1,0 0.1,0 Z M73,16 a2,2 0 1,0 0.1,0 Z" />
+    <!-- Android Robot Head -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M34,42 C34,28 74,28 74,42 Z" />
+    <!-- Eyes -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,36 a2.5,2.5 0 1,0 0.1,0 Z M64,36 a2.5,2.5 0 1,0 0.1,0 Z" />
+    <!-- Open Book Novel Base -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M24,54 C38,50 52,53 54,60 C56,53 70,50 84,54 L82,78 C68,74 56,77 54,82 C52,77 40,74 26,78 Z" />
+    <!-- Book Center Spine -->
+    <path
+        android:strokeColor="#0B0F19"
+        android:strokeWidth="2"
+        android:pathData="M54,60 L54,82" />
+    <!-- Center AI Sparkle -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M54,46 L55.5,50 L59.5,51.5 L55.5,53 L54,57 L52.5,53 L48.5,51.5 L52.5,50 Z" />
+</vector>

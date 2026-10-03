@@ -1,6 +1,6 @@
 {
-  "summary":  "Cập nhật kế hoạch theo phản hồi của người dùng:\n1. Quy trình Tự động sửa lỗi 2 tầng Khép kín (Offline & Online Auto-Healer): App tự động sửa offline trước; nếu sạch lỗi thì lưu; nếu vẫn còn lỗi nghiêm trọng thì tự động gửi Gemini dịch lại và ghi đè đúng chương lỗi.\n2. Thêm Bộ nhận diện & Biểu tượng ứng dụng (App Icon): Tạo biểu tượng DroidTranslator đặc trưng (kết hợp Robot Android, Sách/Tiểu thuyết và Trí tuệ AI) đưa vào Header web, Favicon, Android Phone Simulator và dự án Native Android.\n3. Tích hợp Động cơ phiên âm Hán-Việt 500 từ và Bảng đo đạc Linux Kernel.\n4. Giữ nguyên cơ chế xuất file hiện tại theo yêu cầu.",
-  "updatedAt":  "2026-10-03T19:30:47.399424994Z",
+  "summary":  "Kế hoạch tích hợp cấu trúc Android tối giản trong thư mục android/ và thiết lập GitHub Actions tự động build Debug APK, lưu Artifacts và phát hành GitHub Release khi gắn Tag.",
+  "updatedAt":  "2026-10-03T19:44:52.341606297Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
