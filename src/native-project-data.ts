@@ -178,8 +178,8 @@ dependencies {
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:roundIcon="@android:drawable/sym_def_app_icon"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="DroidTranslator"
         android:supportsRtl="true"
         android:theme="@style/Theme.DroidTranslator"
@@ -208,15 +208,34 @@ dependencies {
 </manifest>`
   },
   {
+    path: 'app/src/main/res/values/colors.xml',
+    language: 'xml',
+    description: 'Bảng màu chuẩn Android tránh lỗi AAPT Resource Linking',
+    content: `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#2563EB</color>
+    <color name="colorPrimaryVariant">#1D4ED8</color>
+    <color name="colorOnPrimary">#FFFFFF</color>
+    <color name="colorSecondary">#059669</color>
+    <color name="colorSecondaryVariant">#047857</color>
+    <color name="colorOnSecondary">#FFFFFF</color>
+    <color name="backgroundColor">#0A0A0A</color>
+    <color name="surfaceColor">#171717</color>
+    <color name="textColorPrimary">#F8FAFC</color>
+    <color name="textColorSecondary">#94A3B8</color>
+    <color name="ic_launcher_background">#0F172A</color>
+</resources>`
+  },
+  {
     path: 'app/src/main/res/values/themes.xml',
     language: 'xml',
     description: 'Theme Material tối giản',
     content: `<resources>
     <style name="Theme.DroidTranslator" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#2563EB</item>
-        <item name="colorPrimaryVariant">#1D4ED8</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">#059669</item>
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryVariant">@color/colorPrimaryVariant</item>
+        <item name="colorOnPrimary">@color/colorOnPrimary</item>
+        <item name="colorSecondary">@color/colorSecondary</item>
         <item name="android:statusBarColor">#0A0A0A</item>
     </style>
 </resources>`
