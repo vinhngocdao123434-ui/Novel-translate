@@ -1674,7 +1674,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (index == 0) {
             refreshKeyList();
-            refreshPromptCardsList();
+            refreshPromptList();
         } else if (index == 1) {
             updateProgressUI();
             refreshGlossaryList();
