@@ -1,0 +1,6 @@
+{
+  "name": "DroidTranslator Native Studio",
+  "description": "Android Native Java project converter & 5-Layer God Mode background translator engine.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
