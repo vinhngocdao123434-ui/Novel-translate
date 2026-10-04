@@ -31,9 +31,9 @@ rootProject.name = "DroidTranslator"
 include ':app'
 `;
 
-// 2. Root build.gradle (AGP 8.2.2)
+// 2. Root build.gradle (AGP 8.4.2)
 const rootBuildGradleContent = `plugins {
-    id 'com.android.application' version '8.2.2' apply false
+    id 'com.android.application' version '8.4.2' apply false
 }
 
 tasks.register('clean', Delete) {
@@ -50,7 +50,7 @@ android.nonTransitiveRClass=true
 // 4. gradle-wrapper.properties
 const gradleWrapperPropsContent = `distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
-distributionUrl=https\\://services.gradle.org/distributions/gradle-8.2-bin.zip
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip
 networkTimeout=10000
 validateDistributionUrl=true
 zipStoreBase=GRADLE_USER_HOME
@@ -128,16 +128,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle 8.2
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.2'
+          gradle-version: '8.7'
           cache-read-only: false
+
+      - name: Make Gradlew Executable
+        run: |
+          if [ -f android/gradlew ]; then
+            chmod +x android/gradlew
+          fi
 
       - name: Build Debug APK with Gradle
         run: |
           cd android
-          gradle assembleDebug --no-daemon --stacktrace
+          if [ -f ./gradlew ]; then
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            gradle assembleDebug --no-daemon --stacktrace
+          fi
 
       - name: Locate Generated APK
         id: find_apk

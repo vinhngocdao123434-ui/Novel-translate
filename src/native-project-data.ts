@@ -36,10 +36,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle 8.4
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.4'
+          gradle-version: '8.7'
           build-root-directory: android
           cache-disabled: true
 
@@ -101,7 +101,7 @@ org.gradle.daemon=false
     language: 'groovy',
     description: 'Root build.gradle chuẩn hóa không dính plugin rườm rà',
     content: `plugins {
-    id 'com.android.application' version '8.3.2' apply false
+    id 'com.android.application' version '8.4.2' apply false
 }
 
 tasks.register('clean', Delete) {
@@ -129,6 +129,19 @@ dependencyResolutionManagement {
 }
 rootProject.name = "DroidTranslator"
 include ':app'
+`
+  },
+  {
+    path: 'gradle/wrapper/gradle-wrapper.properties',
+    language: 'properties',
+    description: 'Cấu hình Gradle Wrapper 8.7 tương thích AGP 8.4+ và JDK 17',
+    content: `distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
 `
   },
   {
