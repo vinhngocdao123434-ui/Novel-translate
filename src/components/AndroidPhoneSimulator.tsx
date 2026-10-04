@@ -14,6 +14,10 @@ import { parseEbookFile } from '../utils/ebook-parser';
 import { AppLogo } from './AppLogo';
 import { ChapterAuditor, AuditResult } from '../utils/chapterAuditor';
 import { transliterateLeftoverHanzi } from '../utils/sinoVietnameseDictionary';
+import { HowToUseModal } from './HowToUseModal';
+import { HelpTooltipModal, HelpBtn, HelpInfoItem } from './HelpTooltipModal';
+import { HELP_ENTRIES } from '../utils/helpEntries';
+import { HelpCircle } from 'lucide-react';
 
 interface Props {
   onOpenGodModeModal: () => void;
@@ -308,6 +312,12 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   }, [advancedSettings]);
 
   // Key testing state
+  const [showHowToUseModal, setShowHowToUseModal] = useState<boolean>(false);
+  const [activeHelpInfo, setActiveHelpInfo] = useState<HelpInfoItem | null>(null);
+  const openHelp = (key: string) => {
+    if (HELP_ENTRIES[key]) setActiveHelpInfo(HELP_ENTRIES[key]);
+  };
+
   const [testingKeyIndex, setTestingKeyIndex] = useState<number | null>(null);
   const [keyPingResults, setKeyPingResults] = useState<Record<number, { latency: number; status: string }>>({});
 
@@ -1555,6 +1565,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           <AppLogo size="sm" showText={true} />
           <div className="flex items-center gap-1.5">
             <button
+              onClick={() => setShowHowToUseModal(true)}
+              className="px-2 py-0.5 rounded-lg bg-blue-950/90 text-blue-300 border border-blue-500/40 text-[10px] font-bold flex items-center gap-1 hover:bg-blue-900/60 cursor-pointer shadow-sm"
+              title="Cẩm nang hướng dẫn sử dụng từ A đến Z"
+            >
+              <HelpCircle className="w-3 h-3 text-blue-400" />
+              <span>Hướng Dẫn</span>
+            </button>
+            <button
               onClick={onOpenGodModeModal}
               className="px-2 py-0.5 rounded-lg bg-emerald-950/90 text-emerald-300 border border-emerald-600/40 text-[10px] font-bold flex items-center gap-1 hover:bg-emerald-900/60 cursor-pointer"
             >
@@ -1611,12 +1629,33 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           {/* ======================================================== */}
           {activeBottomTab === 'keys' && (
             <div className="space-y-3">
+              {/* BIG HOW TO USE ONBOARDING BANNER */}
+              <div 
+                onClick={() => setShowHowToUseModal(true)}
+                className="bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-blue-900/60 border border-blue-600/40 rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:border-blue-400 transition-all shadow-lg shadow-blue-950/40 group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300 group-hover:scale-105 transition-transform shrink-0">
+                    <HelpCircle className="w-4.5 h-4.5 text-blue-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Cẩm Nang Hướng Dẫn Sử Dụng</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30 font-mono">Từ A-Z</span>
+                    </div>
+                    <p className="text-[10px] text-blue-200/70">Nhấn để xem cách lấy key, chọn model, dịch bù và xuất file</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-blue-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </div>
+
               {/* Multi-Key Pool Card */}
               <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Key className="w-4 h-4 text-amber-400" />
                     <span className="text-xs font-bold text-neutral-100">Multi-Key Gemini Pool</span>
+                    <HelpBtn onClick={() => openHelp('key_pool')} />
                   </div>
                   <button
                     onClick={handleTestAllKeys}
@@ -1706,6 +1745,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                   <div className="flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-blue-400" />
                     <span className="text-xs font-bold text-neutral-100">Chọn Dòng Model Gemini</span>
+                    <HelpBtn onClick={() => openHelp('model_selection')} />
                   </div>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 font-mono border border-blue-800">
                     {project?.model}
@@ -1764,6 +1804,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                   <div className="flex items-center gap-1.5">
                     <Sliders className="w-4 h-4 text-emerald-400" />
                     <span className="text-xs font-bold text-neutral-100">Thẻ Phong Cách Dịch Thuật</span>
+                    <HelpBtn onClick={() => openHelp('prompt_cards')} />
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -1845,12 +1886,142 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           {/* ======================================================== */}
           {activeBottomTab === 'translate' && (
             <div className="space-y-3">
-              {/* Range Translation Progress & Controls */}
+              {/* BIG HOW TO USE ONBOARDING BANNER */}
+              <div 
+                onClick={() => setShowHowToUseModal(true)}
+                className="bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-blue-900/60 border border-blue-600/40 rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:border-blue-400 transition-all shadow-lg shadow-blue-950/40 group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300 group-hover:scale-105 transition-transform shrink-0">
+                    <HelpCircle className="w-4.5 h-4.5 text-blue-300" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Cẩm Nang Hướng Dẫn Sử Dụng</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30 font-mono">Từ A-Z</span>
+                    </div>
+                    <p className="text-[10px] text-blue-200/70">Nhấn để xem cách lấy key, chọn model, dịch bù và xuất file</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-blue-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </div>
+
+              {/* ======================================================== */}
+              {/* MỤC 1: NHẬP & BÓC TÁCH FILE TRUYỆN GỐC */}
+              {/* ======================================================== */}
+              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-blue-400" />
+                    <span className="text-xs font-bold text-neutral-100">1. Nhập & Bóc Tách File Truyện Gốc</span>
+                    <HelpBtn onClick={() => openHelp('novel_raw_input')} />
+                  </div>
+                  
+                  {/* Chế độ tách chương */}
+                  <div className="flex items-center gap-1 bg-neutral-950 p-0.5 rounded-lg border border-neutral-800 text-[10px]">
+                    <button
+                      onClick={() => setSplitMode('regex')}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition-all ${splitMode === 'regex' ? 'bg-blue-600 text-white font-bold' : 'text-neutral-400 hover:text-white'}`}
+                    >
+                      Theo Tác Giả
+                    </button>
+                    <button
+                      onClick={() => setSplitMode('chunk')}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition-all ${splitMode === 'chunk' ? 'bg-blue-600 text-white font-bold' : 'text-neutral-400 hover:text-white'}`}
+                    >
+                      Tùy Ký Tự
+                    </button>
+                  </div>
+                </div>
+
+                {/* Custom Chunk Size Selector with quick presets */}
+                {splitMode === 'chunk' && (
+                  <div className="bg-neutral-950 p-2 rounded-xl border border-neutral-800 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                      <span>Số ký tự mỗi chương:</span>
+                      <div className="flex items-center gap-1">
+                        {[2000, 3000, 3500, 5000].map(sz => (
+                          <button
+                            key={sz}
+                            onClick={() => setChunkSizeInput(String(sz))}
+                            className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer ${
+                              chunkSizeInput === String(sz) ? 'bg-blue-600 text-white font-bold' : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                            }`}
+                          >
+                            {sz}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      type="number"
+                      value={chunkSizeInput}
+                      onChange={(e) => setChunkSizeInput(e.target.value)}
+                      placeholder="Nhập số ký tự tùy ý (VD: 2500, 4000...)"
+                      className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* File summary badge if loaded */}
+                {fileSummary && (
+                  <div className="p-2 bg-blue-950/40 border border-blue-800/60 rounded-xl flex items-center justify-between text-[11px] text-blue-300">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <FileCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="font-semibold text-white truncate">{fileSummary.name}</span>
+                      <span className="text-neutral-400">({fileSummary.size} - {fileSummary.length.toLocaleString()} ký tự)</span>
+                    </div>
+                    <span className="text-emerald-400 font-mono text-[10px]">ĐÃ NẠP</span>
+                  </div>
+                )}
+
+                <textarea
+                  rows={2}
+                  value={rawTextInput}
+                  onChange={(e) => {
+                    setRawTextInput(e.target.value);
+                    fullRawTextRef.current = e.target.value;
+                  }}
+                  placeholder="Dán văn bản truyện gốc hoặc bấm chọn file..."
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-2 text-xs text-neutral-200 font-mono focus:outline-none focus:border-blue-500 resize-none"
+                />
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSplitChapters}
+                    className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Tách chương ({splitMode === 'regex' ? 'Theo tác giả' : `${chunkSizeInput} ký tự`})</span>
+                  </button>
+                  
+                  {/* Multi-Format Ebook File Picker (EPUB, MOBI, AZW3, TXT) */}
+                  <label className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-blue-500/40 cursor-pointer">
+                    {isFileLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    <span>{isFileLoading ? 'Đang đọc...' : 'Nạp Ebook'}</span>
+                    <input 
+                      type="file" 
+                      accept=".txt,.epub,.mobi,.azw3,.azw" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFilePicked(file);
+                        e.target.value = '';
+                      }} 
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* ======================================================== */}
+              {/* MỤC 2: TIẾN ĐỘ DỊCH THUẬT & ĐIỀU KHIỂN */}
+              {/* ======================================================== */}
               <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Zap className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-neutral-100">Tiến Độ Dịch Thuật</span>
+                    <span className="text-xs font-bold text-neutral-100">2. Tiến Độ Dịch Thuật & Điều Khiển</span>
+                    <HelpBtn onClick={() => openHelp('range_progress')} />
                   </div>
                   <span className="text-[11px] font-mono text-blue-400 font-semibold">
                     {project ? Object.keys(project.translatedChapters).length : 0} / {project ? project.chapters.length : 0} chương
@@ -1869,8 +2040,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
                 {/* Range inputs: Từ chương -> Đến chương */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="flex items-center gap-1.5 bg-neutral-950 p-2 rounded-xl border border-neutral-800">
-                    <span className="text-[11px] text-neutral-400 shrink-0">Từ chương:</span>
+                  <div className="flex items-center bg-neutral-950 p-2 rounded-xl border border-neutral-800">
+                    <span className="text-[11px] text-neutral-400 shrink-0 mr-1.5">Từ chương:</span>
                     <input
                       type="number"
                       min={1}
@@ -1880,8 +2051,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       className="w-full bg-transparent text-xs text-white font-bold font-mono focus:outline-none"
                     />
                   </div>
-                  <div className="flex items-center gap-1.5 bg-neutral-950 p-2 rounded-xl border border-neutral-800">
-                    <span className="text-[11px] text-neutral-400 shrink-0">Đến chương:</span>
+                  <div className="flex items-center bg-neutral-950 p-2 rounded-xl border border-neutral-800">
+                    <span className="text-[11px] text-neutral-400 shrink-0 mr-1.5">Đến chương:</span>
                     <input
                       type="number"
                       min={1}
@@ -2001,111 +2172,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 )}
               </div>
 
-              {/* Input Raw text & Smart Splitter with Async Large File Support */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-neutral-200">Nạp văn bản truyện thô:</span>
-                  <div className="flex items-center gap-1 bg-neutral-950 p-0.5 rounded-lg border border-neutral-800 text-[10px]">
-                    <button
-                      onClick={() => setSplitMode('regex')}
-                      className={`px-2 py-0.5 rounded cursor-pointer ${splitMode === 'regex' ? 'bg-neutral-800 text-blue-400 font-bold' : 'text-neutral-400'}`}
-                    >
-                      Theo Tác Giả
-                    </button>
-                    <button
-                      onClick={() => setSplitMode('chunk')}
-                      className={`px-2 py-0.5 rounded cursor-pointer ${splitMode === 'chunk' ? 'bg-neutral-800 text-blue-400 font-bold' : 'text-neutral-400'}`}
-                    >
-                      Tùy Ký Tự
-                    </button>
-                  </div>
-                </div>
-
-                {/* Custom Chunk Size Selector with quick presets */}
-                {splitMode === 'chunk' && (
-                  <div className="bg-neutral-950 p-2 rounded-xl border border-neutral-800 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-neutral-400">
-                      <span>Số ký tự mỗi chương:</span>
-                      <div className="flex items-center gap-1">
-                        {[2000, 3000, 3500, 5000].map(sz => (
-                          <button
-                            key={sz}
-                            onClick={() => setChunkSizeInput(String(sz))}
-                            className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer ${
-                              chunkSizeInput === String(sz) ? 'bg-blue-600 text-white font-bold' : 'bg-neutral-800 text-neutral-400 hover:text-white'
-                            }`}
-                          >
-                            {sz}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <input
-                      type="number"
-                      value={chunkSizeInput}
-                      onChange={(e) => setChunkSizeInput(e.target.value)}
-                      placeholder="Nhập số ký tự tùy ý (VD: 2500, 4000...)"
-                      className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                )}
-
-                {/* File summary badge if loaded */}
-                {fileSummary && (
-                  <div className="p-2 bg-blue-950/40 border border-blue-800/60 rounded-xl flex items-center justify-between text-[11px] text-blue-300">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <FileCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span className="font-semibold text-white truncate">{fileSummary.name}</span>
-                      <span className="text-neutral-400">({fileSummary.size} - {fileSummary.length.toLocaleString()} ký tự)</span>
-                    </div>
-                    <span className="text-emerald-400 font-mono text-[10px]">ĐÃ NẠP</span>
-                  </div>
-                )}
-
-                <textarea
-                  rows={2}
-                  value={rawTextInput}
-                  onChange={(e) => {
-                    setRawTextInput(e.target.value);
-                    fullRawTextRef.current = e.target.value;
-                  }}
-                  placeholder="Dán văn bản truyện gốc hoặc bấm chọn file..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-2 text-xs text-neutral-200 font-mono focus:outline-none focus:border-blue-500 resize-none"
-                />
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleSplitChapters}
-                    className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Tách chương ({splitMode === 'regex' ? 'Theo tác giả' : `${chunkSizeInput} ký tự`})</span>
-                  </button>
-                  
-                  {/* Multi-Format Ebook File Picker (EPUB, MOBI, AZW3, TXT) */}
-                  <label className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-blue-500/40 cursor-pointer">
-                    {isFileLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    <span>{isFileLoading ? 'Đang đọc...' : 'Nạp Ebook (EPUB, MOBI, AZW3, TXT)'}</span>
-                    <input 
-                      type="file" 
-                      accept=".txt,.epub,.mobi,.azw3,.azw" 
-                      className="hidden" 
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFilePicked(file);
-                        e.target.value = '';
-                      }} 
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Master Glossary in Tab 2 (Compact view + Full Modal to avoid lag) */}
+              {/* ======================================================== */}
+              {/* MỤC 3: KHO THUẬT NGỮ MASTER GLOSSARY */}
+              {/* ======================================================== */}
               <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <BookMarked className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-neutral-100">Master Glossary</span>
+                    <span className="text-xs font-bold text-neutral-100">3. Kho Thuật Ngữ Master Glossary</span>
+                    <HelpBtn onClick={() => openHelp('master_glossary')} />
                   </div>
                   <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800">
                     {project ? Object.keys(project.masterGlossary).length : 0} Thuật ngữ
@@ -2247,6 +2322,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                   <div className="flex items-center gap-1.5">
                     <BookOpen className="w-4 h-4 text-emerald-400" />
                     <span className="text-xs font-bold text-neutral-100">Danh Sách Chương</span>
+                    <HelpBtn onClick={() => openHelp('chapter_auditor')} />
                   </div>
                   <span className="text-[10px] text-emerald-400 font-mono font-bold">
                     Đã dịch {project ? Object.keys(project.translatedChapters).length : 0}/{totalChapters}
@@ -2439,6 +2515,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <div className="flex items-center gap-1.5">
                       <Key className="w-4 h-4 text-amber-400" />
                       <span className="text-xs font-bold text-neutral-100">1. Cài Đặt Key API & Động Cơ Xoay Tua</span>
+                      <HelpBtn onClick={() => openHelp('settings_api_rotation')} />
                     </div>
 
                     <div className="space-y-2.5 text-xs">
@@ -2555,6 +2632,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <div className="flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-emerald-400" />
                       <span className="text-xs font-bold text-neutral-100">2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)</span>
+                      <HelpBtn onClick={() => openHelp('settings_glossary_learning')} />
                     </div>
 
                     <div className="space-y-2.5 text-xs">
@@ -2742,6 +2820,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <div className="flex items-center gap-1.5">
                       <ShieldAlert className="w-4 h-4 text-blue-400" />
                       <span className="text-xs font-bold text-neutral-100">3. Cài Đặt Dịch Thuật & Chống Lọt Chữ Hán</span>
+                      <HelpBtn onClick={() => openHelp('settings_translation_anti_hanzi')} />
                     </div>
 
                     <div className="space-y-2.5 text-xs">
@@ -2854,6 +2933,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <div className="flex items-center gap-1.5">
                       <BookOpen className="w-4 h-4 text-purple-400" />
                       <span className="text-xs font-bold text-neutral-100">4. Cài Đặt Trình Đọc & Trải Nghiệm Đọc</span>
+                      <HelpBtn onClick={() => openHelp('settings_reader_experience')} />
                     </div>
 
                     <div className="space-y-2.5 text-xs">
@@ -2956,6 +3036,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       <div className="flex items-center gap-1.5">
                         <Layers className="w-4 h-4 text-blue-400" />
                         <span className="text-xs font-bold text-neutral-100">Kho Tất Cả Các Dự Án Đã Lưu</span>
+                        <HelpBtn onClick={() => openHelp('settings_projects_manager')} />
                       </div>
                       <button
                         onClick={() => setShowNewProjModal(true)}
@@ -3029,7 +3110,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold text-neutral-100">Kiểm Soát 5 Lớp Chạy Ngầm (God-Mode)</span>
+                        <span className="text-xs font-bold text-neutral-100">5. Kiểm Soát 5 Lớp Chạy Ngầm (God-Mode)</span>
+                        <HelpBtn onClick={() => openHelp('settings_god_mode')} />
                       </div>
                       <span className="text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800 font-mono">
                         5/5 KÍCH HOẠT
@@ -3137,6 +3219,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <div className="flex items-center gap-1.5">
                       <Download className="w-4 h-4 text-emerald-400" />
                       <span className="text-xs font-bold text-neutral-100">Xuất Toàn Văn Tác Phẩm</span>
+                      <HelpBtn onClick={() => openHelp('export_full_txt')} />
                     </div>
                     <p className="text-[11px] text-neutral-400">
                       Gộp toàn bộ tất cả các chương đã dịch thành một file văn bản hoàn chỉnh (.txt) và tải ngay về máy hoặc lưu vào thư mục Download.
@@ -3856,6 +3939,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           </div>
         </div>
       )}
+
+      {/* HOW TO USE COMPREHENSIVE MODAL */}
+      <HowToUseModal 
+        isOpen={showHowToUseModal} 
+        onClose={() => setShowHowToUseModal(false)} 
+      />
+
+      {/* SUB-ITEM HELP TOOLTIP MODAL */}
+      <HelpTooltipModal 
+        info={activeHelpInfo} 
+        onClose={() => setActiveHelpInfo(null)} 
+      />
 
     </div>
   );

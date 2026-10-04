@@ -1629,6 +1629,68 @@ import java.util.*;
 
 public class MainActivity extends AppCompatActivity {
 
+    private void showHowToUseDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("📖 CẨM NANG HƯỚNG DẪN TỪ A ĐẾN Z");
+        String nl = String.valueOf((char) 10);
+        
+        String message = 
+            "1. LẤY VÀ NẠP API KEY MIỄN PHÍ:" + nl +
+            "• Lấy tại: aistudio.google.com -> Bấm 'Get API key' -> Copy." + nl +
+            "• MẸO HAY: Mỗi tài khoản Google được 15 lượt/phút. Bạn NÊN DÙNG 2 - 5 TÀI KHOẢN GOOGLE để lấy 2 - 5 key nạp vào app. App sẽ tự động xoay tua từng key, giúp bạn dịch hàng ngàn chương liên tục không bao giờ bị nghẽn mạng!" + nl + nl +
+            "2. TẠO DỰ ÁN & NẠP FILE TRUYỆN:" + nl +
+            "• Bấm 'Dự Án' để tạo truyện mới." + nl +
+            "• Nạp file .txt hoặc .epub truyện tiếng Trung thô vào. App tự động chia chương chuẩn xác." + nl + nl +
+            "3. CHỌN KHOẢNG CHƯƠNG & CHỌN MODEL:" + nl +
+            "• Khuyên dùng cho truyện dài (>10MB): Gemini 2.5 Flash-Lite hoặc 3.5 Flash-Lite vì tốc độ siêu nhanh và không lo chạm hạn mức. Các lỗi nhỏ sẽ được hệ thống cứu hộ tự vá mượt đạt 9/10." + nl +
+            "• Gemini 2.5 Flash / 3.6 Flash: Dành cho dịch đoạn ngắn trau chuốt." + nl + nl +
+            "4. CÀI ĐẶT ẢNH HƯỞNG CHẤT LƯỢNG:" + nl +
+            "• Độ dài Glossary tối thiểu (2-4 ký tự): Lọc bỏ từ rác 1 chữ, chỉ lưu tên nhân vật." + nl +
+            "• Tần suất tối thiểu (2 lần): Chỉ lưu từ quan trọng." + nl +
+            "• Bật Chống Lọt Chữ Hán Nghiêm Ngặt & Tự Động Cứu Hộ Online để ép bản dịch 100% tiếng Việt." + nl + nl +
+            "5. XỬ LÝ KHI LỌT CHƯƠNG THIẾU:" + nl +
+            "• Bật 'Dịch bù chương thiếu' và bấm Dịch tiếp. App sẽ tự lướt qua chương đã có và chỉ dịch chương còn thiếu." + nl + nl +
+            "6. LÀM MƯỢT FINAL & XUẤT FILE:" + nl +
+            "• Bấm 'Làm Mượt Final' sau khi dịch xong toàn bộ." + nl +
+            "• Bấm 'Xuất Toàn Văn (.txt)' để nạp vào máy đọc sách hoặc app đọc truyện.";
+
+        builder.setMessage(message);
+        builder.setPositiveButton("ĐÃ HIỂU", (d, w) -> d.dismiss());
+        builder.show();
+    }
+
+    private void showHelpTooltipDialog(String title, String whatIsIt, String howToUse, String proTip) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("❓ " + title);
+        String nl = String.valueOf((char) 10);
+        StringBuilder sb = new StringBuilder();
+        sb.append("📌 DÙNG ĐỂ LÀM GÌ:").append(nl).append(whatIsIt).append(nl).append(nl);
+        sb.append("💡 CÁCH SỬ DỤNG:").append(nl).append(howToUse);
+        if (proTip != null && !proTip.isEmpty()) {
+            sb.append(nl).append(nl).append("✨ MẸO BỎ TÚI:").append(nl).append(proTip);
+        }
+        builder.setMessage(sb.toString());
+        builder.setPositiveButton("ĐÃ HIỂU", (d, w) -> d.dismiss());
+        builder.show();
+    }
+
+    private View createHelpButton(final String title, final String whatIsIt, final String howToUse, final String proTip) {
+        TextView tv = new TextView(this);
+        tv.setText(" ? ");
+        tv.setTextColor(Color.parseColor("#60A5FA"));
+        tv.setTextSize(11);
+        tv.setTypeface(null, Typeface.BOLD);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#1E293B"));
+        bg.setCornerRadius(20);
+        bg.setStroke(1, Color.parseColor("#3B82F6"));
+        tv.setBackground(bg);
+        tv.setPadding(12, 4, 12, 4);
+        tv.setOnClickListener(v -> showHelpTooltipDialog(title, whatIsIt, howToUse, proTip));
+        return tv;
+    }
+
+
     private static final int REQUEST_PICK_FILE = 1001;
     private static final int REQUEST_PICK_GLOSSARY_FILE = 1002;
 
@@ -2037,6 +2099,19 @@ public class MainActivity extends AppCompatActivity {
         tvTitle.setTextSize(17);
         tvTitle.setTypeface(null, Typeface.BOLD);
         header.addView(tvTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        Button btnHeaderHelp = new Button(this);
+        btnHeaderHelp.setText("❓ Hướng Dẫn");
+        btnHeaderHelp.setTextColor(Color.WHITE);
+        btnHeaderHelp.setTextSize(11);
+        btnHeaderHelp.setTypeface(null, Typeface.BOLD);
+        GradientDrawable hBg = new GradientDrawable();
+        hBg.setColor(Color.parseColor("#2563EB"));
+        hBg.setCornerRadius(16);
+        btnHeaderHelp.setBackground(hBg);
+        btnHeaderHelp.setPadding(20, 8, 20, 8);
+        btnHeaderHelp.setOnClickListener(v -> showHowToUseDialog());
+        header.addView(btnHeaderHelp);
 
         TextView tvBadge = new TextView(this);
         tvBadge.setText(RootController.isRootAvailable() ? "ROOT #" : "GOD-MODE");
