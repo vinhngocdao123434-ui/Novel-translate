@@ -2537,6 +2537,7 @@ public class MainActivity extends AppCompatActivity {
                         mainHandler.post(() -> {
                             appendLog("❌ Lỗi đọc tệp Ebook: " + e.getMessage());
                             Toast.makeText(MainActivity.this, "Lỗi đọc tệp: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        });
                     }
                 }).start();
             }
