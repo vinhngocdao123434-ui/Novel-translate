@@ -18,6 +18,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import com.droidtranslator.app.engine.HanziSweeperEngine;
 import com.droidtranslator.app.engine.RootController;
 import com.droidtranslator.app.model.ApiKeyItem;
 import com.droidtranslator.app.model.PromptCardItem;
@@ -96,8 +97,10 @@ public class MainActivity extends AppCompatActivity {
     private int contextSnippetLength = 350;
 
     private String currentModel = "gemini-2.5-flash";
+    private String polishModel = "gemini-3.6-flash";
     private boolean isTranslating = false;
     private boolean isPaused = false;
+    private boolean isPolishing = false;
     private int currentChapterIdx = 0;
     private int rangeFromChap = 1;
     private int rangeToChap = 1;
@@ -126,6 +129,8 @@ public class MainActivity extends AppCompatActivity {
     private Button btnCancelTrans;
     private Button btnFillGaps;
     private Button btnFillGapsTab3;
+    private Button btnFinalPolish;
+    private Button btnFinalPolishTab3;
     private boolean isGapFillingMode = false;
     private EditText edtRawText;
     private EditText edtChunkSize;
@@ -213,6 +218,7 @@ public class MainActivity extends AppCompatActivity {
             editor.putBoolean("anti_hanzi_strict", antiHanziStrict);
             editor.putBoolean("auto_heal_online", autoHealOnlineEnabled);
             editor.putString("target_language", targetLanguage);
+            editor.putString("polish_model", polishModel);
             editor.putInt("cooldown_seconds", cooldownSeconds);
             editor.putString("rotation_strategy", rotationStrategy);
             editor.putInt("context_snippet_len", contextSnippetLength);
@@ -350,6 +356,7 @@ public class MainActivity extends AppCompatActivity {
             antiHanziStrict = sp.getBoolean("anti_hanzi_strict", true);
             autoHealOnlineEnabled = sp.getBoolean("auto_heal_online", true);
             targetLanguage = sp.getString("target_language", "Tiếng Việt");
+            polishModel = sp.getString("polish_model", "gemini-3.6-flash");
             cooldownSeconds = sp.getInt("cooldown_seconds", 60);
             rotationStrategy = sp.getString("rotation_strategy", "round-robin");
             contextSnippetLength = sp.getInt("context_snippet_len", 350);
@@ -544,7 +551,7 @@ public class MainActivity extends AppCompatActivity {
         tvSelectedModel.setPadding(0, 4, 0, 12);
         content.addView(tvSelectedModel);
 
-        String[] models = {"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-pro"};
+        String[] models = {"gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-pro"};
         LinearLayout rowM = new LinearLayout(this);
         rowM.setOrientation(LinearLayout.HORIZONTAL);
         for (String m : models) {
@@ -957,6 +964,13 @@ public class MainActivity extends AppCompatActivity {
         btnFillGaps = createButton("⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)", "#059669");
         btnFillGaps.setOnClickListener(v -> startFillGapsTranslation());
         cardProgress.addView(btnFillGaps);
+
+        View spPol = new View(this);
+        cardProgress.addView(spPol, new LinearLayout.LayoutParams(1, 10));
+
+        btnFinalPolish = createButton("✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)", "#7C3AED");
+        btnFinalPolish.setOnClickListener(v -> executeFinalGlobalPolish());
+        cardProgress.addView(btnFinalPolish);
 
         content.addView(cardProgress);
 
@@ -1924,17 +1938,123 @@ public class MainActivity extends AppCompatActivity {
                     Thread.sleep(delaySec * 1000L);
                 } catch (Exception e) {
                     mainHandler.post(() -> appendLog("❌ Lỗi chương " + (chapIndex + 1) + ": " + e.getMessage()));
-                    try { Thread.sleep(4000); } catch (Exception ignored) {}
+                    currentChapterIdx++;
+                    try { Thread.sleep(3000); } catch (Exception ignored) {}
                 }
             }
 
             mainHandler.post(() -> {
-                if (currentChapterIdx >= rangeToChap) {
+                if (currentChapterIdx >= rangeToChap || currentChapterIdx >= rawChapters.size()) {
                     isTranslating = false;
+                    isGapFillingMode = false;
                     appendLog("🎉 Đã hoàn thành khoảng chương yêu cầu!");
                     Toast.makeText(MainActivity.this, "Đã hoàn thành dịch khoảng chương!", Toast.LENGTH_LONG).show();
+
+                    // TỰ ĐỘNG KÍCH HOẠT BỘ QUÉT LÀM MƯỢT FINAL SAU KHI DỊCH XONG TOÀN BỘ CHƯƠNG CUỐI
+                    if (currentChapterIdx >= rawChapters.size() || currentChapterIdx >= rangeToChap) {
+                        appendLog("🚀 [AUTO POLISH] Đang tự động kích hoạt Bộ Quét Làm Mượt Final...");
+                        executeFinalGlobalPolish();
+                    }
                 }
             });
+        }).start();
+    }
+
+    private void executeFinalGlobalPolish() {
+        if (isPolishing) {
+            Toast.makeText(this, "Đang trong tiến trình làm mượt!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (translatedChapters.isEmpty()) {
+            Toast.makeText(this, "Chưa có bản dịch nào để làm mượt!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        appendLog("🔍 [LÀM MƯỢT FINAL] Đang quét Offline toàn bộ " + translatedChapters.size() + " chương bản dịch...");
+
+        new Thread(() -> {
+            isPolishing = true;
+            try {
+                // 1. Quét Offline phân loại 3 nhóm thông minh (Từ lai, Hán >= 2 ký tự, Hán đơn kèm ngữ cảnh)
+                HanziSweeperEngine.TriagedScanResult triagedScan = HanziSweeperEngine.scanTriagedArtifacts(translatedChapters);
+
+                if (triagedScan.isEmpty()) {
+                    mainHandler.post(() -> {
+                        appendLog("🎉 [LÀM MƯỢT FINAL] Toàn bộ bản dịch đã sạch 100% tiếng Việt, không có bất kỳ chữ Hán nào sót lại!");
+                        Toast.makeText(MainActivity.this, "🎉 Bản dịch đã sạch 100% tiếng Việt!", Toast.LENGTH_LONG).show();
+                    });
+                    isPolishing = false;
+                    return;
+                }
+
+                mainHandler.post(() -> {
+                    appendLog("⚡ [LÀM MƯỢT 3 NHÓM] Phát hiện " + triagedScan.totalUniqueCount() + " mục (Nhóm 1 Từ lai: " + triagedScan.mixedWords.size() + ", Nhóm 2 Cụm Hán: " + triagedScan.multiHanziWords.size() + ", Nhóm 3 Hán đơn kèm ngữ cảnh: " + triagedScan.singleHanziContext.size() + "). Đang gửi Batch JSON duy nhất đến model " + polishModel + "...");
+                    Toast.makeText(MainActivity.this, "Đang làm mượt " + triagedScan.totalUniqueCount() + " mục qua " + polishModel + "...", Toast.LENGTH_SHORT).show();
+                });
+
+                // 2. Tạo prompt Batch 3 nhóm
+                String batchPrompt = HanziSweeperEngine.buildTriagedPrompt(triagedScan);
+
+                // 3. Gửi 1 request duy nhất đến model chuyên biệt (Gemini 3.6 Flash / 2.5 Flash)
+                String targetPolishModel = (polishModel != null && !polishModel.isEmpty()) ? polishModel : "gemini-3.6-flash";
+
+                String[] aiResponse = engine.translateChapter(
+                        batchPrompt,
+                        null,
+                        "Bạn là chuyên gia dịch thuật tiểu thuyết và Hán Việt. Chỉ trả về JSON Object thuần túy.",
+                        Collections.emptyMap(),
+                        targetPolishModel,
+                        "Tiếng Việt",
+                        false,
+                        2,
+                        1,
+                        null,
+                        msg -> mainHandler.post(() -> appendLog(msg))
+                );
+
+                String rawJson = (aiResponse != null && aiResponse.length > 0) ? aiResponse[0] : "";
+                Map<String, String> translationMap = HanziSweeperEngine.parseJsonResponse(rawJson);
+
+                if (translationMap.isEmpty()) {
+                    mainHandler.post(() -> {
+                        appendLog("⚠️ Không trích xuất được bảng dịch từ AI. Vui lòng thử lại!");
+                        Toast.makeText(MainActivity.this, "Làm mượt không thành công, vui lòng thử lại.", Toast.LENGTH_SHORT).show();
+                    });
+                    isPolishing = false;
+                    return;
+                }
+
+                // 4. Ghi đè toàn cục (Longest Match First)
+                int replacedCount = HanziSweeperEngine.applyGlobalReplacements(translatedChapters, translationMap);
+
+                // 5. Lưu bền vững vào đĩa
+                saveCurrentProjectData();
+
+                mainHandler.post(() -> {
+                    updateProgressUI();
+                    refreshChapterListView();
+
+                    StringBuilder sbReport = new StringBuilder("✨ [HOÀN TẤT LÀM MƯỢT] Đã sửa " + translationMap.size() + " từ rác (" + replacedCount + " vị trí) trên toàn bộ tác phẩm:\n");
+                    int previewCount = Math.min(translationMap.size(), 10);
+                    int count = 0;
+                    for (Map.Entry<String, String> e : translationMap.entrySet()) {
+                        sbReport.append("[").append(e.getKey()).append(" ➔ ").append(e.getValue()).append("] ");
+                        count++;
+                        if (count >= previewCount) break;
+                    }
+                    if (translationMap.size() > 10) sbReport.append("...");
+                    appendLog(sbReport.toString());
+                    Toast.makeText(MainActivity.this, "🎉 Đã làm mượt xong " + translationMap.size() + " từ rác trên toàn bộ bản dịch!", Toast.LENGTH_LONG).show();
+                });
+
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    appendLog("❌ Lỗi trong khâu làm mượt Final: " + e.getMessage());
+                    Toast.makeText(MainActivity.this, "Lỗi làm mượt: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            } finally {
+                isPolishing = false;
+            }
         }).start();
     }
 
@@ -1999,6 +2119,13 @@ public class MainActivity extends AppCompatActivity {
             startFillGapsTranslation();
         });
         content.addView(btnFillGapsTab3);
+
+        View spPol3 = new View(this);
+        content.addView(spPol3, new LinearLayout.LayoutParams(1, 10));
+
+        btnFinalPolishTab3 = createButton("✨ Làm Mượt Toàn Văn Bản Dịch (Quét Sạch Chữ Hán)", "#7C3AED");
+        btnFinalPolishTab3.setOnClickListener(v -> executeFinalGlobalPolish());
+        content.addView(btnFinalPolishTab3);
 
         View spExp = new View(this);
         content.addView(spExp, new LinearLayout.LayoutParams(1, 14));
@@ -2808,6 +2935,40 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         });
         content.addView(btnSaveDelay);
+
+        // 5. Cấu hình Model Làm Mượt Bản Dịch Final (Global Polish Model)
+        TextView tvPolishModelTitle = new TextView(this);
+        tvPolishModelTitle.setText("5. Model Dùng Cho Khâu Làm Mượt Final:");
+        tvPolishModelTitle.setTextColor(Color.WHITE);
+        tvPolishModelTitle.setTextSize(15);
+        tvPolishModelTitle.setTypeface(null, Typeface.BOLD);
+        tvPolishModelTitle.setPadding(0, 16, 0, 0);
+        content.addView(tvPolishModelTitle);
+
+        LinearLayout cardPolishModel = createCard();
+        TextView tvCurPolishModel = new TextView(this);
+        tvCurPolishModel.setText("• Model làm mượt đang chọn: " + polishModel);
+        tvCurPolishModel.setTextColor(Color.parseColor("#C084FC"));
+        tvCurPolishModel.setPadding(0, 0, 0, 8);
+        cardPolishModel.addView(tvCurPolishModel);
+
+        String[] pModels = {"gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"};
+        LinearLayout rowPM = new LinearLayout(this);
+        rowPM.setOrientation(LinearLayout.HORIZONTAL);
+        for (String pm : pModels) {
+            String label = pm.replace("gemini-", "");
+            Button b = createButton(label, polishModel.equals(pm) ? "#7C3AED" : "#1E293B");
+            b.setOnClickListener(v -> {
+                polishModel = pm;
+                saveAllState();
+                tvCurPolishModel.setText("• Model làm mượt đang chọn: " + polishModel);
+                appendLog("⚙️ Đã đổi Model Làm Mượt Final: " + polishModel);
+                Toast.makeText(this, "Đã chọn " + pm + " cho khâu làm mượt", Toast.LENGTH_SHORT).show();
+            });
+            rowPM.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        }
+        cardPolishModel.addView(rowPM);
+        content.addView(cardPolishModel);
 
         // Xuất toàn văn tác phẩm
         Button btnExport = createButton("📥 Xuất Toàn Văn Tác Phẩm (.txt)", "#059669");

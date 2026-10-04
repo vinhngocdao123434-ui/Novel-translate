@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch tích hợp cấu trúc Android tối giản trong thư mục android/ và thiết lập GitHub Actions tự động build Debug APK, lưu Artifacts và phát hành GitHub Release khi gắn Tag.",
-  "updatedAt":  "2026-10-03T19:44:52.341606297Z",
+  "summary":  "Cập nhật kế hoạch làm rõ thuật toán quét Offline toàn diện: bóc tách cả chữ Trung đứng độc lập (như 璇, 天道) lẫn các từ Hán - Việt bị dính liền (như Ngư璇, Diệp辰), lọc trùng offline trước khi gửi API batch lên Gemini 3.6 Flash.",
+  "updatedAt":  "2026-10-04T03:51:48.069957716Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

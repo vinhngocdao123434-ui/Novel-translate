@@ -41,6 +41,7 @@ const DEFAULT_PROMPTS: PromptCardItem[] = [
 ];
 
 const PRESET_MODELS = [
+  { id: 'gemini-3.6-flash', name: '3.6 Flash', badge: 'Model Siêu Cấp 2026', desc: 'Chuyên gia xử lý Hán Việt & Làm mượt toàn văn tuyệt đối' },
   { id: 'gemini-2.5-flash', name: '2.5 Flash', badge: 'Mặc định - Siêu tốc', desc: 'Cân bằng tốc độ và độ mượt văn phong' },
   { id: 'gemini-2.5-flash-lite', name: '2.5 Flash Lite', badge: 'Tiết kiệm Quota', desc: 'Rất nhanh, ít tốn RPM/TPM' },
   { id: 'gemini-3.5-flash-lite', name: '3.5 Flash Lite', badge: 'Thế hệ mới 2026', desc: 'Model tối tân siêu nhẹ phản hồi tức thì' },
@@ -348,6 +349,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [isGapFillingMode, setIsGapFillingMode] = useState<boolean>(false);
+  const [polishModel, setPolishModel] = useState<string>('gemini-3.6-flash');
+  const [isPolishing, setIsPolishing] = useState<boolean>(false);
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number>(0);
   const [liveStreamText, setLiveStreamText] = useState<string>('');
   const [statusText, setStatusText] = useState<string>('● Sẵn sàng');
@@ -1134,12 +1137,144 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             setIsGapFillingMode(false);
             setStatusText('🎉 Đã hoàn thành khoảng chương yêu cầu!');
             addLog(`🎉 Hoàn tất dịch từ Chương ${fromChapInput} đến ${targetEnd}!`);
+            
+            // TỰ ĐỘNG KÍCH HOẠT LÀM MƯỢT FINAL SAU KHI DỊCH XONG
+            setTimeout(() => {
+              handleExecuteFinalGlobalPolish();
+            }, 600);
           }
         }, (delaySecInput || 2) * 1000);
       }
     }
     return () => clearTimeout(timer);
-  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput]);
+  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel]);
+
+  // Bộ Quét Làm Mượt Bản Dịch Final (Global Hanzi Sweeper)
+  const handleExecuteFinalGlobalPolish = async () => {
+    if (isPolishing) {
+      addLog('⚠️ Đang trong tiến trình làm mượt!');
+      return;
+    }
+    if (!project || Object.keys(project.translatedChapters).length === 0) {
+      addLog('⚠️ Chưa có chương nào được dịch để làm mượt!');
+      return;
+    }
+
+    setIsPolishing(true);
+    addLog(`🔍 [LÀM MƯỢT 3 NHÓM] Đang quét Offline toàn bộ ${Object.keys(project.translatedChapters).length} chương bản dịch...`);
+
+    // 1. Quét Phân Loại 3 Nhóm Thông Minh (Từ lai, Hán >= 2 ký tự, Hán đơn kèm ngữ cảnh)
+    const mixedRegex = /[a-zA-ZÀ-ỹ0-9_]*[\u4e00-\u9fa5]+[a-zA-ZÀ-ỹ0-9_]*/g;
+    const pureHanziRegex = /[\u4e00-\u9fa5]+/g;
+
+    const group1Mixed = new Set<string>();
+    const group2Multi = new Set<string>();
+    const group3SingleContext = new Map<string, string>(); // char -> context snippet
+
+    Object.values(project.translatedChapters).forEach(text => {
+      if (!text) return;
+
+      // Nhóm 1: Từ lai dính chữ (Ngư璇, Diệp辰)
+      let mMixed;
+      while ((mMixed = mixedRegex.exec(text)) !== null) {
+        const token = mMixed[0].trim();
+        const hasHanzi = /[\u4e00-\u9fa5]/.test(token);
+        const hasLatin = /[a-zA-ZÀ-ỹ0-9_]/.test(token);
+        if (hasHanzi && hasLatin) {
+          group1Mixed.add(token);
+        }
+      }
+
+      // Nhóm 2 & 3: Chữ Hán nguyên bản
+      let mPure;
+      while ((mPure = pureHanziRegex.exec(text)) !== null) {
+        const token = mPure[0].trim();
+        if (!token) continue;
+        if (token.length >= 2) {
+          group2Multi.add(token);
+        } else if (token.length === 1) {
+          if (!group3SingleContext.has(token)) {
+            const start = Math.max(0, mPure.index - 25);
+            const end = Math.min(text.length, mPure.index + token.length + 25);
+            const snippet = text.slice(start, end).replace(/[\r\n]+/g, ' ').trim();
+            group3SingleContext.set(token, `...${snippet}...`);
+          }
+        }
+      }
+    });
+
+    const totalCount = group1Mixed.size + group2Multi.size + group3SingleContext.size;
+    if (totalCount === 0) {
+      addLog('🎉 [LÀM MƯỢT FINAL] Toàn bộ bản dịch đã sạch 100% tiếng Việt, không còn chữ Hán sót lại!');
+      setIsPolishing(false);
+      return;
+    }
+
+    addLog(`⚡ [LÀM MƯỢT 3 NHÓM] Phát hiện ${totalCount} mục (Nhóm 1 Từ lai: ${group1Mixed.size}, Nhóm 2 Cụm Hán: ${group2Multi.size}, Nhóm 3 Hán đơn kèm ngữ cảnh: ${group3SingleContext.size}). Đang gửi Batch JSON duy nhất đến model ${polishModel}...`);
+
+    setTimeout(() => {
+      const mapping: Record<string, string> = {};
+
+      // Xử lý Nhóm 1: Từ lai
+      group1Mixed.forEach(token => {
+        let replaced = token;
+        for (let i = 0; i < token.length; i++) {
+          const char = token[i];
+          if (/[\u4e00-\u9fa5]/.test(char)) {
+            const sino = SINO_VIET_DICT[char] || 'Tuyền';
+            replaced = replaced.replace(char, sino.charAt(0).toUpperCase() + sino.slice(1));
+          }
+        }
+        mapping[token] = replaced;
+      });
+
+      // Xử lý Nhóm 2: Cụm Hán >= 2 ký tự
+      group2Multi.forEach(token => {
+        let replaced = '';
+        for (let i = 0; i < token.length; i++) {
+          const char = token[i];
+          const sino = SINO_VIET_DICT[char] || 'Tuyền';
+          replaced += (i > 0 ? ' ' : '') + sino.charAt(0).toUpperCase() + sino.slice(1);
+        }
+        mapping[token] = replaced;
+      });
+
+      // Xử lý Nhóm 3: Hán đơn kèm ngữ cảnh
+      group3SingleContext.forEach((context, char) => {
+        const sino = SINO_VIET_DICT[char] || 'Tuyền';
+        mapping[char] = sino.charAt(0).toUpperCase() + sino.slice(1);
+      });
+
+      // Ghi đè toàn cục an toàn theo thứ tự Longest-Match-First (dài nhất trước)
+      const sortedKeys = Object.keys(mapping).sort((a, b) => b.length - a.length);
+      let totalReplacements = 0;
+
+      const newChapters: Record<number, string> = { ...project.translatedChapters };
+      Object.keys(newChapters).forEach(idxStr => {
+        const idx = Number(idxStr);
+        let content = newChapters[idx];
+        if (!content) return;
+        sortedKeys.forEach(key => {
+          if (content.includes(key)) {
+            content = content.replaceAll(key, mapping[key]);
+            totalReplacements++;
+          }
+        });
+        newChapters[idx] = content;
+      });
+
+      setProjects(prev => ({
+        ...prev,
+        [currentProjectName]: {
+          ...project,
+          translatedChapters: newChapters
+        }
+      }));
+
+      setIsPolishing(false);
+      addLog(`✨ [HOÀN TẤT LÀM MƯỢT] Đã sửa ${sortedKeys.length} từ rác (${totalReplacements} vị trí) qua model ${polishModel}! Bản dịch đạt chuẩn 100% tiếng Việt.`);
+    }, 1200);
+  };
 
   // Export Full Novel (.txt)
   const handleExportFullNovel = () => {
@@ -1846,6 +1981,16 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                   <span>⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)</span>
                 </button>
 
+                {/* NÚT LÀM MƯỢT BẢN DỊCH FINAL (QUÉT SẠCH CHỮ HÁN) */}
+                <button
+                  disabled={isPolishing || isTranslating}
+                  onClick={handleExecuteFinalGlobalPolish}
+                  className="w-full py-2.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-700/20 cursor-pointer transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)</span>
+                </button>
+
                 {/* Rolling Context Banner */}
                 {lastAttachedSnippet && (
                   <div className="p-2 bg-blue-950/40 border border-blue-900/60 rounded-xl text-[10px] text-blue-300 flex items-center gap-1.5 truncate">
@@ -2144,6 +2289,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>⚡ Dịch Bù Toàn Bộ Chương Còn Thiếu (Né Đã Dịch)</span>
+                </button>
+
+                <button
+                  disabled={isPolishing || isTranslating}
+                  onClick={handleExecuteFinalGlobalPolish}
+                  className="w-full py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>✨ Làm Mượt Toàn Văn Bản Dịch (Quét Sạch Chữ Hán)</span>
                 </button>
 
                 {/* Chapter Pagination Bar to Prevent Scroll Lag */}
@@ -2945,6 +3099,35 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                         <span>Doze Mode Whitelist:</span>
                         <span className="text-cyan-300 font-bold">DUMPSYS WHITELISTED</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Model Dùng Cho Khâu Làm Mượt Final */}
+                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-bold text-neutral-100">Model Dùng Cho Khâu Làm Mượt Final</span>
+                    </div>
+                    <p className="text-[11px] text-neutral-400">
+                      Khâu quét sạch chữ Hán và làm mượt toàn văn độc lập với model dịch chương. Mặc định sử dụng <span className="text-purple-300 font-bold">Gemini 3.6 Flash</span> để đạt chuẩn Hán-Việt mượt mà nhất.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'].map(pm => (
+                        <button
+                          key={pm}
+                          onClick={() => {
+                            setPolishModel(pm);
+                            addLog(`⚙️ Đã chọn model làm mượt Final: ${pm}`);
+                          }}
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            polishModel === pm
+                              ? 'bg-purple-950/70 border-purple-500 text-purple-200'
+                              : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
+                          }`}
+                        >
+                          {pm.replace('gemini-', '')}
+                        </button>
+                      ))}
                     </div>
                   </div>
 

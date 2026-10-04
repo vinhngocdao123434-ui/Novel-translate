@@ -1,59 +1,109 @@
-# Kế Hoạch Triển Khai: Tự Động Build APK Qua GitHub Actions
+# Kế Hoạch Kiến Trúc: Bộ Quét Làm Mượt Bản Dịch Final & Quét Sạch Chữ Hán Rác (Final Global Polish & Sweeper)
 
-Dựa trên phản hồi của bạn, chúng ta sẽ thiết lập một quy trình CI/CD hoàn chỉnh và tối giản nhất trong repo, đảm bảo **100% không bị lỗi build môi trường trên GitHub** khi bạn push mã nguồn lên.
-
----
-
-## 1. Mục Tiêu & Tiêu Chí Tối Giản (Zero-Build-Error)
-- **Cấu trúc độc lập:** Đặt toàn bộ mã nguồn Android sạch vào thư mục `android/`, tách biệt với ứng dụng Web hiện tại.
-- **Không cần Keystore:** Build trực tiếp `assembleDebug`, sinh ra file `app-debug.apk` có thể cài đặt ngay lập tức trên mọi thiết bị Android mà không cần tạo hay cấu hình Secret Keystore trên GitHub.
-- **Gradle Wrapper chuẩn:** Cung cấp đầy đủ `gradlew`, `gradlew.bat` và `gradle-wrapper.properties` (Gradle 8.2) để GitHub runner tự động tải đúng bản Gradle tương thích, không phụ thuộc vào môi trường máy local.
-- **Tương thích Java 17 & Android SDK 34 (Android 14/15/16):** Cấu hình tương thích chuẩn với runner `ubuntu-latest`.
+Bản kế hoạch thiết kế và kiến trúc hoàn chỉnh cho tính năng **Làm Mượt Toàn Bộ Bản Dịch Cuối Cùng (Global Hanzi Sweeper)**, sử dụng thuật toán quét Offline chuyên sâu để bóc tách cả chữ Trung đứng độc lập lẫn từ dính Hán - Việt, lọc trùng và dịch thay thế đồng bộ 100%.
 
 ---
 
-## 2. Các Thành Phần Sẽ Được Tạo & Cấu Hình
+## User Review & Critical Decisions
 
-### A. Cấu trúc Android tối giản (`android/`)
-1. **`android/gradle/wrapper/gradle-wrapper.properties`:** Cấu hình Gradle `8.2-bin`.
-2. **`android/gradlew` & `android/gradlew.bat`:** Tệp script thực thi Gradle (được cấp quyền `chmod +x`).
-3. **`android/gradle.properties`:** Cấu hình cấp phát bộ nhớ JVM (`-Xmx2048m`) và bật `android.useAndroidX=true`.
-4. **`android/settings.gradle`:** Khai báo project `:app` và repository `google()`, `mavenCentral()`.
-5. **`android/build.gradle`:** Cấu hình Android Gradle Plugin `8.2.2`.
-6. **`android/app/build.gradle`:** 
-   - `compileSdk 34`, `minSdk 26`, `targetSdk 34`
-   - Chỉ thêm các thư viện tối thiểu cần thiết đã được kiểm chứng: `androidx.appcompat`, `material`, `okhttp3`, `gson`, `androidx.work:work-runtime`.
-7. **`android/app/src/main/AndroidManifest.xml`:** Khai báo quyền chạy nền God-Mode, Foreground Service và Activity chính.
-8. **Mã nguồn Java:** Đưa toàn bộ 9 tệp Java đã được kiểm định cú pháp 0 lỗi sang `android/app/src/main/java/com/droidtranslator/app/`:
-   - `MainActivity.java`
-   - `GeminiEngine.java`
-   - `ChapterAuditor.java`
-   - `SinoVietnameseDictionary.java`
-   - `GlossaryManager.java`
-   - `TranslationForegroundService.java`
-   - `RootController.java`
-   - `ApiKeyItem.java`
-   - `PromptCardItem.java`
-9. **Resources:** Biểu tượng Vector Adaptive Icon (`ic_launcher_foreground.xml`), `strings.xml`, `colors.xml`, `themes.xml`.
+> [!IMPORTANT]
+> **Các tiêu chuẩn xử lý cốt lõi được cập nhật theo phản hồi của người dùng:**
+> 1. **Thuật toán quét Offline toàn diện 2 tầng (Dual-Pattern Offline Scanner)**:
+>    - **Tầng 1 (Chữ Trung đứng độc lập)**: Gom các cụm chữ Hán nguyên bản chưa được dịch (ví dụ: `璇`, `天道`, `玄冥`, `仙帝`,...).
+>    - **Tầng 2 (Từ lai Hán - Việt bị dính chữ)**: Gom các từ bị dính chữ Việt và chữ Trung cạnh nhau (ví dụ: `Ngư璇`, `Diệp辰`, `Hàn宗`, `Tiêu 炎`, `Lăng 霄`,...).
+>    - Toàn bộ quá trình quét và lọc trùng (Deduplication) chạy hoàn toàn **Offline** trên bộ nhớ máy trước khi gọi bất kỳ API nào.
+> 2. **Cơ chế kích hoạt kép (Dual Trigger)**: Tự động chạy sau khi chương cuối hoàn thành, và có nút bấm thủ công `✨ Làm Mượt Bản Dịch Final` ở Thẻ 2 & Thẻ 3.
+> 3. **Chính sách từ điển**: Chỉ thay thế trực tiếp vào nội dung các chương truyện, không tự động nạp các từ rác vào Master Glossary.
+> 4. **Model AI chuyên biệt**: Cho phép chọn model làm mượt độc lập, bổ sung **Gemini 3.6 Flash** vào danh mục model.
 
 ---
 
-### B. Quy trình GitHub Actions CI/CD (`.github/workflows/build-apk.yml`)
-Workflow chạy trên `ubuntu-latest` với các bước:
-1. **Trigger:** Kích hoạt tự động khi:
-   - `push` lên bất kỳ nhánh nào (bao gồm `main`, `master`).
-   - `push tags` dạng `v*` (ví dụ: `v1.0.0`).
-   - Cho phép kích hoạt thủ công từ giao diện GitHub qua `workflow_dispatch`.
-2. **Setup JDK 17:** Sử dụng `actions/setup-java@v4` với distribution Temurin ổn định nhất.
-3. **Gradle Cache:** Tích hợp `gradle/actions/setup-gradle@v4` để tăng tốc độ build các lần sau.
-4. **Quyền thực thi:** Chạy `chmod +x android/gradlew`.
-5. **Biên dịch:** Chạy `./gradlew assembleDebug --no-daemon --stacktrace`.
-6. **Lưu Artifacts:** Upload file APK đã build thành công lên GitHub Actions Artifacts với tên `DroidTranslator-Debug-APK` (thời hạn lưu trữ 30 ngày).
-7. **Tạo GitHub Release (khi có Tag):** Khi bạn tạo Git tag (vd: `git tag v1.0.0 && git push origin v1.0.0`), action sẽ tự động tạo một GitHub Release và đính kèm trực tiếp file `.apk` vào Release để bạn tải về từ điện thoại.
+## 1. Overview & Core Concept
+
+* **Mục tiêu**: Đảm bảo bản dịch cuối cùng đạt độ sạch 100% tiếng Việt, loại bỏ hoàn toàn mọi tàn dư chữ Hán mà không làm mất ngữ cảnh.
+* **Quy trình xử lý 3 giai đoạn (Offline Filter $\rightarrow$ Single AI Batch $\rightarrow$ Global Longest-First Overwrite)**:
+  1. **Quét & Phân Loại Offline**:
+     - Sử dụng Regex kết hợp: `[\u4e00-\u9fa5]+` (chữ Hán độc lập) và `[a-zA-ZÀ-ỹ0-9_]*[\u4e00-\u9fa5]+[a-zA-ZÀ-ỹ0-9_]*` (từ lai Hán - Việt).
+     - Lọc trùng để đưa về tập hợp danh sách các từ duy nhất (Unique List).
+     - *Nếu danh sách trống*: Báo ngay *"🎉 Bản dịch đã sạch 100% tiếng Việt, không có chữ Hán rác!"* mà không tốn một lượt gọi API nào.
+  2. **Đóng Gói 1 Request Gửi Gemini 3.6 Flash**:
+     - Gửi toàn bộ danh sách từ cần làm mượt dưới dạng Batch JSON sang Gemini 3.6 Flash.
+     - AI trả về định dạng chuẩn: `{"Ngư璇": "Ngư Tuyền", "璇": "Tuyền", "Diệp辰": "Diệp Thần"}`.
+  3. **Ghi Đè Toàn Cục An Toàn (Longest Match First)**:
+     - Sắp xếp các cụm từ theo độ dài ký tự giảm dần để thay thế các cụm từ dài trước, tránh nuốt ký tự hoặc xung đột chuỗi con.
+     - Cập nhật toàn bộ các chương trong RAM và ghi đĩa bền vững.
 
 ---
 
-## 3. Các Bước Xác Minh
-1. Kiểm tra quyền thực thi của `android/gradlew`.
-2. Kiểm tra tính toàn vẹn cú pháp của các tệp Gradle và Manifest.
-3. Chạy `compile_applet` và `lint_applet` để bảo đảm ứng dụng Web và trình xem mã nguồn vẫn hoạt động trơn tru 100%.
+## 2. Trải Nghiệm Người Dùng (UX) & Thiết Kế Giao Diện
+
+### A. Vị trí các Nút Điều Khiển
+1. **Thẻ 2 (DỊCH & TỪ ĐIỂN)**:
+   - Nút màu tím thạch anh nổi bật: **`✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)`** nằm ngay bên dưới cụm nút Dịch Range và Dịch Bù.
+2. **Thẻ 3 (BẢN DỊCH & ĐỌC)**:
+   - Nút **`✨ Làm Mượt Toàn Văn Bản Dịch`** đặt cạnh nút Xuất Toàn Văn `.txt`.
+3. **Thẻ 1 & Thẻ 4 (CÀI ĐẶT / KEY)**:
+   - Bổ sung tùy chọn model `gemini-3.6-flash`.
+   - Mục chọn **"Model Dùng Cho Khâu Làm Mượt Final"** (mặc định: `gemini-3.6-flash`).
+
+### B. Luồng Trải Nghiệm Chi Tiết (User Flow)
+```
+[Dịch Xong Chương Cuối HOẶC Bấm Nút 'Làm Mượt Final']
+                      │
+                      ▼
+[Quét Offline 100%]: Thuật toán rà soát toàn bộ các chương trong 0.05s
+                      │
+        ┌─────────────┴─────────────┐
+        ▼                           ▼
+[Không phát hiện chữ Hán]    [Phát hiện 28 cụm từ Hán/Dính Hán]
+        │                           │
+        ▼                           ▼
+"🎉 Bản dịch sạch 100%!"     [Gửi 1 lượt API đến Gemini 3.6 Flash]
+                                    │
+                                    ▼
+                             [Nhận kết quả JSON chuẩn xác]
+                                    │
+                                    ▼
+                             [Thay thế Longest-First trên toàn bộ chương]
+                                    │
+                                    ▼
+                             "✅ Đã làm mượt xong 28 từ rác trên 300 chương!"
+```
+
+---
+
+## 3. Kiến Trúc Kỹ Thuật & Sơ Đồ Hệ Thống
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    DROIDTRANSLATOR OFFLINE SCANNER                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  [Toàn bộ bản dịch các chương]                                          │
+│                │                                                        │
+│                ├──► Pattern 1: Chữ Hán độc lập (璇, 天道, 仙帝...)       │
+│                │                                                        │
+│                └──► Pattern 2: Từ lai dính chữ (Ngư璇, Diệp辰, Hàn宗...) │
+│                                                                         │
+│                ▼                                                        │
+│  [Tập Hợp Lọc Trùng Duy Nhất (Offline Deduplicated Set)]                │
+│                                                                         │
+│                ▼ (Chỉ 1 Request Batch JSON)                             │
+│  [Gemini 3.6 Flash Engine] ──► Dịch chuẩn Hán Việt / Ngữ cảnh tiểu thuyết│
+│                                                                         │
+│                ▼ (JSON Mapping)                                         │
+│  [Global Longest-First Replacer] ──► Ghi đè vào các chương & Lưu đĩa   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Kế Hoạch Triển Khai (Khi Được Phê Duyệt)
+
+1. **Thêm Model Gemini 3.6 Flash**: Cập nhật danh sách model ở Thẻ 1 và Thẻ 4.
+2. **Cài Đặt Bộ Quét Offline `HanziSweeperEngine`**:
+   - Hàm `scanNovelForHanziArtifacts()`: Tự động lọc cả chữ Hán độc lập và từ dính lai Hán-Việt.
+   - Hàm `polishHanziBatchWithGemini()`: Đóng gói prompt gửi model làm mượt.
+   - Hàm `applyGlobalReplacementsLongestFirst()`: Thực hiện thay thế dài nhất trước.
+3. **Gắn Trigger Tự Động & Nút Bấm Giao Diện**: Kích hoạt khi chương cuối kết thúc và khi nhấn nút tại Thẻ 2 / Thẻ 3.

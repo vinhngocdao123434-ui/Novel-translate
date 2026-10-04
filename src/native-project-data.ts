@@ -1174,6 +1174,238 @@ public class TranslationForegroundService extends Service {
 `
   },
   {
+    path: 'app/src/main/java/com/droidtranslator/app/engine/HanziSweeperEngine.java',
+    language: 'java',
+    description: 'Bộ Quét Làm Mượt Final & Diệt Sạch Chữ Hán Rác (Global Hanzi Sweeper Engine)',
+    content: `package com.droidtranslator.app.engine;
+
+import com.droidtranslator.app.GeminiEngine;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * HanziSweeperEngine: Bộ quét Thông Minh 3 Nhóm (Phân Luồng Rác & Neo Ngữ Cảnh)
+ * - Nhóm 1: Từ lai dính chữ Hán (Ngư璇, Diệp辰, Hàn宗)
+ * - Nhóm 2: Cụm chữ Hán từ 2 ký tự trở lên (天道, 玄冥, 仙帝)
+ * - Nhóm 3: Chữ Hán đơn độc lập (璇, 辰, 宗) kèm neo ngữ cảnh 3-5 từ xung quanh
+ * Ghi đè toàn cục theo nguyên tắc Longest-Match-First để chống nhầm lẫn tuyệt đối.
+ */
+public class HanziSweeperEngine {
+
+    public static class TriagedScanResult {
+        public final Set<String> mixedWords = new LinkedHashSet<>();          // Nhóm 1
+        public final Set<String> multiHanziWords = new LinkedHashSet<>();      // Nhóm 2
+        public final Map<String, String> singleHanziContext = new LinkedHashMap<>(); // Nhóm 3: char -> context snippet
+
+        public boolean isEmpty() {
+            return mixedWords.isEmpty() && multiHanziWords.isEmpty() && singleHanziContext.isEmpty();
+        }
+
+        public int totalUniqueCount() {
+            return mixedWords.size() + multiHanziWords.size() + singleHanziContext.size();
+        }
+    }
+
+    private static final Pattern MIXED_TOKEN_PATTERN = Pattern.compile("[a-zA-ZÀ-ỹ0-9_]*[\\u4e00-\\u9fa5]+[a-zA-ZÀ-ỹ0-9_]*");
+    private static final Pattern PURE_HANZI_PATTERN = Pattern.compile("[\\u4e00-\\u9fa5]+");
+
+    /**
+     * Quét phân loại 3 nhóm thông minh trên toàn bộ các chương đã dịch
+     */
+    public static TriagedScanResult scanTriagedArtifacts(Map<Integer, String> chapters) {
+        TriagedScanResult result = new TriagedScanResult();
+        if (chapters == null || chapters.isEmpty()) {
+            return result;
+        }
+
+        for (Map.Entry<Integer, String> entry : chapters.entrySet()) {
+            String text = entry.getValue();
+            if (text == null || text.trim().isEmpty()) continue;
+
+            // 1. Quét Nhóm 1: Từ lai dính Hán - Việt (VD: Ngư璇, Diệp辰, Hàn宗)
+            Matcher mixedMatcher = MIXED_TOKEN_PATTERN.matcher(text);
+            while (mixedMatcher.find()) {
+                String token = mixedMatcher.group().trim();
+                if (isMixedWord(token)) {
+                    result.mixedWords.add(token);
+                }
+            }
+
+            // 2. Quét Nhóm 2 & Nhóm 3: Chữ Hán nguyên bản
+            Matcher pureMatcher = PURE_HANZI_PATTERN.matcher(text);
+            while (pureMatcher.find()) {
+                String token = pureMatcher.group().trim();
+                if (token.isEmpty()) continue;
+
+                if (token.length() >= 2) {
+                    // Nhóm 2: Cụm Hán từ 2 ký tự trở lên (VD: 天道, 大罗金仙)
+                    result.multiHanziWords.add(token);
+                } else if (token.length() == 1) {
+                    // Nhóm 3: Chữ Hán đơn độc lập (VD: 璇) -> Cắt neo ngữ cảnh xung quanh
+                    String singleChar = token;
+                    if (!result.singleHanziContext.containsKey(singleChar)) {
+                        int start = Math.max(0, pureMatcher.start() - 25);
+                        int end = Math.min(text.length(), pureMatcher.end() + 25);
+                        String rawSnippet = text.substring(start, end).replace('\\n', ' ').replace('\\r', ' ').trim();
+                        result.singleHanziContext.put(singleChar, "..." + rawSnippet + "...");
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static boolean isMixedWord(String s) {
+        if (s == null || s.length() <= 1) return false;
+        boolean hasHanzi = false;
+        boolean hasLatinOrDigit = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 0x4E00 && c <= 0x9FA5) {
+                hasHanzi = true;
+            } else if (Character.isLetterOrDigit(c)) {
+                hasLatinOrDigit = true;
+            }
+        }
+        return hasHanzi && hasLatinOrDigit;
+    }
+
+    /**
+     * Đóng gói prompt 3 nhóm rõ ràng gửi đến Gemini Flash
+     */
+    public static String buildTriagedPrompt(TriagedScanResult scan) {
+        Gson gson = new Gson();
+
+        JsonObject rootObj = new JsonObject();
+
+        // Nhóm 1: Từ lai
+        JsonArray arrMixed = new JsonArray();
+        for (String w : scan.mixedWords) arrMixed.add(w);
+        rootObj.add("nhom_1_tu_lai_dinh_chu", arrMixed);
+
+        // Nhóm 2: Hán từ 2 ký tự trở lên
+        JsonArray arrMulti = new JsonArray();
+        for (String w : scan.multiHanziWords) arrMulti.add(w);
+        rootObj.add("nhom_2_cum_han_tu_2_ky_tu", arrMulti);
+
+        // Nhóm 3: Hán đơn kèm ngữ cảnh
+        JsonArray arrSingle = new JsonArray();
+        for (Map.Entry<String, String> e : scan.singleHanziContext.entrySet()) {
+            JsonObject item = new JsonObject();
+            item.addProperty("target", e.getKey());
+            item.addProperty("context", e.getValue());
+            arrSingle.add(item);
+        }
+        rootObj.add("nhom_3_han_don_kem_ngu_canh", arrSingle);
+
+        return "Bạn là chuyên gia dịch thuật tiểu thuyết Trung - Việt và Hán Việt thượng thừa.\\n"
+                + "Dưới đây là danh sách các từ sót chữ Hán được phân làm 3 nhóm:\\n"
+                + "- Nhóm 1 (Từ lai dính chữ): Dịch trọn vẹn cả từ sang tiếng Việt thuần (VD: 'Ngư璇' -> 'Ngư Tuyền', 'Diệp辰' -> 'Diệp Thần').\\n"
+                + "- Nhóm 2 (Cụm Hán >= 2 chữ): Dịch chuẩn âm Hán Việt (VD: '天道' -> 'Thiên Đạo', '玄冥' -> 'Huyền Minh').\\n"
+                + "- Nhóm 3 (Chữ Hán 1 ký tự kèm ngữ cảnh): ĐỌC KỸ NGỮ CẢNH CÂU để dịch chữ Hán đơn đó thành 1 từ tiếng Việt chuẩn xác nhất (VD: target '璇' trong ngữ cảnh kiếm -> dịch là 'Tuyền').\\n\\n"
+                + "BẮT BUỘC: Trả về DUY NHẤT một JSON Object phẳng (không lồng nhóm, không bọc \`\`\`json thừa) chứa ánh xạ trực tiếp:\\n"
+                + "{\\n"
+                + "  \\"từ_gốc_cần_thay_thế\\": \\"bản_dịch_chuẩn_tiếng_việt\\",\\n"
+                + "  \\"Ngư璇\\": \\"Ngư Tuyền\\",\\n"
+                + "  \\"天道\\": \\"Thiên Đạo\\",\\n"
+                + "  \\"璇\\": \\"Tuyền\\"\\n"
+                + "}\\n\\n"
+                + "Dữ liệu đầu vào 3 nhóm:\\n"
+                + gson.toJson(rootObj);
+    }
+
+    /**
+     * Bóc tách phản hồi JSON từ AI thành Map<String, String>.
+     */
+    public static Map<String, String> parseJsonResponse(String rawResponse) {
+        Map<String, String> result = new LinkedHashMap<>();
+        if (rawResponse == null || rawResponse.trim().isEmpty()) {
+            return result;
+        }
+
+        String clean = rawResponse.trim();
+        if (clean.startsWith("\`\`\`")) {
+            int firstNl = clean.indexOf('\\n');
+            if (firstNl != -1) clean = clean.substring(firstNl + 1);
+            if (clean.endsWith("\`\`\`")) {
+                clean = clean.substring(0, clean.length() - 3).trim();
+            }
+        }
+
+        try {
+            Gson gson = new Gson();
+            JsonObject obj = gson.fromJson(clean, JsonObject.class);
+            if (obj != null) {
+                for (Map.Entry<String, JsonElement> entry : obj.entrySet()) {
+                    String k = entry.getKey().trim();
+                    String v = entry.getValue().getAsString().trim();
+                    if (!k.isEmpty() && !v.isEmpty() && !k.equals(v)) {
+                        result.put(k, v);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            Pattern linePat = Pattern.compile("\\"([^\\"]+)\\"[ \\t]*:[ \\t]*\\"([^\\"]+)\\"");
+            Matcher m = linePat.matcher(clean);
+            while (m.find()) {
+                String k = m.group(1).trim();
+                String v = m.group(2).trim();
+                if (!k.isEmpty() && !v.isEmpty() && !k.equals(v)) {
+                    result.put(k, v);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Ghi đè toàn cục an toàn (Longest-Match-First):
+     * Cụm từ dài (Nhóm 1 và Nhóm 2) được thay thế trước -> Chữ đơn (Nhóm 3) được thay thế sau cùng.
+     * Chống 100% hiện tượng nuốt chữ, trùng lặp hay ghi đè sai vị trí.
+     */
+    public static int applyGlobalReplacements(Map<Integer, String> chapters, Map<String, String> translationMap) {
+        if (chapters == null || chapters.isEmpty() || translationMap == null || translationMap.isEmpty()) {
+            return 0;
+        }
+
+        // Sắp xếp các cụm từ theo độ dài GIẢM DẦN
+        List<String> sortedKeys = new ArrayList<>(translationMap.keySet());
+        sortedKeys.sort((a, b) -> Integer.compare(b.length(), a.length()));
+
+        int replacedCount = 0;
+
+        for (Map.Entry<Integer, String> entry : chapters.entrySet()) {
+            String originalText = entry.getValue();
+            if (originalText == null || originalText.isEmpty()) continue;
+
+            String updatedText = originalText;
+            for (String key : sortedKeys) {
+                String replacement = translationMap.get(key);
+                if (replacement != null && !replacement.isEmpty() && updatedText.contains(key)) {
+                    updatedText = updatedText.replace(key, replacement);
+                    replacedCount++;
+                }
+            }
+
+            if (!updatedText.equals(originalText)) {
+                entry.setValue(updatedText);
+            }
+        }
+
+        return replacedCount;
+    }
+}
+`
+  },
+  {
     path: 'app/src/main/java/com/droidtranslator/app/engine/RootController.java',
     language: 'java',
     description: 'Thực thi quyền Root đặt OOM Score -1000 bảo vệ tiến trình bất tử',
@@ -1240,6 +1472,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import com.droidtranslator.app.engine.HanziSweeperEngine;
 import com.droidtranslator.app.engine.RootController;
 import com.droidtranslator.app.model.ApiKeyItem;
 import com.droidtranslator.app.model.PromptCardItem;
@@ -1318,8 +1551,10 @@ public class MainActivity extends AppCompatActivity {
     private int contextSnippetLength = 350;
 
     private String currentModel = "gemini-2.5-flash";
+    private String polishModel = "gemini-3.6-flash";
     private boolean isTranslating = false;
     private boolean isPaused = false;
+    private boolean isPolishing = false;
     private int currentChapterIdx = 0;
     private int rangeFromChap = 1;
     private int rangeToChap = 1;
@@ -1348,6 +1583,8 @@ public class MainActivity extends AppCompatActivity {
     private Button btnCancelTrans;
     private Button btnFillGaps;
     private Button btnFillGapsTab3;
+    private Button btnFinalPolish;
+    private Button btnFinalPolishTab3;
     private boolean isGapFillingMode = false;
     private EditText edtRawText;
     private EditText edtChunkSize;
@@ -1435,6 +1672,7 @@ public class MainActivity extends AppCompatActivity {
             editor.putBoolean("anti_hanzi_strict", antiHanziStrict);
             editor.putBoolean("auto_heal_online", autoHealOnlineEnabled);
             editor.putString("target_language", targetLanguage);
+            editor.putString("polish_model", polishModel);
             editor.putInt("cooldown_seconds", cooldownSeconds);
             editor.putString("rotation_strategy", rotationStrategy);
             editor.putInt("context_snippet_len", contextSnippetLength);
@@ -1572,6 +1810,7 @@ public class MainActivity extends AppCompatActivity {
             antiHanziStrict = sp.getBoolean("anti_hanzi_strict", true);
             autoHealOnlineEnabled = sp.getBoolean("auto_heal_online", true);
             targetLanguage = sp.getString("target_language", "Tiếng Việt");
+            polishModel = sp.getString("polish_model", "gemini-3.6-flash");
             cooldownSeconds = sp.getInt("cooldown_seconds", 60);
             rotationStrategy = sp.getString("rotation_strategy", "round-robin");
             contextSnippetLength = sp.getInt("context_snippet_len", 350);
@@ -1766,7 +2005,7 @@ public class MainActivity extends AppCompatActivity {
         tvSelectedModel.setPadding(0, 4, 0, 12);
         content.addView(tvSelectedModel);
 
-        String[] models = {"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-pro"};
+        String[] models = {"gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-pro"};
         LinearLayout rowM = new LinearLayout(this);
         rowM.setOrientation(LinearLayout.HORIZONTAL);
         for (String m : models) {
@@ -2179,6 +2418,13 @@ public class MainActivity extends AppCompatActivity {
         btnFillGaps = createButton("⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)", "#059669");
         btnFillGaps.setOnClickListener(v -> startFillGapsTranslation());
         cardProgress.addView(btnFillGaps);
+
+        View spPol = new View(this);
+        cardProgress.addView(spPol, new LinearLayout.LayoutParams(1, 10));
+
+        btnFinalPolish = createButton("✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)", "#7C3AED");
+        btnFinalPolish.setOnClickListener(v -> executeFinalGlobalPolish());
+        cardProgress.addView(btnFinalPolish);
 
         content.addView(cardProgress);
 
@@ -3146,17 +3392,123 @@ public class MainActivity extends AppCompatActivity {
                     Thread.sleep(delaySec * 1000L);
                 } catch (Exception e) {
                     mainHandler.post(() -> appendLog("❌ Lỗi chương " + (chapIndex + 1) + ": " + e.getMessage()));
-                    try { Thread.sleep(4000); } catch (Exception ignored) {}
+                    currentChapterIdx++;
+                    try { Thread.sleep(3000); } catch (Exception ignored) {}
                 }
             }
 
             mainHandler.post(() -> {
-                if (currentChapterIdx >= rangeToChap) {
+                if (currentChapterIdx >= rangeToChap || currentChapterIdx >= rawChapters.size()) {
                     isTranslating = false;
+                    isGapFillingMode = false;
                     appendLog("🎉 Đã hoàn thành khoảng chương yêu cầu!");
                     Toast.makeText(MainActivity.this, "Đã hoàn thành dịch khoảng chương!", Toast.LENGTH_LONG).show();
+
+                    // TỰ ĐỘNG KÍCH HOẠT BỘ QUÉT LÀM MƯỢT FINAL SAU KHI DỊCH XONG TOÀN BỘ CHƯƠNG CUỐI
+                    if (currentChapterIdx >= rawChapters.size() || currentChapterIdx >= rangeToChap) {
+                        appendLog("🚀 [AUTO POLISH] Đang tự động kích hoạt Bộ Quét Làm Mượt Final...");
+                        executeFinalGlobalPolish();
+                    }
                 }
             });
+        }).start();
+    }
+
+    private void executeFinalGlobalPolish() {
+        if (isPolishing) {
+            Toast.makeText(this, "Đang trong tiến trình làm mượt!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (translatedChapters.isEmpty()) {
+            Toast.makeText(this, "Chưa có bản dịch nào để làm mượt!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        appendLog("🔍 [LÀM MƯỢT FINAL] Đang quét Offline toàn bộ " + translatedChapters.size() + " chương bản dịch...");
+
+        new Thread(() -> {
+            isPolishing = true;
+            try {
+                // 1. Quét Offline phân loại 3 nhóm thông minh (Từ lai, Hán >= 2 ký tự, Hán đơn kèm ngữ cảnh)
+                HanziSweeperEngine.TriagedScanResult triagedScan = HanziSweeperEngine.scanTriagedArtifacts(translatedChapters);
+
+                if (triagedScan.isEmpty()) {
+                    mainHandler.post(() -> {
+                        appendLog("🎉 [LÀM MƯỢT FINAL] Toàn bộ bản dịch đã sạch 100% tiếng Việt, không có bất kỳ chữ Hán nào sót lại!");
+                        Toast.makeText(MainActivity.this, "🎉 Bản dịch đã sạch 100% tiếng Việt!", Toast.LENGTH_LONG).show();
+                    });
+                    isPolishing = false;
+                    return;
+                }
+
+                mainHandler.post(() -> {
+                    appendLog("⚡ [LÀM MƯỢT 3 NHÓM] Phát hiện " + triagedScan.totalUniqueCount() + " mục (Nhóm 1 Từ lai: " + triagedScan.mixedWords.size() + ", Nhóm 2 Cụm Hán: " + triagedScan.multiHanziWords.size() + ", Nhóm 3 Hán đơn kèm ngữ cảnh: " + triagedScan.singleHanziContext.size() + "). Đang gửi Batch JSON duy nhất đến model " + polishModel + "...");
+                    Toast.makeText(MainActivity.this, "Đang làm mượt " + triagedScan.totalUniqueCount() + " mục qua " + polishModel + "...", Toast.LENGTH_SHORT).show();
+                });
+
+                // 2. Tạo prompt Batch 3 nhóm
+                String batchPrompt = HanziSweeperEngine.buildTriagedPrompt(triagedScan);
+
+                // 3. Gửi 1 request duy nhất đến model chuyên biệt (Gemini 3.6 Flash / 2.5 Flash)
+                String targetPolishModel = (polishModel != null && !polishModel.isEmpty()) ? polishModel : "gemini-3.6-flash";
+
+                String[] aiResponse = engine.translateChapter(
+                        batchPrompt,
+                        null,
+                        "Bạn là chuyên gia dịch thuật tiểu thuyết và Hán Việt. Chỉ trả về JSON Object thuần túy.",
+                        Collections.emptyMap(),
+                        targetPolishModel,
+                        "Tiếng Việt",
+                        false,
+                        2,
+                        1,
+                        null,
+                        msg -> mainHandler.post(() -> appendLog(msg))
+                );
+
+                String rawJson = (aiResponse != null && aiResponse.length > 0) ? aiResponse[0] : "";
+                Map<String, String> translationMap = HanziSweeperEngine.parseJsonResponse(rawJson);
+
+                if (translationMap.isEmpty()) {
+                    mainHandler.post(() -> {
+                        appendLog("⚠️ Không trích xuất được bảng dịch từ AI. Vui lòng thử lại!");
+                        Toast.makeText(MainActivity.this, "Làm mượt không thành công, vui lòng thử lại.", Toast.LENGTH_SHORT).show();
+                    });
+                    isPolishing = false;
+                    return;
+                }
+
+                // 4. Ghi đè toàn cục (Longest Match First)
+                int replacedCount = HanziSweeperEngine.applyGlobalReplacements(translatedChapters, translationMap);
+
+                // 5. Lưu bền vững vào đĩa
+                saveCurrentProjectData();
+
+                mainHandler.post(() -> {
+                    updateProgressUI();
+                    refreshChapterListView();
+
+                    StringBuilder sbReport = new StringBuilder("✨ [HOÀN TẤT LÀM MƯỢT] Đã sửa " + translationMap.size() + " từ rác (" + replacedCount + " vị trí) trên toàn bộ tác phẩm:\\n");
+                    int previewCount = Math.min(translationMap.size(), 10);
+                    int count = 0;
+                    for (Map.Entry<String, String> e : translationMap.entrySet()) {
+                        sbReport.append("[").append(e.getKey()).append(" ➔ ").append(e.getValue()).append("] ");
+                        count++;
+                        if (count >= previewCount) break;
+                    }
+                    if (translationMap.size() > 10) sbReport.append("...");
+                    appendLog(sbReport.toString());
+                    Toast.makeText(MainActivity.this, "🎉 Đã làm mượt xong " + translationMap.size() + " từ rác trên toàn bộ bản dịch!", Toast.LENGTH_LONG).show();
+                });
+
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    appendLog("❌ Lỗi trong khâu làm mượt Final: " + e.getMessage());
+                    Toast.makeText(MainActivity.this, "Lỗi làm mượt: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            } finally {
+                isPolishing = false;
+            }
         }).start();
     }
 
@@ -3221,6 +3573,13 @@ public class MainActivity extends AppCompatActivity {
             startFillGapsTranslation();
         });
         content.addView(btnFillGapsTab3);
+
+        View spPol3 = new View(this);
+        content.addView(spPol3, new LinearLayout.LayoutParams(1, 10));
+
+        btnFinalPolishTab3 = createButton("✨ Làm Mượt Toàn Văn Bản Dịch (Quét Sạch Chữ Hán)", "#7C3AED");
+        btnFinalPolishTab3.setOnClickListener(v -> executeFinalGlobalPolish());
+        content.addView(btnFinalPolishTab3);
 
         View spExp = new View(this);
         content.addView(spExp, new LinearLayout.LayoutParams(1, 14));
@@ -4030,6 +4389,40 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
         });
         content.addView(btnSaveDelay);
+
+        // 5. Cấu hình Model Làm Mượt Bản Dịch Final (Global Polish Model)
+        TextView tvPolishModelTitle = new TextView(this);
+        tvPolishModelTitle.setText("5. Model Dùng Cho Khâu Làm Mượt Final:");
+        tvPolishModelTitle.setTextColor(Color.WHITE);
+        tvPolishModelTitle.setTextSize(15);
+        tvPolishModelTitle.setTypeface(null, Typeface.BOLD);
+        tvPolishModelTitle.setPadding(0, 16, 0, 0);
+        content.addView(tvPolishModelTitle);
+
+        LinearLayout cardPolishModel = createCard();
+        TextView tvCurPolishModel = new TextView(this);
+        tvCurPolishModel.setText("• Model làm mượt đang chọn: " + polishModel);
+        tvCurPolishModel.setTextColor(Color.parseColor("#C084FC"));
+        tvCurPolishModel.setPadding(0, 0, 0, 8);
+        cardPolishModel.addView(tvCurPolishModel);
+
+        String[] pModels = {"gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"};
+        LinearLayout rowPM = new LinearLayout(this);
+        rowPM.setOrientation(LinearLayout.HORIZONTAL);
+        for (String pm : pModels) {
+            String label = pm.replace("gemini-", "");
+            Button b = createButton(label, polishModel.equals(pm) ? "#7C3AED" : "#1E293B");
+            b.setOnClickListener(v -> {
+                polishModel = pm;
+                saveAllState();
+                tvCurPolishModel.setText("• Model làm mượt đang chọn: " + polishModel);
+                appendLog("⚙️ Đã đổi Model Làm Mượt Final: " + polishModel);
+                Toast.makeText(this, "Đã chọn " + pm + " cho khâu làm mượt", Toast.LENGTH_SHORT).show();
+            });
+            rowPM.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        }
+        cardPolishModel.addView(rowPM);
+        content.addView(cardPolishModel);
 
         // Xuất toàn văn tác phẩm
         Button btnExport = createButton("📥 Xuất Toàn Văn Tác Phẩm (.txt)", "#059669");
