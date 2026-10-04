@@ -63,109 +63,152 @@ public class MainActivity extends AppCompatActivity {
 
     private void initHelpMap() {
         if (!helpMap.isEmpty()) return;
+
         helpMap.put("select_model", new HelpData(
-            "Lựa Chọn Model Dịch (Mô Hình AI)",
-            "Cấu Hình Động Cơ AI",
-            "Chọn bộ não AI của Google để thực hiện dịch thuật toàn văn tác phẩm.",
-            "• Gemini 2.5 Flash-Lite / 3.5 Flash-Lite: Khuyên dùng cho truyện dài (>10MB). Tốc độ siêu nhanh, hạn ngạch dồi dào không lo nghẽn mạng. Hệ thống tự động cứu hộ sẽ vá mượt bản dịch đạt 9/10 điểm.\n• Gemini 2.5 Flash / 3.6 Flash: Dành cho dịch đoạn ngắn cần độ trau chuốt tuyệt đối.",
-            "Bạn cũng có thể nhập mã Model ID tùy biến của Google vào ô bên cạnh rồi bấm 'Dùng Model Này'."
+            "Chọn Dòng Model Gemini",
+            "Bộ Não AI",
+            "Chọn phiên bản trí tuệ nhân tạo của Google để dịch truyện.",
+            "• 2.5 Flash / 3.5 Flash Lite / 2.5 Flash Lite: Dịch siêu tốc, tốn rất ít hạn mức, thích hợp dịch truyện dài hàng nghìn chương.\n• 3.6 Flash / 2.5 Pro: Câu từ mượt mà, văn phong chau chuốt nhất.",
+            "Nên chọn '2.5 Flash' hoặc '3.5 Flash Lite' làm mặc định để dịch nhanh và không lo hết lượt."
         ));
         helpMap.put("model_selection", helpMap.get("select_model"));
 
         helpMap.put("key_pool", new HelpData(
-            "Multi-Key Gemini Pool (Kho Chìa Khóa API)",
-            "Quản Lý Khóa API",
-            "Nơi lưu trữ danh sách API Key Google Gemini của bạn. Ứng dụng sẽ tự động luân phiên đổi chìa khóa khi dịch để không bao giờ bị nghẽn mạng hay chạm Rate Limit 429.",
-            "• Dán API key (mỗi dòng 1 key, hỗ trợ dán hàng loạt) rồi bấm 'Thêm API Key Vào Pool'.\n• Bấm 'Test Tất Cả' để kiểm tra kết nối và hạn mức từng key.\n• Có thể xóa hoặc test riêng lẻ từng key trong danh sách.",
-            "NÊN DÙNG 2 - 5 TÀI KHOẢN GOOGLE để lấy 2 - 5 key nạp vào, giúp bạn dịch một mạch hàng nghìn chương liên tục!"
+            "Kho Chìa Khóa API (Key Pool)",
+            "Quản Lý API Key",
+            "Nơi chứa các mã API Key miễn phí từ Google để chạy dịch.",
+            "• Dán nhiều key (mỗi dòng 1 key) rồi bấm '+ Thêm API Key Vào Pool'.\n• App sẽ tự động đổi sang key khác khi key hiện tại bị nghẽn mạng.",
+            "Nên nạp từ 2 đến 5 key của các tài khoản Google khác nhau để dịch liên tục không bao giờ bị dừng."
         ));
 
         helpMap.put("prompt_cards", new HelpData(
-            "Thẻ Phong Cách Dịch (Prompt Cards)",
-            "Văn Phong Dịch Thuật",
-            "Quyết định văn phong bản dịch (Tiên hiệp cổ trang, Đô thị hiện đại, Kiếm hiệp kiếm khí...).",
-            "• Nhấn vào thẻ phong cách để kích hoạt.\n• Bấm '+ Thêm Prompt' để tạo phong cách dịch theo sở thích của riêng bạn.\n• Chạm vào thẻ để xem hoặc chỉnh sửa nội dung prompt chi tiết.",
-            "Có thể tạo prompt riêng biệt cho từng thể loại truyện để câu từ mượt mà, đúng chuẩn nhất."
+            "Thẻ Phong Cách Dịch",
+            "Văn Phong",
+            "Hướng dẫn AI dịch theo thể loại truyện bạn thích (Tiên hiệp, Đô thị, Kiếm hiệp...).",
+            "• Chọn thẻ có sẵn hoặc bấm '+ Thêm' để tự viết phong cách riêng.",
+            "Mặc định phong cách Tiên Hiệp đã được tối ưu rất mượt cho hầu hết truyện dịch."
         ));
 
         helpMap.put("novel_raw_input", new HelpData(
-            "Mục 1: Nhập & Bóc Tách File Truyện Gốc",
-            "Nạp & Phân Tích File",
-            "Khu vực đưa truyện tiếng Trung thô vào và chia nhỏ thành từng chương để AI xử lý.",
-            "• Chọn File .txt / .epub: Bấm để nạp file truyện từ bộ nhớ điện thoại vào app.\n• Tách Tác Giả (Regex): Tự động nhận diện dòng tiêu đề chương (第一章, 第1章, Chương 1, Hồi thứ 1...) để cắt chuẩn y như sách in. Khuyên dùng cho 95% truyện mạng.\n• Tách Theo Ký Tự: Cắt đều đặn theo số ký tự (2000, 3000, 3500 ký tự). Dành cho truyện ngắn hoặc file thô bị mất dòng tiêu đề chương.\n• Đổi Truyện / Dự Án Mới: Quản lý nhiều bộ truyện độc lập mà không bị đè dữ liệu.",
-            "Độ dài tối ưu nhất cho AI dịch mượt là khoảng 3.000 - 3.500 ký tự mỗi chương."
+            "Nạp File Truyện Gốc",
+            "Nạp File",
+            "Tải file tiếng Trung (.txt hoặc .epub) vào để máy tự động cắt chương.",
+            "• Chọn 'Tách Tác Giả (Regex)' để app tự nhận diện tiêu đề từng chương y như sách in.",
+            "Nên dùng file .txt chuẩn để app chia chương chính xác nhất."
         ));
 
         helpMap.put("range_progress", new HelpData(
-            "Mục 2: Tiến Độ Dịch Thuật & Điều Khiển",
-            "Tiến Trình Dịch",
-            "Trung tâm điều khiển toàn bộ quá trình dịch thuật của bộ truyện.",
-            "• Từ chương -> Đến chương: Nhập khoảng chương bạn muốn dịch (ví dụ: từ 1 đến 50).\n• Dịch Range: Khởi động quá trình dịch tự động tuần tự từng chương.\n• Tạm dừng / Tiếp tục: Dừng tạm thời khi có việc bận mà không làm mất chương đang dịch dở.\n• Hủy: Dừng hẳn tiến trình dịch an toàn.\n• ⚡ Dịch Bù Chương Sót: Tự động quét kiểm tra, phát hiện chương nào bị mất mạng/chưa dịch để dịch bù, và TỰ ĐỘNG BỎ QUA 100% các chương đã dịch xong.\n• ✨ Làm Mượt Bản Dịch Final: Khâu quét sạch toàn bộ chữ Hán và từ lai còn sót lại trong toàn tác phẩm sau khi bạn đã dịch xong.",
-            "Nếu truyện dài, hãy dịch theo từng đợt 50 - 100 chương để dễ kiểm soát và lưu trữ."
+            "Tiến Độ Dịch Thuật",
+            "Quá Trình Dịch",
+            "Khu vực điều khiển AI dịch từ chương nào đến chương nào.",
+            "• Nhập số chương cần dịch (VD: 1 đến 50) rồi bấm '▶ Dịch Range'.\n• '⚡ Dịch Bù Chương Sót': Tự động tìm và dịch nốt các chương bị thiếu/lỗi mà không dịch lại các chương đã có.",
+            "Nếu bị đứt mạng giữa chừng, chỉ cần bấm 'Dịch Bù Chương Sót' là xong ngay."
         ));
 
         helpMap.put("master_glossary", new HelpData(
-            "Mục 3: Kho Thuật Ngữ Master Glossary",
-            "Từ Điển Tác Phẩm",
-            "Bộ từ điển độc lập của tác phẩm, lưu giữ danh sách tên nhân vật, môn phái, chiêu thức, địa danh (VD: 林辰 = Lâm Thần).",
-            "• Đảm bảo nhân vật giữ đúng một tên gọi xuyên suốt từ chương đầu đến chương cuối.\n• Thêm nhanh: Nhập 'Từ gốc' và 'Nghĩa dịch' rồi bấm '+ Thêm Từ'.\n• Nạp / Xuất .txt: Nhập hoặc xuất file từ điển dạng txt (raw=vi) để sao lưu hoặc chia sẻ.\n• Danh sách hiển thị trực tiếp bên dưới với nút Xóa từng từ.",
-            "Nên kết hợp bật chức năng AI Auto-Learn ở Tab Cài đặt để AI tự động trích xuất nhân vật mới vào kho này."
+            "Kho Từ Điển (Glossary)",
+            "Từ Điển Nhân Vật",
+            "Danh sách tên nhân vật, môn phái và địa danh để dịch đồng nhất.",
+            "• Ví dụ: 林辰 ➔ Lâm Thần. Đảm bảo nhân vật giữ đúng một tên từ đầu đến cuối truyện.",
+            "Bạn có thể thêm từ thủ công hoặc để app tự động thu thập trong quá trình dịch."
         ));
 
         helpMap.put("chapter_auditor", new HelpData(
-            "Kho Chương Đã Dịch & Trình Đọc AMOLED",
-            "Đọc & Kiểm Tra Chất Lượng",
-            "Không gian quản lý các chương đã dịch xong kèm Trình đọc toàn màn hình AMOLED/Sepia chống mỏi mắt.",
-            "• Chạm vào bất kỳ chương nào trong danh sách để mở Trình Đọc Toàn Màn Hình.\n• Hỗ trợ 3 chế độ hiển thị: Bản Dịch, Song Ngữ (Đối Chiếu Trung-Việt) và Bản Gốc.\n• Đổi màu nền (AMOLED Đen Sâu, Sepia Dịu Mắt, Sáng) và cỡ chữ tùy ý.\n• Nút 'Dịch lại' trong từng chương giúp AI làm lại riêng chương đó nếu chưa ưng ý.\n• Phân trang 100 chương/trang chống giật lag khi truyện có hàng nghìn chương.",
-            "Chế độ Song Ngữ cực kỳ hữu ích để bạn đối chiếu câu chữ gốc khi gặp đoạn dịch khó hiểu."
+            "Đọc & Xem Bản Dịch",
+            "Trình Đọc",
+            "Nơi đọc truyện toàn màn hình với giao diện tối chống mỏi mắt.",
+            "• Chạm vào chương để mở trình đọc.\n• Hỗ trợ xem Bản Dịch hoặc xem Song Ngữ (đối chiếu Trung - Việt).",
+            "Bấm vào nút 'Dịch lại' trong từng chương nếu muốn AI làm lại riêng chương đó."
         ));
 
+        // TAB CÀI ĐẶT: HƯỚNG DẪN SIÊU DỄ HIỂU
         helpMap.put("settings_projects_manager", new HelpData(
-            "1. Quản Lý & Lưu Trữ Đa Dự Án Truyện",
-            "Quản Lý Tác Phẩm",
-            "Quản lý nhiều bộ truyện độc lập cùng lúc trên một thiết bị mà không bị lẫn lộn dữ liệu.",
-            "• Mỗi dự án lưu giữ riêng biệt: toàn bộ các chương thô, bản dịch đã hoàn thành và từ điển Master Glossary riêng của bộ đó.\n• Bấm 'Chuyển Dự Án' để tiếp tục dịch hoặc đọc một bộ truyện khác.\n• Bấm '+ Tạo Mới' để bắt đầu một bộ truyện mới.\n• Nút 'Xóa Vĩnh Viễn Dự Án': Chỉ xóa nội dung của bộ truyện đang chọn. Kho Key API và các Thẻ Prompt ở Tab 1 được bảo toàn vĩnh cửu 100%!",
-            "Bạn có thể lưu trữ hàng chục bộ truyện cùng lúc mà không lo mất dữ liệu."
+            "Quản Lý Dự Án Truyện",
+            "Quản Lý Dự Án",
+            "Giúp bạn dịch cùng lúc nhiều bộ truyện khác nhau mà không bị lẫn lộn.",
+            "• Bấm 'Chuyển Dự Án' để đổi sang truyện khác.\n• Bấm '+ Tạo Mới' để bắt đầu một bộ truyện mới.\n• Xóa dự án chỉ xóa nội dung truyện đó, kho Key API và Thẻ Prompt được giữ nguyên 100%.",
+            "Mỗi truyện sẽ có một kho từ điển và danh sách chương riêng biệt."
         ));
 
         helpMap.put("settings_glossary_learning", new HelpData(
-            "2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)",
-            "Bộ Lọc & Quản Lý Từ Điển",
-            "Bộ quy chuẩn chất lượng để AI tự động lọc và thu thập tên nhân vật, chiêu thức, địa danh từ bản dịch vào Master Glossary.",
-            "• Độ dài chữ Hán tối thiểu: Khuyên để 2 đến 4 ký tự. Ngăn AI tự ý đưa các từ 1 chữ (hắn, nàng, đi, đến...) vào từ điển làm rác văn bản.\n• Tần suất tối thiểu: Đặt >= 2 lần để chỉ ghi nhớ các nhân vật/địa danh quan trọng xuất hiện lặp lại trong chương.\n• Chính sách xung đột (Conflict Policy): 'Giữ Cũ - Bỏ Mới' (Khuyên dùng) giúp cố định tên nhân vật ban đầu, tránh việc cùng một nhân vật bị đổi tên lộn xộn ở các chương sau.",
-            "Chính sách 'Giữ Cũ - Bỏ Mới' là chìa khóa vàng giúp toàn bộ 1000 chương truyện thống nhất tên gọi."
+            "Tự Động Gom Từ Điển (AI Auto-Learning)",
+            "Bộ Lọc Từ Điển",
+            "Máy sẽ tự động phát hiện tên nhân vật mới trong truyện và lưu vào từ điển.",
+            "• Độ dài chữ Hán tối thiểu: Nên để 2 hoặc 3 ký tự (tránh lưu chữ rác 1 từ).\n• Tần suất lặp lại: Nên để 2 đến 4 lần (để chỉ lưu các nhân vật quan trọng).",
+            "Bật tính năng này giúp bạn không cần phải tự gõ từ điển bằng tay."
+        ));
+
+        helpMap.put("settings_min_term_length", new HelpData(
+            "Độ Dài Chữ Hán Tối Thiểu",
+            "Lọc Từ Điển",
+            "Quy định từ tiếng Trung phải có từ bao nhiêu chữ trở lên thì mới được lưu vào từ điển.",
+            "• KHUYÊN DÙNG: Đặt là 2 hoặc 3 ký tự.\n• TẠI SAO: Nếu đặt 1 ký tự, máy sẽ lưu cả những chữ thông thường như 'tôi', 'nó', 'đi' làm hỏng bản dịch.",
+            "Nên để mặc định là 2 ký tự."
+        ));
+
+        helpMap.put("settings_min_frequency", new HelpData(
+            "Tần Suất Lặp Lại Tối Thiểu",
+            "Lọc Từ Điển",
+            "Từ tiếng Trung đó phải xuất hiện bao nhiêu lần trong chương thì mới được coi là tên nhân vật.",
+            "• KHUYÊN DÙNG: Đặt từ 2 đến 4 lần.\n• TẠI SAO: Tránh lưu những từ người qua đường chỉ xuất hiện 1 lần rồi biến mất.",
+            "Nên để mặc định là 2 hoặc 3 lần."
+        ));
+
+        helpMap.put("settings_conflict_policy", new HelpData(
+            "Xử Lý Khi Trùng Tên Nhân Vật (Xung Đột Nghĩa)",
+            "Quy Tắc Tên",
+            "Khi chương sau xuất hiện một từ đã có ở chương trước nhưng nghĩa dịch hơi khác nhau.",
+            "• KHUYÊN DÙNG: Chọn 'Giữ Cũ - Bỏ Mới'.\n• TẠI SAO: Để tên nhân vật từ chương 1 không bao giờ bị đổi sang tên khác ở chương 100.",
+            "Luôn chọn 'Giữ Cũ' để tên nhân vật xuyên suốt và đồng nhất."
         ));
 
         helpMap.put("settings_translation_anti_hanzi", new HelpData(
-            "3. Cài Đặt Dịch Thuật & Chống Lọt Chữ Hán",
-            "Chất Lượng Bản Dịch & Đa Ngôn Ngữ",
-            "Kiểm soát ngôn ngữ dịch đầu ra và hệ thống phòng thủ chống sót chữ Hán 2 lớp (Dual-Layer Guard).",
-            "• Ngôn ngữ đích: Chọn Tiếng Việt, Tiếng Nhật, Tiếng Anh hoặc Tiếng Hàn.\n• Bộ lọc chống lọt chữ Hán 2 lớp:\n  - Lớp 1 (Ép khuôn Prompt): Cấm AI sinh chữ tượng hình Hán trong câu trả lời.\n  - Lớp 2 (Hậu kiểm Regex): Tự động quét regex [\\u4e00-\\u9fa5] để chuyển đổi triệt để sang âm Hán-Việt chuẩn, bản dịch sạch 100% tiếng Việt!\n• Tự Động Dịch Lại Khi Lỗi Nặng: Tự động gửi yêu cầu dịch lại nếu AI bị kẹt hoặc đứt mạng.",
-            "Nếu chọn ngôn ngữ đích là Tiếng Nhật, app sẽ tự động thả lỏng để AI sinh chữ Kanji tự nhiên."
+            "Chống Lọt Chữ Hán (2 Lớp)",
+            "Lọc Chữ Sót",
+            "Tự động rà soát và chuyển sạch toàn bộ chữ tiếng Trung còn sót lại sang tiếng Việt.",
+            "• KHUYÊN DÙNG: NÊN BẬT (Xanh ngọc).\n• TÁC DỤNG: Đảm bảo bản dịch 100% tiếng Việt, không bị lẫn chữ tượng hình.",
+            "Hãy luôn BẬT tính năng này để có trải nghiệm đọc truyện hoàn hảo."
+        ));
+        helpMap.put("settings_anti_hanzi", helpMap.get("settings_translation_anti_hanzi"));
+
+        helpMap.put("settings_auto_heal", new HelpData(
+            "Tự Động Sửa Lỗi Khi Mất Mạng (Auto-Heal)",
+            "Tự Động Cứu Hộ",
+            "Nếu đang dịch mà bị rớt mạng hoặc AI trả về thiếu câu, app sẽ tự đổi chìa khóa (Key) khác để dịch lại ngay.",
+            "• KHUYÊN DÙNG: NÊN BẬT (Xanh ngọc).\n• TÁC DỤNG: Bạn không cần phải ngồi canh máy bấm dịch lại từng câu.",
+            "BẬT tính năng này giúp bạn có thể cắm máy dịch tự động cả đêm."
+        ));
+
+        helpMap.put("settings_target_language", new HelpData(
+            "Ngôn Ngữ Đích",
+            "Ngôn Ngữ",
+            "Chọn ngôn ngữ bạn muốn dịch sang (Tiếng Việt, Tiếng Nhật, Tiếng Anh, Tiếng Hàn).",
+            "• Mặc định là Tiếng Việt.\n• Nếu chọn Tiếng Nhật, app sẽ cho phép sinh chữ Kanji mượt mà.",
+            "Chọn Tiếng Việt để đọc truyện dịch tốt nhất."
         ));
 
         helpMap.put("settings_god_mode", new HelpData(
-            "4. Kiểm Soát 5 Lớp Chạy Ngầm (God-Mode)",
-            "Độ Bền Bỉ Hệ Thống Android",
-            "Kiến trúc dịch ngầm độc quyền giúp ứng dụng dịch liên tục hàng nghìn chương ngay cả khi tắt màn hình, khóa máy hoặc máy ít RAM.",
-            "• Lớp 1 (Foreground Service): Hiển thị tiến trình dịch liên tục trên thanh thông báo hệ thống.\n• Lớp 2 (CPU WakeLock): Giữ chip xử lý chạy ngầm, chống Deep Sleep khi tắt màn hình.\n• Lớp 3 (Bỏ qua tối ưu pin Doze Mode): Miễn nhiễm với cơ chế tự ngắt ứng dụng của Android.\n• Lớp 4 (WorkManager Watchdog): Tự động kiểm tra và hồi sinh tiến trình sau 15 giây nếu bị Android vô tình giải phóng RAM.\n• Lớp 5 (Root OOM Score -1000): Thiết lập độ ưu tiên tối thượng tương đương tiến trình nhân hệ thống (dành cho máy Root).",
-            "Bạn hoàn toàn có thể cắm sạc, khóa màn hình và đi ngủ, sáng dậy sẽ có hàng trăm chương truyện đã dịch xong!"
+            "Dịch Ngầm Chống Tắt Máy (God-Mode)",
+            "Chạy Ngầm",
+            "Hệ thống giúp máy tiếp tục dịch ngay cả khi bạn tắt màn hình, khóa máy hoặc chuyển sang ứng dụng khác.",
+            "• Hoàn toàn tự động kích hoạt.\n• Không lo bị Android tự tắt app khi thiếu RAM.",
+            "Bạn có thể khóa máy đi ngủ, sáng dậy truyện đã dịch xong."
         ));
 
         helpMap.put("settings_api_rotation", new HelpData(
-            "5. Cấu Hình Model Làm Mượt Final & Độ Trễ",
-            "Động Cơ Xử Lý Nâng Cao",
-            "Cấu hình model phục vụ khâu rà soát văn phong cuối cùng và độ trễ an toàn giữa các chương.",
-            "• Model làm mượt Final: Khuyên dùng Gemini 3.6 Flash hoặc Gemini 2.5 Flash để rà soát lại ngữ pháp, khử sạch chữ Hán sót lại.\n• Độ trễ an toàn giữa các chương: Đặt từ 1 đến 3 giây để giãn cách các lượt gọi API, chống bị hệ thống Google đánh dấu nghi ngờ spam.",
-            "Sau khi dịch trọn bộ truyện, chạy Làm Mượt Final một lần sẽ nâng tầm toàn văn tác phẩm lên chất lượng xuất bản."
+            "Thời Gian Nghỉ Giữa Các Chương",
+            "Tốc Độ Dịch",
+            "Khoảng thời gian nghỉ ngắn (1 - 3 giây) giữa các chương để tránh bị Google chặn mạng vì gửi lệnh quá nhanh.",
+            "• Khuyên để từ 1 đến 2 giây là tối ưu nhất.",
+            "Để 2 giây giúp bảo vệ API Key sống lâu và ổn định."
         ));
 
         helpMap.put("export_full_txt", new HelpData(
-            "Xuất Toàn Văn Tác Phẩm (.txt)",
-            "Xuất Dữ Liệu Hoàn Tất",
-            "Gộp toàn bộ tất cả các chương đã dịch thành một file văn bản hoàn chỉnh (.txt) duy nhất.",
-            "• Bấm nút '📥 Xuất Toàn Văn Tác Phẩm (.txt)' để lưu file vào thư mục Download của thiết bị.\n• File sau khi xuất có tiêu đề rõ ràng, phân cách từng chương chuẩn mực.\n• Sẵn sàng để copy vào máy đọc sách Kindle, Kobo hoặc mở bằng bất kỳ ứng dụng đọc sách nào trên điện thoại.",
-            "File xuất ra mã hóa UTF-8 chuẩn 100%, không bị lỗi font trên bất kỳ thiết bị nào."
+            "Xuất Toàn Văn Truyện (.txt)",
+            "Lưu File",
+            "Gộp tất cả các chương đã dịch thành 1 file .txt duy nhất lưu vào máy.",
+            "• File lưu trong thư mục Download của điện thoại.\n• Đọc mượt trên mọi máy đọc sách Kindle, Kobo hoặc app đọc truyện.",
+            "File xuất ra định dạng chuẩn, không bao giờ bị lỗi font."
         ));
     }
 
@@ -1590,11 +1633,12 @@ public class MainActivity extends AppCompatActivity {
         rowMHead.addView(tvSelectedModel);
         cardModel.addView(rowMHead);
 
-        // Danh sách thẻ Model chọn
+        // Danh sách thẻ Model chọn (Đầy đủ 5 Model)
         final String[][] modelList = {
                 {"gemini-3.6-flash", "3.6 Flash", "Model Siêu Cấp 2026", "Chuyên gia xử lý Hán Việt & Làm mượt toàn văn tuyệt đối"},
                 {"gemini-2.5-flash", "2.5 Flash", "Mặc định - Siêu tốc", "Cân bằng tốc độ và độ mượt văn phong"},
                 {"gemini-2.5-flash-lite", "2.5 Flash Lite", "Tiết kiệm Quota", "Rất nhanh, ít tốn RPM/TPM"},
+                {"gemini-3.5-flash-lite", "3.5 Flash Lite", "Thế hệ mới Siêu nhẹ", "Tốc độ phản hồi tức thì, tối ưu chi phí & hạn ngạch"},
                 {"gemini-2.5-pro", "2.5 Pro", "Chuyên sâu", "Dành cho chương văn học phức tạp cần lập luận sâu"}
         };
 
@@ -3805,100 +3849,41 @@ public class MainActivity extends AppCompatActivity {
     // THẺ 4: CÀI ĐẶT CHUYÊN SÂU & QUẢN LÝ DỰ ÁN (DEEP SETTINGS HUB)
     // =========================================================================
     private void refreshSettingsUI() {
-        if (tvSettingsProjName != null) {
-            tvSettingsProjName.setText("• Dự án: " + currentProjectName);
-        }
-        if (tvSettingsProjStats != null) {
-            tvSettingsProjStats.setText("• Đã dịch: " + translatedChapters.size() + "/" + rawChapters.size() + " chương · Glossary: " + masterGlossary.size() + " từ");
-        }
-        if (tvSettingsMinTerm != null) {
-            tvSettingsMinTerm.setText("• Độ dài chữ Hán tối thiểu: " + minTermLength + " ký tự");
-        }
-        if (edtCustomMinTerm != null && !edtCustomMinTerm.hasFocus()) {
-            edtCustomMinTerm.setText(String.valueOf(minTermLength));
-        }
-        if (tvSettingsMinFreq != null) {
-            tvSettingsMinFreq.setText("• Tần suất lặp lại tối thiểu trong chương: ≥ " + minFrequency + " lần");
-        }
-        if (edtCustomMinFreq != null && !edtCustomMinFreq.hasFocus()) {
-            edtCustomMinFreq.setText(String.valueOf(minFrequency));
-        }
-        if (tvSettingsTargetLang != null) {
-            tvSettingsTargetLang.setText("• Ngôn ngữ đích: " + targetLanguage);
-        }
-
-        updateLangButtonStyles();
-        updateMinTermButtonStyles();
-        updateMinFreqButtonStyles();
-
-        if (btnSettingsAntiHanzi != null) {
-            btnSettingsAntiHanzi.setText("Bộ Lọc 2 Lớp Chống Chữ Hán: " + (antiHanziStrict ? "🟢 BẬT [Lớp 1 + Lớp 2]" : "⚪ TẮT"));
-            btnSettingsAntiHanzi.setBackground(createButtonDrawable(antiHanziStrict ? "#059669" : "#374151", 18f));
-        }
-        if (btnSettingsAutoHeal != null) {
-            btnSettingsAutoHeal.setText("Tự Động Dịch Lại Khi Lỗi Nặng: " + (autoHealOnlineEnabled ? "🟢 BẬT [Auto-Heal Online]" : "⚪ TẮT"));
-            btnSettingsAutoHeal.setBackground(createButtonDrawable(autoHealOnlineEnabled ? "#0D9488" : "#374151", 18f));
-        }
-        if (btnSettingsPolicy != null) {
-            btnSettingsPolicy.setText("Xung Đột Nghĩa: " + ("keep-old".equals(conflictPolicy) ? "Giữ Cũ - Bỏ Mới (Bảo toàn)" : "Ghi Đè Bằng Nghĩa Mới"));
-        }
-    }
-
-    private void updateLangButtonStyles() {
-        if (btnLangVi == null) return;
-        boolean isVi = targetLanguage.contains("Việt");
-        boolean isJa = targetLanguage.contains("Nhật") || targetLanguage.contains("日本語");
-        boolean isEn = targetLanguage.equalsIgnoreCase("English");
-        boolean isKo = targetLanguage.contains("Hàn") || targetLanguage.contains("한국어");
-
-        btnLangVi.setText((isVi ? "✓ " : "") + "Tiếng Việt");
-        btnLangJa.setText((isJa ? "✓ " : "") + "日本語");
-        btnLangEn.setText((isEn ? "✓ " : "") + "English");
-        btnLangKo.setText((isKo ? "✓ " : "") + "한국어");
-
-        btnLangVi.setBackground(createButtonDrawable(isVi ? "#1D4ED8" : "#1E293B", 14f));
-        btnLangJa.setBackground(createButtonDrawable(isJa ? "#1D4ED8" : "#1E293B", 14f));
-        btnLangEn.setBackground(createButtonDrawable(isEn ? "#1D4ED8" : "#1E293B", 14f));
-        btnLangKo.setBackground(createButtonDrawable(isKo ? "#1D4ED8" : "#1E293B", 14f));
-    }
-
-    private void updateMinTermButtonStyles() {
-        for (int i = 0; i < minTermButtons.size(); i++) {
-            int len = i + 1;
-            Button b = minTermButtons.get(i);
-            b.setBackground(createButtonDrawable(minTermLength == len ? "#059669" : "#1E293B", 12f));
-        }
-    }
-
-    private void updateMinFreqButtonStyles() {
-        for (int i = 0; i < minFreqButtons.size(); i++) {
-            int freq = i + 1;
-            Button b = minFreqButtons.get(i);
-            b.setBackground(createButtonDrawable(minFrequency == freq ? "#059669" : "#1E293B", 12f));
+        if (tabSettingsView != null) {
+            tabSettingsView.removeAllViews();
+            LinearLayout content = buildSettingsContentLayout();
+            tabSettingsView.addView(content);
         }
     }
 
     private void createTabSettingsView() {
         tabSettingsView = new ScrollView(this);
         tabSettingsView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
+        LinearLayout content = buildSettingsContentLayout();
+        tabSettingsView.addView(content);
+    }
+
+    private LinearLayout buildSettingsContentLayout() {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(16), dp(16), dp(16), dp(80));
 
-        // 1. Quản Lý Dự Án & Xóa Dự Án
+        // ---------------------------------------------------------------------
+        // 1. Quản Lý Dự Án Hiện Tại
+        // ---------------------------------------------------------------------
         LinearLayout rowS1Head = new LinearLayout(this);
         rowS1Head.setOrientation(LinearLayout.HORIZONTAL);
         rowS1Head.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView tvPrIcon = new TextView(this);
         tvPrIcon.setText("⚙️ ");
-        tvPrIcon.setTextSize(15);
+        tvPrIcon.setTextSize(14);
         rowS1Head.addView(tvPrIcon);
 
         TextView tvProjTitle = new TextView(this);
         tvProjTitle.setText("Quản Lý Dự Án Hiện Tại");
         tvProjTitle.setTextColor(Color.WHITE);
-        tvProjTitle.setTextSize(14.5f);
+        tvProjTitle.setTextSize(14f);
         tvProjTitle.setTypeface(null, Typeface.BOLD);
         rowS1Head.addView(tvProjTitle);
         rowS1Head.addView(createHelpButton("settings_projects_manager"));
@@ -3908,22 +3893,23 @@ public class MainActivity extends AppCompatActivity {
         tvSettingsProjName = new TextView(this);
         tvSettingsProjName.setText("• Dự án: " + currentProjectName);
         tvSettingsProjName.setTextColor(Color.parseColor("#38BDF8"));
-        tvSettingsProjName.setTextSize(14f);
+        tvSettingsProjName.setTextSize(13.5f);
         tvSettingsProjName.setTypeface(null, Typeface.BOLD);
         cardProj.addView(tvSettingsProjName);
 
         tvSettingsProjStats = new TextView(this);
         tvSettingsProjStats.setText("• Đã dịch: " + translatedChapters.size() + "/" + rawChapters.size() + " chương · Glossary: " + masterGlossary.size() + " từ");
         tvSettingsProjStats.setTextColor(Color.parseColor("#94A3B8"));
-        tvSettingsProjStats.setTextSize(12f);
-        tvSettingsProjStats.setPadding(0, dp(4), 0, dp(12));
+        tvSettingsProjStats.setTextSize(11.5f);
+        tvSettingsProjStats.setPadding(0, dp(4), 0, dp(10));
         cardProj.addView(tvSettingsProjStats);
 
         LinearLayout rowProjBtns = new LinearLayout(this);
         rowProjBtns.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button btnSwitch = createButton("CHUYỂN DỰ ÁN", "#1E293B");
-        btnSwitch.setMinHeight(dp(44));
+        Button btnSwitch = createButton("CHUYỂN DỰ ÁN", "#1A1C28");
+        btnSwitch.setMinHeight(dp(40));
+        btnSwitch.setTextSize(11.5f);
         btnSwitch.setOnClickListener(v -> {
             triggerHaptic();
             showSwitchProjectDialog();
@@ -3931,7 +3917,8 @@ public class MainActivity extends AppCompatActivity {
         rowProjBtns.addView(btnSwitch, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         Button btnNewProj = createGradientButton("+ TẠO MỚI", Color.parseColor("#0284C7"), Color.parseColor("#00D2FF"));
-        btnNewProj.setMinHeight(dp(44));
+        btnNewProj.setMinHeight(dp(40));
+        btnNewProj.setTextSize(11.5f);
         LinearLayout.LayoutParams nplp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
         nplp.leftMargin = dp(8);
         btnNewProj.setLayoutParams(nplp);
@@ -3945,313 +3932,235 @@ public class MainActivity extends AppCompatActivity {
 
         // Nút Xóa Dự Án Màu Đỏ Ruby Cực Kỳ An Toàn
         Button btnDeleteProj = createButton("🗑️ XÓA VĨNH VIỄN DỰ ÁN NÀY", "#7F1D1D");
-        btnDeleteProj.setMinHeight(dp(46));
+        btnDeleteProj.setMinHeight(dp(42));
+        btnDeleteProj.setTextSize(11.5f);
         btnDeleteProj.setOnClickListener(v -> {
             triggerHaptic();
             showDeleteProjectConfirmationDialog();
         });
         LinearLayout.LayoutParams lpDel = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lpDel.setMargins(0, dp(10), 0, 0);
+        lpDel.setMargins(0, dp(8), 0, 0);
         cardProj.addView(btnDeleteProj, lpDel);
 
         TextView tvDelHint = new TextView(this);
-        tvDelHint.setText("💡 Khi xóa dự án, chỉ dữ liệu của truyện này bị xóa. Toàn bộ kho Key API và Thẻ Prompt ở Tab 1 được BẢO TOÀN VĨNH CỬU 100%.");
+        tvDelHint.setText("💡 Khi xóa dự án, chỉ dữ liệu của truyện này bị xóa. Kho Key API và Thẻ Prompt ở Tab 1 được BẢO TOÀN VĨNH CỬU 100%.");
         tvDelHint.setTextColor(Color.parseColor("#64748B"));
-        tvDelHint.setTextSize(10.5f);
-        tvDelHint.setPadding(0, dp(8), 0, 0);
+        tvDelHint.setTextSize(10f);
+        tvDelHint.setPadding(0, dp(6), 0, 0);
         cardProj.addView(tvDelHint);
 
         content.addView(cardProj);
 
-        // 2. Tinh Chỉnh Glossary AI Auto-Learning
+        // ---------------------------------------------------------------------
+        // 2. Tinh Chỉnh Glossary AI Auto-Learning (Dùng Stepper chống vỡ chữ)
+        // ---------------------------------------------------------------------
         LinearLayout rowS2Head = new LinearLayout(this);
         rowS2Head.setOrientation(LinearLayout.HORIZONTAL);
         rowS2Head.setGravity(Gravity.CENTER_VERTICAL);
-        rowS2Head.setPadding(0, 16, 0, 0);
+        rowS2Head.setPadding(0, dp(12), 0, 0);
+
         TextView tvGlossSettingsTitle = new TextView(this);
-        tvGlossSettingsTitle.setText("2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning):");
+        tvGlossSettingsTitle.setText("2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)");
         tvGlossSettingsTitle.setTextColor(Color.WHITE);
-        tvGlossSettingsTitle.setTextSize(15);
+        tvGlossSettingsTitle.setTextSize(14f);
         tvGlossSettingsTitle.setTypeface(null, Typeface.BOLD);
         rowS2Head.addView(tvGlossSettingsTitle);
         rowS2Head.addView(createHelpButton("settings_glossary_learning"));
         content.addView(rowS2Head);
 
         LinearLayout cardGloss = createCard();
-        tvSettingsMinTerm = new TextView(this);
-        tvSettingsMinTerm.setText("• Độ dài chữ Hán tối thiểu: " + minTermLength + " ký tự");
-        tvSettingsMinTerm.setTextColor(Color.parseColor("#D1D5DB"));
-        cardGloss.addView(tvSettingsMinTerm);
 
-        // Quick buttons cho Độ dài (1 đến 6 ký tự)
-        minTermButtons.clear();
-        LinearLayout rowLen = new LinearLayout(this);
-        rowLen.setOrientation(LinearLayout.HORIZONTAL);
-        rowLen.setPadding(0, 8, 0, 8);
-        for (int l = 1; l <= 6; l++) {
-            final int chosenLen = l;
-            Button b = createButton(l + " kt", minTermLength == l ? "#059669" : "#1E293B");
-            b.setOnClickListener(v -> {
-                minTermLength = chosenLen;
-                if (edtCustomMinTerm != null) edtCustomMinTerm.setText(String.valueOf(chosenLen));
-                saveAllState();
-                refreshSettingsUI();
-                appendLog("⚙️ Đã đặt Độ dài Glossary tối thiểu: >= " + chosenLen + " ký tự");
-            });
-            minTermButtons.add(b);
-            rowLen.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-            if (l < 6) {
-                View s = new View(this);
-                rowLen.addView(s, new LinearLayout.LayoutParams(6, 1));
-            }
-        }
-        cardGloss.addView(rowLen);
-
-        // Nhập số tùy ý cho Độ dài
-        LinearLayout rowCustomMinTerm = new LinearLayout(this);
-        rowCustomMinTerm.setOrientation(LinearLayout.HORIZONTAL);
-        rowCustomMinTerm.setGravity(Gravity.CENTER_VERTICAL);
-        rowCustomMinTerm.setPadding(0, 0, 0, 14);
-
-        TextView tvCustomTermLabel = new TextView(this);
-        tvCustomTermLabel.setText("Hoặc nhập số tùy ý:");
-        tvCustomTermLabel.setTextColor(Color.parseColor("#9CA3AF"));
-        tvCustomTermLabel.setTextSize(12);
-        rowCustomMinTerm.addView(tvCustomTermLabel);
-
-        View sct1 = new View(this);
-        rowCustomMinTerm.addView(sct1, new LinearLayout.LayoutParams(10, 1));
-
-        edtCustomMinTerm = new EditText(this);
-        edtCustomMinTerm.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        edtCustomMinTerm.setText(String.valueOf(minTermLength));
-        edtCustomMinTerm.setTextColor(Color.WHITE);
-        edtCustomMinTerm.setBackgroundColor(Color.parseColor("#171717"));
-        edtCustomMinTerm.setPadding(20, 12, 20, 12);
-        edtCustomMinTerm.setGravity(Gravity.CENTER);
-        rowCustomMinTerm.addView(edtCustomMinTerm, new LinearLayout.LayoutParams(140, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        View sct2 = new View(this);
-        rowCustomMinTerm.addView(sct2, new LinearLayout.LayoutParams(10, 1));
-
-        Button btnSaveCustomTerm = createButton("Lưu số này", "#059669");
-        btnSaveCustomTerm.setOnClickListener(v -> {
-            try {
-                int val = Integer.parseInt(edtCustomMinTerm.getText().toString().trim());
-                if (val >= 1) {
-                    minTermLength = val;
-                    saveAllState();
-                    refreshSettingsUI();
-                    appendLog("⚙️ Đã lưu Độ dài Glossary tối thiểu: >= " + minTermLength + " ký tự");
-                    Toast.makeText(this, "Đã lưu độ dài tối thiểu: " + minTermLength + " ký tự!", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, "Vui lòng nhập số >= 1!", Toast.LENGTH_SHORT).show();
-                }
-            } catch (Exception e) {
-                Toast.makeText(this, "Vui lòng nhập số hợp lệ!", Toast.LENGTH_SHORT).show();
-            }
-        });
-        rowCustomMinTerm.addView(btnSaveCustomTerm);
-        cardGloss.addView(rowCustomMinTerm);
-
-        // Tần suất xuất hiện tối thiểu
-        tvSettingsMinFreq = new TextView(this);
-        tvSettingsMinFreq.setText("• Tần suất lặp lại tối thiểu trong chương: ≥ " + minFrequency + " lần");
-        tvSettingsMinFreq.setTextColor(Color.parseColor("#D1D5DB"));
-        cardGloss.addView(tvSettingsMinFreq);
-
-        minFreqButtons.clear();
-        LinearLayout rowFreq = new LinearLayout(this);
-        rowFreq.setOrientation(LinearLayout.HORIZONTAL);
-        rowFreq.setPadding(0, 8, 0, 8);
-        for (int f = 1; f <= 6; f++) {
-            final int chosenFreq = f;
-            Button b = createButton("≥ " + f + " lần", minFrequency == f ? "#059669" : "#1E293B");
-            b.setOnClickListener(v -> {
-                minFrequency = chosenFreq;
-                if (edtCustomMinFreq != null) edtCustomMinFreq.setText(String.valueOf(chosenFreq));
-                saveAllState();
-                refreshSettingsUI();
-                appendLog("⚙️ Đã đặt Tần suất Glossary tối thiểu: >= " + chosenFreq + " lần");
-            });
-            minFreqButtons.add(b);
-            rowFreq.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-            if (f < 6) {
-                View s = new View(this);
-                rowFreq.addView(s, new LinearLayout.LayoutParams(6, 1));
-            }
-        }
-        cardGloss.addView(rowFreq);
-
-        // Nhập số tùy ý cho Tần suất
-        LinearLayout rowCustomMinFreq = new LinearLayout(this);
-        rowCustomMinFreq.setOrientation(LinearLayout.HORIZONTAL);
-        rowCustomMinFreq.setGravity(Gravity.CENTER_VERTICAL);
-        rowCustomMinFreq.setPadding(0, 0, 0, 14);
-
-        TextView tvCustomFreqLabel = new TextView(this);
-        tvCustomFreqLabel.setText("Hoặc nhập số tùy ý:");
-        tvCustomFreqLabel.setTextColor(Color.parseColor("#9CA3AF"));
-        tvCustomFreqLabel.setTextSize(12);
-        rowCustomMinFreq.addView(tvCustomFreqLabel);
-
-        View scf1 = new View(this);
-        rowCustomMinFreq.addView(scf1, new LinearLayout.LayoutParams(10, 1));
-
-        edtCustomMinFreq = new EditText(this);
-        edtCustomMinFreq.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        edtCustomMinFreq.setText(String.valueOf(minFrequency));
-        edtCustomMinFreq.setTextColor(Color.WHITE);
-        edtCustomMinFreq.setBackgroundColor(Color.parseColor("#171717"));
-        edtCustomMinFreq.setPadding(20, 12, 20, 12);
-        edtCustomMinFreq.setGravity(Gravity.CENTER);
-        rowCustomMinFreq.addView(edtCustomMinFreq, new LinearLayout.LayoutParams(140, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        View scf2 = new View(this);
-        rowCustomMinFreq.addView(scf2, new LinearLayout.LayoutParams(10, 1));
-
-        Button btnSaveCustomFreq = createButton("Lưu số này", "#059669");
-        btnSaveCustomFreq.setOnClickListener(v -> {
-            try {
-                int val = Integer.parseInt(edtCustomMinFreq.getText().toString().trim());
-                if (val >= 1) {
-                    minFrequency = val;
-                    saveAllState();
-                    refreshSettingsUI();
-                    appendLog("⚙️ Đã lưu Tần suất Glossary tối thiểu: >= " + minFrequency + " lần");
-                    Toast.makeText(this, "Đã lưu tần suất tối thiểu: " + minFrequency + " lần!", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, "Vui lòng nhập số >= 1!", Toast.LENGTH_SHORT).show();
-                }
-            } catch (Exception e) {
-                Toast.makeText(this, "Vui lòng nhập số hợp lệ!", Toast.LENGTH_SHORT).show();
-            }
-        });
-        rowCustomMinFreq.addView(btnSaveCustomFreq);
-        cardGloss.addView(rowCustomMinFreq);
-
-        btnSettingsPolicy = createButton("Xung Đột Nghĩa: " + ("keep-old".equals(conflictPolicy) ? "Giữ Cũ - Bỏ Mới (Bảo toàn)" : "Ghi Đè Bằng Nghĩa Mới"), "#1E293B");
-        btnSettingsPolicy.setOnClickListener(v -> {
-            conflictPolicy = "keep-old".equals(conflictPolicy) ? "overwrite" : "keep-old";
+        // Stepper 1: Độ dài chữ Hán tối thiểu
+        cardGloss.addView(createStepperRow("Độ dài chữ Hán tối thiểu:", "settings_min_term_length", minTermLength, "ký tự", 1, 10, newVal -> {
+            minTermLength = newVal;
             saveAllState();
             refreshSettingsUI();
-            appendLog("⚙️ Đã chuyển chính sách xung đột: " + conflictPolicy);
-        });
-        cardGloss.addView(btnSettingsPolicy);
+            appendLog("⚙️ Đã đặt Độ dài Glossary tối thiểu: >= " + minTermLength + " ký tự");
+        }));
 
+        // Stepper 2: Tần suất lặp lại tối thiểu
+        cardGloss.addView(createStepperRow("Tần suất lặp lại trong chương:", "settings_min_frequency", minFrequency, "lần", 1, 20, newVal -> {
+            minFrequency = newVal;
+            saveAllState();
+            refreshSettingsUI();
+            appendLog("⚙️ Đã đặt Tần suất Glossary tối thiểu: >= " + minFrequency + " lần");
+        }));
+
+        // Xử lý Xung đột nghĩa từ điển (2 tùy chọn rõ ràng)
+        LinearLayout rowPolHead = new LinearLayout(this);
+        rowPolHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowPolHead.setGravity(Gravity.CENTER_VERTICAL);
+        rowPolHead.setPadding(0, dp(8), 0, dp(4));
+
+        TextView tvPolTitle = new TextView(this);
+        tvPolTitle.setText("Xử lý khi trùng từ / đổi nghĩa:");
+        tvPolTitle.setTextColor(Color.parseColor("#94A3B8"));
+        tvPolTitle.setTextSize(12f);
+        rowPolHead.addView(tvPolTitle);
+        rowPolHead.addView(createHelpButton("settings_conflict_policy"));
+        cardGloss.addView(rowPolHead);
+
+        LinearLayout rowPolicyChoice = new LinearLayout(this);
+        rowPolicyChoice.setOrientation(LinearLayout.HORIZONTAL);
+        rowPolicyChoice.setPadding(0, dp(2), 0, 0);
+
+        boolean isKeepOld = "keep-old".equals(conflictPolicy);
+
+        Button btnKeepOld = createButton(isKeepOld ? "✓ Giữ Cũ - Bỏ Mới (Bảo toàn)" : "Giữ Cũ - Bỏ Mới", isKeepOld ? "#064E3B" : "#151720");
+        btnKeepOld.setTextSize(11f);
+        btnKeepOld.setTextColor(Color.parseColor(isKeepOld ? "#34D399" : "#94A3B8"));
+        btnKeepOld.setMinHeight(dp(36));
+        btnKeepOld.setPadding(dp(8), dp(4), dp(8), dp(4));
+        btnKeepOld.setOnClickListener(v -> {
+            triggerHaptic();
+            conflictPolicy = "keep-old";
+            saveAllState();
+            refreshSettingsUI();
+            appendLog("⚙️ Đã chọn chính sách: Giữ Cũ - Bỏ Mới");
+        });
+        rowPolicyChoice.addView(btnKeepOld, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        Button btnOverwrite = createButton(!isKeepOld ? "✓ Ghi Đè Nghĩa Mới" : "Ghi Đè Nghĩa Mới", !isKeepOld ? "#1E3A8A" : "#151720");
+        btnOverwrite.setTextSize(11f);
+        btnOverwrite.setTextColor(Color.parseColor(!isKeepOld ? "#38BDF8" : "#94A3B8"));
+        btnOverwrite.setMinHeight(dp(36));
+        btnOverwrite.setPadding(dp(8), dp(4), dp(8), dp(4));
+        LinearLayout.LayoutParams owl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+        owl.leftMargin = dp(6);
+        btnOverwrite.setLayoutParams(owl);
+        btnOverwrite.setOnClickListener(v -> {
+            triggerHaptic();
+            conflictPolicy = "overwrite";
+            saveAllState();
+            refreshSettingsUI();
+            appendLog("⚙️ Đã chọn chính sách: Ghi Đè Nghĩa Mới");
+        });
+        rowPolicyChoice.addView(btnOverwrite);
+
+        cardGloss.addView(rowPolicyChoice);
         content.addView(cardGloss);
 
-        // 3. Dịch Thuật & Chống Lọt Chữ Hán
+        // ---------------------------------------------------------------------
+        // 3. Dịch Thuật & Chống Lỗi (NÚT GẠT SWITCH XANH NGỌC)
+        // ---------------------------------------------------------------------
         LinearLayout rowS3Head = new LinearLayout(this);
         rowS3Head.setOrientation(LinearLayout.HORIZONTAL);
         rowS3Head.setGravity(Gravity.CENTER_VERTICAL);
-        rowS3Head.setPadding(0, 16, 0, 0);
+        rowS3Head.setPadding(0, dp(12), 0, 0);
+
         TextView tvTransTitle = new TextView(this);
-        tvTransTitle.setText("3. Dịch Thuật & Chống Lọt Chữ Hán (2 Lớp):");
+        tvTransTitle.setText("3. Dịch Thuật & Chống Lỗi Thông Minh");
         tvTransTitle.setTextColor(Color.WHITE);
-        tvTransTitle.setTextSize(15);
+        tvTransTitle.setTextSize(14f);
         tvTransTitle.setTypeface(null, Typeface.BOLD);
         rowS3Head.addView(tvTransTitle);
         rowS3Head.addView(createHelpButton("settings_translation_anti_hanzi"));
         content.addView(rowS3Head);
 
         LinearLayout cardTrans = createCard();
-        tvSettingsTargetLang = new TextView(this);
-        tvSettingsTargetLang.setText("• Ngôn ngữ đích: " + targetLanguage);
-        tvSettingsTargetLang.setTextColor(Color.parseColor("#93C5FD"));
-        cardTrans.addView(tvSettingsTargetLang);
 
-        LinearLayout rowLangs = new LinearLayout(this);
-        rowLangs.setOrientation(LinearLayout.HORIZONTAL);
-        rowLangs.setPadding(0, 8, 0, 12);
+        // Switch 1: Bộ lọc chống chữ Hán 2 lớp
+        cardTrans.addView(createSwitchRow(
+                "Bộ Lọc 2 Lớp Chống Chữ Hán",
+                "Rà soát và chuyển sạch toàn bộ chữ Hán sót sang tiếng Việt",
+                "settings_anti_hanzi",
+                antiHanziStrict,
+                () -> {
+                    antiHanziStrict = !antiHanziStrict;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Bộ lọc chống lọt chữ Hán: " + (antiHanziStrict ? "BẬT" : "TẮT"));
+                }
+        ));
 
-        btnLangVi = createButton("Tiếng Việt", targetLanguage.contains("Việt") ? "#2563EB" : "#1E293B");
-        btnLangVi.setOnClickListener(v -> {
-            targetLanguage = "Tiếng Việt";
-            saveAllState();
-            refreshSettingsUI();
-            appendLog("⚙️ Ngôn ngữ đích: Tiếng Việt (Kích hoạt bộ lọc cấm chữ Hán)");
-            Toast.makeText(this, "Đã chọn ngôn ngữ đích: Tiếng Việt", Toast.LENGTH_SHORT).show();
-        });
-        rowLangs.addView(btnLangVi, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        View spL1 = new View(this);
-        rowLangs.addView(spL1, new LinearLayout.LayoutParams(6, 1));
-
-        btnLangJa = createButton("日本語", targetLanguage.contains("Nhật") || targetLanguage.contains("日本語") ? "#2563EB" : "#1E293B");
-        btnLangJa.setOnClickListener(v -> {
-            targetLanguage = "日本語";
-            saveAllState();
-            refreshSettingsUI();
-            appendLog("⚙️ Ngôn ngữ đích: 日本語 (Thả lỏng cho phép sinh Kanji mượt mà)");
-            Toast.makeText(this, "Đã chọn ngôn ngữ đích: 日本語 (Tiếng Nhật)", Toast.LENGTH_SHORT).show();
-        });
-        rowLangs.addView(btnLangJa, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        View spL2 = new View(this);
-        rowLangs.addView(spL2, new LinearLayout.LayoutParams(6, 1));
-
-        btnLangEn = createButton("English", targetLanguage.equalsIgnoreCase("English") ? "#2563EB" : "#1E293B");
-        btnLangEn.setOnClickListener(v -> {
-            targetLanguage = "English";
-            saveAllState();
-            refreshSettingsUI();
-            appendLog("⚙️ Ngôn ngữ đích: English");
-            Toast.makeText(this, "Đã chọn ngôn ngữ đích: English", Toast.LENGTH_SHORT).show();
-        });
-        rowLangs.addView(btnLangEn, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        View spL3 = new View(this);
-        rowLangs.addView(spL3, new LinearLayout.LayoutParams(6, 1));
-
-        btnLangKo = createButton("한국어", targetLanguage.contains("한국어") || targetLanguage.contains("Hàn") ? "#2563EB" : "#1E293B");
-        btnLangKo.setOnClickListener(v -> {
-            targetLanguage = "한국어";
-            saveAllState();
-            refreshSettingsUI();
-            appendLog("⚙️ Ngôn ngữ đích: 한국어");
-            Toast.makeText(this, "Đã chọn ngôn ngữ đích: 한국어", Toast.LENGTH_SHORT).show();
-        });
-        rowLangs.addView(btnLangKo, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        cardTrans.addView(rowLangs);
-
-        btnSettingsAntiHanzi = createButton("Bộ Lọc 2 Lớp Chống Chữ Hán: " + (antiHanziStrict ? "🟢 BẬT [Lớp 1 + Lớp 2]" : "⚪ TẮT"), antiHanziStrict ? "#059669" : "#374151");
-        btnSettingsAntiHanzi.setOnClickListener(v -> {
-            antiHanziStrict = !antiHanziStrict;
-            saveAllState();
-            refreshSettingsUI();
-            appendLog("⚙️ Bộ lọc chống lọt chữ Hán: " + (antiHanziStrict ? "BẬT" : "TẮT"));
-        });
-        cardTrans.addView(btnSettingsAntiHanzi);
-
-        View spBetween = new View(this);
-        cardTrans.addView(spBetween, new LinearLayout.LayoutParams(1, 10));
-
-        btnSettingsAutoHeal = createButton("Tự Động Dịch Lại Khi Lỗi Nặng: " + (autoHealOnlineEnabled ? "🟢 BẬT [Auto-Heal Online]" : "⚪ TẮT"), autoHealOnlineEnabled ? "#0D9488" : "#374151");
-        btnSettingsAutoHeal.setOnClickListener(v -> {
-            autoHealOnlineEnabled = !autoHealOnlineEnabled;
-            saveAllState();
-            refreshSettingsUI();
-            appendLog("⚙️ Cơ chế Tự Động Dịch Lại & Ghi Đè khi lỗi nặng: " + (autoHealOnlineEnabled ? "BẬT" : "TẮT"));
-        });
-        cardTrans.addView(btnSettingsAutoHeal);
+        // Switch 2: Tự động sửa lỗi khi mất mạng / dịch lỗi
+        cardTrans.addView(createSwitchRow(
+                "Tự Động Sửa Lỗi Khi Mất Mạng (Auto-Heal)",
+                "Tự động đổi Key khác để dịch bù ngay khi AI bị nghẽn mạng",
+                "settings_auto_heal",
+                autoHealOnlineEnabled,
+                () -> {
+                    autoHealOnlineEnabled = !autoHealOnlineEnabled;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Cơ chế Tự Động Dịch Lại & Sửa Lỗi: " + (autoHealOnlineEnabled ? "BẬT" : "TẮT"));
+                }
+        ));
 
         content.addView(cardTrans);
 
-        // 4. Trạng Thái 5 Tầng Chạy Ngầm (God-Mode)
-        LinearLayout rowS4Head = new LinearLayout(this);
-        rowS4Head.setOrientation(LinearLayout.HORIZONTAL);
-        rowS4Head.setGravity(Gravity.CENTER_VERTICAL);
-        rowS4Head.setPadding(0, 16, 0, 0);
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("4. Trạng Thái 5 Tầng Chạy Ngầm (God-Mode):");
-        tvTitle.setTextColor(Color.WHITE);
-        tvTitle.setTextSize(15);
-        tvTitle.setTypeface(null, Typeface.BOLD);
-        rowS4Head.addView(tvTitle);
-        rowS4Head.addView(createHelpButton("settings_god_mode"));
-        content.addView(rowS4Head);
+        // ---------------------------------------------------------------------
+        // 4. Ngôn Ngữ Đích
+        // ---------------------------------------------------------------------
+        LinearLayout rowS4LangHead = new LinearLayout(this);
+        rowS4LangHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowS4LangHead.setGravity(Gravity.CENTER_VERTICAL);
+        rowS4LangHead.setPadding(0, dp(12), 0, 0);
+
+        TextView tvLangHeadTitle = new TextView(this);
+        tvLangHeadTitle.setText("4. Chọn Ngôn Ngữ Cần Dịch Sang");
+        tvLangHeadTitle.setTextColor(Color.WHITE);
+        tvLangHeadTitle.setTextSize(14f);
+        tvLangHeadTitle.setTypeface(null, Typeface.BOLD);
+        rowS4LangHead.addView(tvLangHeadTitle);
+        rowS4LangHead.addView(createHelpButton("settings_target_language"));
+        content.addView(rowS4LangHead);
+
+        LinearLayout cardLang = createCard();
+        LinearLayout rowLangs = new LinearLayout(this);
+        rowLangs.setOrientation(LinearLayout.HORIZONTAL);
+        rowLangs.setPadding(0, dp(4), 0, dp(4));
+
+        final String[][] langOptions = {
+                {"Tiếng Việt", "Tiếng Việt"},
+                {"日本語", "日本語"},
+                {"English", "English"},
+                {"한국어", "한국어"}
+        };
+
+        for (int i = 0; i < langOptions.length; i++) {
+            final String lName = langOptions[i][0];
+            final String lCode = langOptions[i][1];
+            boolean isSel = targetLanguage.contains(lName) || targetLanguage.equalsIgnoreCase(lCode);
+
+            Button btnL = createButton((isSel ? "✓ " : "") + lName, isSel ? "#1D4ED8" : "#151720");
+            btnL.setTextSize(11f);
+            btnL.setTextColor(Color.parseColor(isSel ? "#FFFFFF" : "#94A3B8"));
+            btnL.setMinHeight(dp(36));
+            btnL.setPadding(dp(6), dp(4), dp(6), dp(4));
+            btnL.setOnClickListener(v -> {
+                triggerHaptic();
+                targetLanguage = lName;
+                saveAllState();
+                refreshSettingsUI();
+                appendLog("⚙️ Đã chọn ngôn ngữ đích: " + targetLanguage);
+                Toast.makeText(this, "Đã chọn ngôn ngữ đích: " + targetLanguage, Toast.LENGTH_SHORT).show();
+            });
+
+            LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            if (i > 0) llp.leftMargin = dp(6);
+            btnL.setLayoutParams(llp);
+            rowLangs.addView(btnL);
+        }
+        cardLang.addView(rowLangs);
+        content.addView(cardLang);
+
+        // ---------------------------------------------------------------------
+        // 5. Trạng Thái 5 Tầng Chạy Ngầm (God-Mode)
+        // ---------------------------------------------------------------------
+        LinearLayout rowS5GodHead = new LinearLayout(this);
+        rowS5GodHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowS5GodHead.setGravity(Gravity.CENTER_VERTICAL);
+        rowS5GodHead.setPadding(0, dp(12), 0, 0);
+
+        TextView tvGodHeadTitle = new TextView(this);
+        tvGodHeadTitle.setText("5. Trạng Thái 5 Tầng Chạy Ngầm (God-Mode)");
+        tvGodHeadTitle.setTextColor(Color.WHITE);
+        tvGodHeadTitle.setTextSize(14f);
+        tvGodHeadTitle.setTypeface(null, Typeface.BOLD);
+        rowS5GodHead.addView(tvGodHeadTitle);
+        rowS5GodHead.addView(createHelpButton("settings_god_mode"));
+        content.addView(rowS5GodHead);
 
         LinearLayout cardStatus = createCard();
         cardStatus.addView(createStatusRow("1. Foreground Service (DataSync)", "KÍCH HOẠT"));
@@ -4261,82 +4170,227 @@ public class MainActivity extends AppCompatActivity {
         cardStatus.addView(createStatusRow("5. Root Mode (OOM Score -1000)", RootController.isRootAvailable() ? "BẤT TỬ (ROOT #)" : "CHƯA CẤP ROOT"));
         content.addView(cardStatus);
 
-        // Tinh chỉnh tốc độ dịch
-        TextView tvDelayTitle = new TextView(this);
-        tvDelayTitle.setText("Độ trễ an toàn giữa các chương (giây):");
-        tvDelayTitle.setTextColor(Color.WHITE);
-        tvDelayTitle.setPadding(0, 16, 0, 8);
-        content.addView(tvDelayTitle);
+        // ---------------------------------------------------------------------
+        // 6. Tốc Độ Dịch & Model Làm Mượt Final & Xuất File
+        // ---------------------------------------------------------------------
+        LinearLayout rowS6AdvHead = new LinearLayout(this);
+        rowS6AdvHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowS6AdvHead.setGravity(Gravity.CENTER_VERTICAL);
+        rowS6AdvHead.setPadding(0, dp(12), 0, 0);
 
-        EditText edtDelay = new EditText(this);
-        edtDelay.setText(String.valueOf(delaySec));
-        edtDelay.setTextColor(Color.WHITE);
-        edtDelay.setBackgroundColor(Color.parseColor("#171717"));
-        edtDelay.setPadding(16, 12, 16, 12);
-        content.addView(edtDelay);
+        TextView tvAdvTitle = new TextView(this);
+        tvAdvTitle.setText("6. Độ Trễ An Toàn & Xuất File Tác Phẩm");
+        tvAdvTitle.setTextColor(Color.WHITE);
+        tvAdvTitle.setTextSize(14f);
+        tvAdvTitle.setTypeface(null, Typeface.BOLD);
+        rowS6AdvHead.addView(tvAdvTitle);
+        rowS6AdvHead.addView(createHelpButton("settings_api_rotation"));
+        content.addView(rowS6AdvHead);
 
-        Button btnSaveDelay = createButton("Lưu Độ Trễ", "#1E293B");
-        btnSaveDelay.setOnClickListener(v -> {
-            try {
-                delaySec = Math.max(1, Integer.parseInt(edtDelay.getText().toString().trim()));
-                saveAllState();
-                Toast.makeText(this, "Đã lưu độ trễ: " + delaySec + "s", Toast.LENGTH_SHORT).show();
-            } catch (Exception ignored) {}
-        });
-        content.addView(btnSaveDelay);
+        LinearLayout cardAdv = createCard();
 
-        // 5. Cấu hình Model Làm Mượt Bản Dịch Final (Global Polish Model)
-        LinearLayout rowS5Head = new LinearLayout(this);
-        rowS5Head.setOrientation(LinearLayout.HORIZONTAL);
-        rowS5Head.setGravity(Gravity.CENTER_VERTICAL);
-        rowS5Head.setPadding(0, 16, 0, 0);
-        TextView tvPolishModelTitle = new TextView(this);
-        tvPolishModelTitle.setText("5. Model Dùng Cho Khâu Làm Mượt Final:");
-        tvPolishModelTitle.setTextColor(Color.WHITE);
-        tvPolishModelTitle.setTextSize(15);
-        tvPolishModelTitle.setTypeface(null, Typeface.BOLD);
-        rowS5Head.addView(tvPolishModelTitle);
-        rowS5Head.addView(createHelpButton("settings_api_rotation"));
-        content.addView(rowS5Head);
+        // Stepper: Độ trễ an toàn giữa các chương
+        cardAdv.addView(createStepperRow("Thời gian nghỉ giữa các chương:", "settings_api_rotation", delaySec, "giây", 1, 10, newVal -> {
+            delaySec = newVal;
+            saveAllState();
+            refreshSettingsUI();
+            appendLog("⚙️ Đã đặt độ trễ an toàn: " + delaySec + " giây");
+        }));
 
-        LinearLayout cardPolishModel = createCard();
+        // Model làm mượt
         TextView tvCurPolishModel = new TextView(this);
-        tvCurPolishModel.setText("• Model làm mượt đang chọn: " + polishModel);
+        tvCurPolishModel.setText("Model rà soát làm mượt Final: " + polishModel);
         tvCurPolishModel.setTextColor(Color.parseColor("#C084FC"));
-        tvCurPolishModel.setPadding(0, 0, 0, 8);
-        cardPolishModel.addView(tvCurPolishModel);
+        tvCurPolishModel.setTextSize(11.5f);
+        tvCurPolishModel.setPadding(0, dp(6), 0, dp(4));
+        cardAdv.addView(tvCurPolishModel);
 
-        String[] pModels = {"gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"};
+        String[] pModels = {"gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-pro"};
         LinearLayout rowPM = new LinearLayout(this);
         rowPM.setOrientation(LinearLayout.HORIZONTAL);
-        for (String pm : pModels) {
+        for (int i = 0; i < pModels.length; i++) {
+            final String pm = pModels[i];
             String label = pm.replace("gemini-", "");
-            Button b = createButton(label, polishModel.equals(pm) ? "#7C3AED" : "#1E293B");
+            boolean isSel = polishModel.equals(pm);
+            Button b = createButton(label, isSel ? "#7C3AED" : "#151720");
+            b.setTextSize(10.5f);
+            b.setTextColor(Color.parseColor(isSel ? "#FFFFFF" : "#94A3B8"));
+            b.setMinHeight(dp(34));
+            b.setPadding(dp(4), dp(2), dp(4), dp(2));
             b.setOnClickListener(v -> {
+                triggerHaptic();
                 polishModel = pm;
                 saveAllState();
-                tvCurPolishModel.setText("• Model làm mượt đang chọn: " + polishModel);
+                refreshSettingsUI();
                 appendLog("⚙️ Đã đổi Model Làm Mượt Final: " + polishModel);
                 Toast.makeText(this, "Đã chọn " + pm + " cho khâu làm mượt", Toast.LENGTH_SHORT).show();
             });
-            rowPM.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+            LinearLayout.LayoutParams pmlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+            if (i > 0) pmlp.leftMargin = dp(4);
+            b.setLayoutParams(pmlp);
+            rowPM.addView(b);
         }
-        cardPolishModel.addView(rowPM);
-        content.addView(cardPolishModel);
+        cardAdv.addView(rowPM);
 
         // Xuất toàn văn tác phẩm
-        LinearLayout rowExp = new LinearLayout(this);
-        rowExp.setOrientation(LinearLayout.HORIZONTAL);
-        rowExp.setGravity(Gravity.CENTER_VERTICAL);
-        rowExp.setPadding(0, 12, 0, 0);
+        Button btnExport = createGradientButton("📥 XUẤT TOÀN VĂN TÁC PHẨM (.TXT)", Color.parseColor("#059669"), Color.parseColor("#10B981"));
+        btnExport.setTextSize(12f);
+        btnExport.setMinHeight(dp(44));
+        btnExport.setOnClickListener(v -> {
+            triggerHaptic();
+            exportFullNovelData();
+        });
+        LinearLayout.LayoutParams explp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        explp.setMargins(0, dp(12), 0, 0);
+        cardAdv.addView(btnExport, explp);
 
-        Button btnExport = createButton("📥 Xuất Toàn Văn Tác Phẩm (.txt)", "#059669");
-        btnExport.setOnClickListener(v -> exportFullNovelData());
-        rowExp.addView(btnExport, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-        rowExp.addView(createHelpButton("export_full_txt"));
-        content.addView(rowExp);
+        content.addView(cardAdv);
 
-        tabSettingsView.addView(content);
+        return content;
+    }
+
+    private interface ValueChangedListener {
+        void onChanged(int newVal);
+    }
+
+    private LinearLayout createSwitchRow(String title, String subtitle, String helpKey, final boolean isChecked, final Runnable onToggle) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setBackground(createInputDrawable());
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rlp.setMargins(0, dp(4), 0, dp(4));
+        row.setLayoutParams(rlp);
+
+        LinearLayout colText = new LinearLayout(this);
+        colText.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout tRow = new LinearLayout(this);
+        tRow.setOrientation(LinearLayout.HORIZONTAL);
+        tRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvT = new TextView(this);
+        tvT.setText(title);
+        tvT.setTextColor(Color.WHITE);
+        tvT.setTextSize(12.5f);
+        tvT.setTypeface(null, Typeface.BOLD);
+        tRow.addView(tvT);
+
+        if (helpKey != null) {
+            tRow.addView(createHelpButton(helpKey));
+        }
+        colText.addView(tRow);
+
+        if (subtitle != null) {
+            TextView tvSub = new TextView(this);
+            tvSub.setText(subtitle);
+            tvSub.setTextColor(Color.parseColor("#94A3B8"));
+            tvSub.setTextSize(10.5f);
+            tvSub.setPadding(0, dp(2), 0, 0);
+            colText.addView(tvSub);
+        }
+        row.addView(colText, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        // Custom Switch Pill
+        FrameLayout switchPill = new FrameLayout(this);
+        GradientDrawable spBg = new GradientDrawable();
+        spBg.setColor(Color.parseColor(isChecked ? "#10B981" : "#262938"));
+        spBg.setCornerRadius(dp(14));
+        switchPill.setBackground(spBg);
+
+        View thumb = new View(this);
+        GradientDrawable thBg = new GradientDrawable();
+        thBg.setColor(Color.parseColor(isChecked ? "#FFFFFF" : "#64748B"));
+        thBg.setCornerRadius(dp(10));
+        thumb.setBackground(thBg);
+
+        FrameLayout.LayoutParams thLp = new FrameLayout.LayoutParams(dp(18), dp(18));
+        thLp.gravity = isChecked ? (Gravity.RIGHT | Gravity.CENTER_VERTICAL) : (Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        thLp.setMargins(dp(3), dp(3), dp(3), dp(3));
+        thumb.setLayoutParams(thLp);
+        switchPill.addView(thumb);
+
+        LinearLayout.LayoutParams splp = new LinearLayout.LayoutParams(dp(44), dp(24));
+        splp.leftMargin = dp(8);
+        switchPill.setLayoutParams(splp);
+
+        row.addView(switchPill);
+
+        row.setOnClickListener(v -> {
+            triggerHaptic();
+            onToggle.run();
+        });
+
+        return row;
+    }
+
+    private LinearLayout createStepperRow(String title, String helpKey, final int currentVal, final String unit, final int minVal, final int maxVal, final ValueChangedListener listener) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(8), dp(12), dp(8));
+        row.setBackground(createInputDrawable());
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rlp.setMargins(0, dp(4), 0, dp(4));
+        row.setLayoutParams(rlp);
+
+        LinearLayout tRow = new LinearLayout(this);
+        tRow.setOrientation(LinearLayout.HORIZONTAL);
+        tRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvT = new TextView(this);
+        tvT.setText(title);
+        tvT.setTextColor(Color.WHITE);
+        tvT.setTextSize(12.5f);
+        tvT.setTypeface(null, Typeface.BOLD);
+        tRow.addView(tvT);
+
+        if (helpKey != null) {
+            tRow.addView(createHelpButton(helpKey));
+        }
+        row.addView(tRow, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        // Stepper Container: [ - ]  [ 2 ký tự ]  [ + ]
+        LinearLayout stepper = new LinearLayout(this);
+        stepper.setOrientation(LinearLayout.HORIZONTAL);
+        stepper.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button btnMinus = createButton("-", "#1A1C28");
+        btnMinus.setTextSize(13f);
+        btnMinus.setMinHeight(dp(28));
+        btnMinus.setPadding(0, 0, 0, 0);
+        btnMinus.setOnClickListener(v -> {
+            triggerHaptic();
+            if (currentVal > minVal) {
+                listener.onChanged(currentVal - 1);
+            }
+        });
+        stepper.addView(btnMinus, new LinearLayout.LayoutParams(dp(30), dp(30)));
+
+        TextView tvVal = new TextView(this);
+        tvVal.setText(unit != null ? (currentVal + " " + unit) : String.valueOf(currentVal));
+        tvVal.setTextColor(Color.parseColor("#38BDF8"));
+        tvVal.setTextSize(12f);
+        tvVal.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tvVal.setGravity(Gravity.CENTER);
+        tvVal.setPadding(dp(6), dp(2), dp(6), dp(2));
+        stepper.addView(tvVal, new LinearLayout.LayoutParams(dp(64), ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        Button btnPlus = createButton("+", "#1A1C28");
+        btnPlus.setTextSize(13f);
+        btnPlus.setMinHeight(dp(28));
+        btnPlus.setPadding(0, 0, 0, 0);
+        btnPlus.setOnClickListener(v -> {
+            triggerHaptic();
+            if (currentVal < maxVal) {
+                listener.onChanged(currentVal + 1);
+            }
+        });
+        stepper.addView(btnPlus, new LinearLayout.LayoutParams(dp(30), dp(30)));
+
+        row.addView(stepper);
+        return row;
     }
 
     private void exportFullNovelData() {

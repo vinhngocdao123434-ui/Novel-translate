@@ -4,160 +4,162 @@ export const HELP_ENTRIES: Record<string, HelpInfoItem> = {
   // ========================================================
   // TAB 1: KEY & PROMPT
   // ========================================================
-  'key_pool': {
-    title: 'Multi-Key Gemini Pool (Kho Chìa Khóa API)',
-    category: 'Quản Lý Khóa API',
-    whatIsIt: 'Nơi lưu trữ danh sách API Key Google Gemini của bạn. Ứng dụng sẽ tự động luân phiên đổi chìa khóa khi dịch để không bị nghẽn mạng.',
-    howToUse: '• Dán API key (mỗi dòng 1 key) rồi bấm "Thêm API Key Vào Pool".\n• Bấm "Test tất cả key" để kiểm tra độ trễ (latency) và hạn mức còn dùng được.\n• Có thể bật/tắt từng key bằng công tắc.',
-    proTip: 'Mẹo hay: Dùng 2 đến 5 tài khoản Google khác nhau để lấy 2 - 5 key nạp vào, giúp dịch liên tục không giới hạn!'
-  },
-  'test_keys': {
-    title: 'Kiểm Tra API Key (Ping & Quota Test)',
-    category: 'Quản Lý Khóa API',
-    whatIsIt: 'Gửi tín hiệu kiểm tra nhanh đến Google để biết chìa khóa này còn hoạt động tốt và còn hạn ngạch miễn phí hay không.',
-    howToUse: 'Bấm nút "Test tất cả key" để kiểm tra đồng loạt.'
+  'select_model': {
+    title: 'Chọn Dòng Model Gemini',
+    category: 'Bộ Não AI',
+    whatIsIt: 'Chọn phiên bản trí tuệ nhân tạo của Google để dịch truyện.',
+    howToUse: '• 2.5 Flash / 3.5 Flash Lite / 2.5 Flash Lite: Dịch siêu tốc, tốn rất ít hạn mức, thích hợp dịch truyện dài hàng nghìn chương.\n• 3.6 Flash / 2.5 Pro: Câu từ mượt mà, văn phong chau chuốt nhất.',
+    proTip: 'Nên chọn "2.5 Flash" hoặc "3.5 Flash Lite" làm mặc định để dịch nhanh và không lo hết lượt.'
   },
   'model_selection': {
-    title: 'Lựa Chọn Model Dịch (Mô Hình AI)',
-    category: 'Cấu Hình Động Cơ AI',
-    whatIsIt: 'Chọn bộ não AI của Google để thực hiện dịch thuật.',
-    howToUse: '• Gemini 2.5 Flash-Lite / 3.5 Flash-Lite: Khuyên dùng cho truyện dài (>10MB). Tốc độ siêu nhanh, hạn ngạch dồi dào không lo nghẽn mạng. Hệ thống tự động cứu hộ sẽ vá mượt bản dịch đạt 9/10 điểm.\n• Gemini 2.5 Flash / 3.6 Flash: Dành cho dịch đoạn ngắn cần độ trau chuốt tuyệt đối.',
-    proTip: 'Bạn cũng có thể nhập mã Model ID tùy chỉnh của Google vào ô bên dưới rồi bấm "Nạp Model".'
+    title: 'Chọn Dòng Model Gemini',
+    category: 'Bộ Não AI',
+    whatIsIt: 'Chọn phiên bản trí tuệ nhân tạo của Google để dịch truyện.',
+    howToUse: '• 2.5 Flash / 3.5 Flash Lite / 2.5 Flash Lite: Dịch siêu tốc, tốn rất ít hạn mức, thích hợp dịch truyện dài hàng nghìn chương.\n• 3.6 Flash / 2.5 Pro: Câu từ mượt mà, văn phong chau chuốt nhất.',
+    proTip: 'Nên chọn "2.5 Flash" hoặc "3.5 Flash Lite" làm mặc định để dịch nhanh và không lo hết lượt.'
+  },
+  'key_pool': {
+    title: 'Kho Chìa Khóa API (Key Pool)',
+    category: 'Quản Lý API Key',
+    whatIsIt: 'Nơi chứa các mã API Key miễn phí từ Google để chạy dịch.',
+    howToUse: '• Dán nhiều key (mỗi dòng 1 key) rồi bấm "+ Thêm API Key Vào Pool".\n• App sẽ tự động đổi sang key khác khi key hiện tại bị nghẽn mạng.',
+    proTip: 'Nên nạp từ 2 đến 5 key của các tài khoản Google khác nhau để dịch liên tục không bao giờ bị dừng.'
+  },
+  'test_keys': {
+    title: 'Kiểm Tra API Key',
+    category: 'Quản Lý API Key',
+    whatIsIt: 'Gửi tín hiệu kiểm tra nhanh xem key còn dùng được hay không.',
+    howToUse: 'Bấm nút "Test tất cả key" để kiểm tra đồng loạt.'
   },
   'prompt_cards': {
-    title: 'Thẻ Phong Cách Dịch (Prompt Cards)',
-    category: 'Văn Phong Dịch Thuật',
-    whatIsIt: 'Quyết định văn phong bản dịch (Tiên hiệp cổ trang, Đô thị hiện đại, Kiếm hiệp kiếm khí...).',
-    howToUse: '• Nhấn vào thẻ phong cách để kích hoạt.\n• Bấm "+ Thêm Prompt" để tạo văn phong theo sở thích của riêng bạn.\n• Bấm biểu tượng cây bút để chỉnh sửa nội dung prompt chi tiết.',
-    proTip: 'Có thể khôi phục về các thẻ mặc định bất kỳ lúc nào bằng nút "Mặc định".'
+    title: 'Thẻ Phong Cách Dịch',
+    category: 'Văn Phong',
+    whatIsIt: 'Hướng dẫn AI dịch theo thể loại truyện bạn thích (Tiên hiệp, Đô thị, Kiếm hiệp...).',
+    howToUse: '• Chọn thẻ có sẵn hoặc bấm "+ Thêm" để tự viết phong cách riêng.',
+    proTip: 'Mặc định phong cách Tiên Hiệp đã được tối ưu rất mượt cho hầu hết truyện dịch.'
   },
 
   // ========================================================
   // TAB 2: DỊCH & TỪ ĐIỂN
   // ========================================================
   'novel_raw_input': {
-    title: 'Mục 1: Nhập & Bóc Tách File Truyện Gốc',
-    category: 'Nạp & Phân Tích File',
-    whatIsIt: 'Khu vực đưa truyện tiếng Trung thô vào và chia nhỏ thành từng chương để AI xử lý.',
-    howToUse: '• Nạp Ebook: Bấm để chọn file .txt, .epub, .mobi, .azw3 từ điện thoại hoặc máy tính. Hệ thống tự giải nén và phân tích cấu trúc.\n• Theo Tác Giả: Tự động dùng biểu thức Regex nhận diện dòng tiêu đề chương (第一章, 第1章, Chương 1, Hồi thứ 1...) để cắt chuẩn y như sách in. Khuyên dùng cho 95% truyện mạng.\n• Tùy Ký Tự (Chunk Size): Cắt đều đặn theo số ký tự (2.000, 3.000, 3.500, 5.000 ký tự). Dùng cho truyện ngắn hoặc file thô bị mất dòng tiêu đề chương.\n• Tách Chương: Bấm nút này sau khi đã dán văn bản hoặc chọn chế độ để hoàn tất chia chương.',
-    proTip: 'Độ dài tối ưu nhất cho AI dịch mượt là khoảng 3.000 - 3.500 ký tự mỗi chương.'
+    title: 'Nạp File Truyện Gốc',
+    category: 'Nạp File',
+    whatIsIt: 'Tải file tiếng Trung (.txt hoặc .epub) vào để máy tự động cắt chương.',
+    howToUse: '• Chọn "Tách Tác Giả (Regex)" để app tự nhận diện tiêu đề từng chương y như sách in.',
+    proTip: 'Nên dùng file .txt chuẩn để app chia chương chính xác nhất.'
   },
   'range_progress': {
-    title: 'Mục 2: Tiến Độ Dịch Thuật & Điều Khiển',
-    category: 'Tiến Trình Dịch',
-    whatIsIt: 'Trung tâm điều khiển toàn bộ quá trình dịch thuật của bộ truyện.',
-    howToUse: '• Từ chương -> Đến chương: Nhập khoảng chương bạn muốn dịch hôm nay (ví dụ: từ 1 đến 50).\n• Dịch Range: Khởi động quá trình dịch tự động tuần tự từng chương.\n• Tạm dừng / Tiếp tục: Dừng tạm thời khi có việc bận hoặc để đổi key/model mà không làm mất chương đang dịch.\n• Hủy: Dừng hẳn tiến trình dịch an toàn.\n• ⚡ Dịch Bù Chương Sót: Tự động quét kiểm tra, phát hiện chương nào bị mất mạng/chưa dịch để dịch bù, và TỰ ĐỘNG BỎ QUA 100% các chương đã dịch xong.\n• ✨ Làm Mượt Bản Dịch Final: Khâu quét sạch toàn bộ chữ Hán và từ lai còn sót lại trong toàn tác phẩm sau khi bạn đã dịch xong.',
-    proTip: 'Nếu truyện dài, hãy dịch theo từng đợt 50 - 100 chương để dễ kiểm soát và sao lưu.'
+    title: 'Tiến Độ Dịch Thuật',
+    category: 'Quá Trình Dịch',
+    whatIsIt: 'Khu vực điều khiển AI dịch từ chương nào đến chương nào.',
+    howToUse: '• Nhập số chương cần dịch (VD: 1 đến 50) rồi bấm "▶ Dịch Range".\n• "⚡ Dịch Bù Chương Sót": Tự động tìm và dịch nốt các chương bị thiếu/lỗi mà không dịch lại các chương đã có.',
+    proTip: 'Nếu bị đứt mạng giữa chừng, chỉ cần bấm "Dịch Bù Chương Sót" là xong ngay.'
   },
   'master_glossary': {
-    title: 'Mục 3: Kho Thuật Ngữ Master Glossary',
-    category: 'Từ Điển Tác Phẩm',
-    whatIsIt: 'Bộ từ điển độc lập của tác phẩm, lưu giữ danh sách tên nhân vật, môn phái, chiêu thức, địa danh (VD: 林辰 = Lâm Thần).',
-    howToUse: '• Đảm bảo nhân vật giữ đúng một tên gọi xuyên suốt từ chương đầu đến chương cuối.\n• Thêm nhanh: Nhập "Từ gốc" và "Nghĩa dịch" rồi bấm "+ Thêm Từ".\n• Nạp / Xuất: Nhập hoặc xuất file từ điển dạng .txt (raw=vi) để dùng lại trên máy khác.\n• Mở kho từ điển đầy đủ: Xem toàn bộ danh sách, tra cứu tìm kiếm và chỉnh sửa lại các từ theo ý muốn.',
-    proTip: 'Nên kết hợp bật chức năng AI Auto-Learn ở Tab Cài đặt để AI tự động trích xuất nhân vật mới vào kho này.'
+    title: 'Kho Từ Điển (Glossary)',
+    category: 'Từ Điển Nhân Vật',
+    whatIsIt: 'Danh sách tên nhân vật, môn phái và địa danh để dịch đồng nhất.',
+    howToUse: '• Ví dụ: 林辰 ➔ Lâm Thần. Đảm bảo nhân vật giữ đúng một tên từ đầu đến cuối truyện.',
+    proTip: 'Bạn có thể thêm từ thủ công hoặc để app tự động thu thập trong quá trình dịch.'
   },
 
   // ========================================================
   // TAB 3: BẢN DỊCH & ĐỌC
   // ========================================================
   'chapter_auditor': {
-    title: 'Trình Đọc & Hệ Thống Kiểm Định Chất Lượng',
-    category: 'Đọc & Kiểm Tra',
-    whatIsIt: 'Không gian đọc bản dịch từng chương kèm hệ thống tự động kiểm tra chất lượng (Chapter Auditor).',
-    howToUse: '• Chọn chương cần đọc ở danh sách bên trái.\n• Nhìn huy hiệu góc trên: Xanh lá (100% Tiếng Việt Chuẩn) hoặc Cam (Phát hiện từ cần cứu hộ).\n• Nút "Dịch lại": Yêu cầu AI dịch lại riêng duy nhất chương này nếu chưa ưng ý.\n• Nút "Xuất chương": Tải riêng file .txt của chương đang đọc về máy.'
+    title: 'Đọc & Xem Bản Dịch',
+    category: 'Trình Đọc',
+    whatIsIt: 'Nơi đọc truyện toàn màn hình với giao diện tối chống mỏi mắt.',
+    howToUse: '• Chạm vào chương để mở trình đọc.\n• Hỗ trợ xem Bản Dịch hoặc xem Song Ngữ (đối chiếu Trung - Việt).',
+    proTip: 'Bấm vào nút "Dịch lại" trong từng chương nếu muốn AI làm lại riêng chương đó.'
   },
 
   // ========================================================
-  // TAB 4: CÀI ĐẶT (ĐẦY ĐỦ MỤC 1, 2, 3, 4, 5 & CÁC SUB-TABS)
+  // TAB 4: CÀI ĐẶT
   // ========================================================
-  'settings_api_rotation': {
-    title: '1. Cài Đặt Key API & Động Cơ Xoay Tua',
-    category: 'Hạ Tầng API & Quản Lý Khóa',
-    whatIsIt: 'Quản lý cách thức ứng dụng luân phiên các API Key Gemini và tự động xử lý khi chạm giới hạn hạn mức (Rate Limit 429).',
-    howToUse: '• Chiến lược xoay key: "Round-Robin tuần tự" dùng lần lượt từng key một cách đều đặn; "Ưu tiên key khỏe nhất" tự chọn key có phản hồi nhanh nhất.\n• Cooldown 429: Thời gian nghỉ của key khi hết hạn ngạch (khuyên để 60 giây theo chu kỳ của Google).\n• Max Retries: Số lần tự động thử lại với key khác khi gặp lỗi mạng trước khi dừng lại.\n• Độ trễ an toàn: Khoảng nghỉ ngắn giữa 2 chương (1 - 2s) giúp bảo vệ tài khoản không bị hệ thống chặn spam.',
-    proTip: 'Cơ chế này phối hợp cùng Multi-Key Pool giúp bạn dịch xuyên suốt không lo đứng máy.'
-  },
-  'rotation_strategy': {
-    title: '1. Cài Đặt Key API & Động Cơ Xoay Tua',
-    category: 'Hạ Tầng API & Quản Lý Khóa',
-    whatIsIt: 'Quản lý cách thức ứng dụng luân phiên các API Key Gemini và tự động xử lý khi chạm giới hạn hạn mức (Rate Limit 429).',
-    howToUse: '• Chiến lược xoay key: "Round-Robin tuần tự" dùng lần lượt từng key một cách đều đặn; "Ưu tiên key khỏe nhất" tự chọn key có phản hồi nhanh nhất.\n• Cooldown 429: Thời gian nghỉ của key khi hết hạn ngạch (khuyên để 60 giây theo chu kỳ của Google).\n• Max Retries: Số lần tự động thử lại với key khác khi gặp lỗi mạng trước khi dừng lại.\n• Độ trễ an toàn: Khoảng nghỉ ngắn giữa 2 chương (1 - 2s) giúp bảo vệ tài khoản không bị hệ thống chặn spam.'
-  },
-  'cooldown_seconds': {
-    title: 'Thời Gian Nghỉ Khi Dính Lỗi 429 (Cooldown)',
-    category: 'Tự Động Phục Hồi',
-    whatIsIt: 'Khi một chìa khóa dùng hết hạn ngạch trong phút đó, app sẽ tạm cho chìa khóa đó nghỉ ngơi trong số giây này rồi mới dùng lại.',
-    howToUse: 'Mặc định là 60 giây (chu kỳ reset hạn ngạch của Google).'
-  },
-
-  'settings_glossary_learning': {
-    title: '2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)',
-    category: 'Bộ Lọc & Quản Lý Từ Điển',
-    whatIsIt: 'Bộ quy chuẩn chất lượng để AI tự động lọc và thu thập tên nhân vật, chiêu thức, địa danh từ bản dịch vào Master Glossary.',
-    howToUse: '• Độ dài tối thiểu: Khuyên để từ 2 đến 4 ký tự. Ngăn AI tự ý đưa các từ 1 chữ (như hắn, nàng, đi, đến...) vào từ điển làm rác văn bản.\n• Tần suất tối thiểu: Đặt ≥ 2 lần để chỉ ghi nhớ các nhân vật/địa danh quan trọng xuất hiện lặp lại trong chương.\n• Chính sách xung đột (Conflict Policy): "Giữ cũ - Bỏ mới" (Khuyên dùng) giúp cố định tên nhân vật ban đầu, tránh việc cùng một nhân vật bị đổi tên lộn xộn ở các chương sau.\n• Bộ lọc từ cấm (Blacklist): Danh sách các đại từ hoặc từ thông dụng không bao giờ được phép thêm vào từ điển.',
-    proTip: 'Chính sách "Giữ Cũ - Bỏ Mới" là chìa khóa vàng giúp toàn bộ 1000 chương truyện thống nhất tên gọi.'
-  },
-  'quality_filters': {
-    title: '2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)',
-    category: 'Bộ Lọc & Quản Lý Từ Điển',
-    whatIsIt: 'Bộ quy chuẩn chất lượng để AI tự động lọc và thu thập tên nhân vật, chiêu thức, địa danh từ bản dịch vào Master Glossary.',
-    howToUse: '• Độ dài tối thiểu: Khuyên để từ 2 đến 4 ký tự. Ngăn AI tự ý đưa các từ 1 chữ (như hắn, nàng, đi, đến...) vào từ điển làm rác văn bản.\n• Tần suất tối thiểu: Đặt ≥ 2 lần để chỉ ghi nhớ các nhân vật/địa danh quan trọng xuất hiện lặp lại trong chương.\n• Chính sách xung đột (Conflict Policy): "Giữ cũ - Bỏ mới" (Khuyên dùng) giúp cố định tên nhân vật ban đầu, tránh việc cùng một nhân vật bị đổi tên lộn xộn ở các chương sau.\n• Bộ lọc từ cấm (Blacklist): Danh sách các đại từ hoặc từ thông dụng không bao giờ được phép thêm vào từ điển.'
-  },
-  'min_term_length': {
-    title: '2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)',
-    category: 'Bộ Lọc & Quản Lý Từ Điển',
-    whatIsIt: 'Bộ quy chuẩn chất lượng để AI tự động lọc và thu thập tên nhân vật, chiêu thức, địa danh từ bản dịch vào Master Glossary.',
-    howToUse: '• Độ dài tối thiểu: Khuyên để từ 2 đến 4 ký tự. Ngăn AI tự ý đưa các từ 1 chữ (như hắn, nàng, đi, đến...) vào từ điển làm rác văn bản.\n• Tần suất tối thiểu: Đặt ≥ 2 lần để chỉ ghi nhớ các nhân vật/địa danh quan trọng xuất hiện lặp lại trong chương.\n• Chính sách xung đột (Conflict Policy): "Giữ cũ - Bỏ mới" (Khuyên dùng) giúp cố định tên nhân vật ban đầu, tránh việc cùng một nhân vật bị đổi tên lộn xộn ở các chương sau.\n• Bộ lọc từ cấm (Blacklist): Danh sách các đại từ hoặc từ thông dụng không bao giờ được phép thêm vào từ điển.'
-  },
-
-  'settings_translation_anti_hanzi': {
-    title: '3. Cài Đặt Dịch Thuật & Chống Lọt Chữ Hán',
-    category: 'Chất Lượng Bản Dịch & Đa Ngôn Ngữ',
-    whatIsIt: 'Kiểm soát ngôn ngữ dịch đầu ra và hệ thống phòng thủ chống sót chữ Hán 2 lớp (Dual-Layer Guard).',
-    howToUse: '• Ngôn ngữ đích: Chọn Tiếng Việt, Tiếng Nhật, Tiếng Anh hoặc Tiếng Hàn.\n• Bộ lọc chống lọt chữ Hán 2 lớp:\n  - Lớp 1 (Ép khuôn Prompt): Cấm AI sinh chữ tượng hình Hán trong câu trả lời.\n  - Lớp 2 (Hậu kiểm Regex): Tự động quét regex [\\u4e00-\\u9fa5] để chuyển đổi triệt để sang âm Hán-Việt chuẩn, bản dịch sạch 100% tiếng Việt!\n• Ngữ cảnh nối chương: Kẹp 250 - 350 ký tự đoạn cuối của chương trước vào đầu chương sau để AI bắt nhịp văn phong và cách xưng hô liền mạch.',
-    proTip: 'Nếu chọn ngôn ngữ đích là Tiếng Nhật, app sẽ tự động thả lỏng để AI sinh chữ Kanji tự nhiên.'
-  },
-  'output_guard': {
-    title: '3. Cài Đặt Dịch Thuật & Chống Lọt Chữ Hán',
-    category: 'Chất Lượng Bản Dịch & Đa Ngôn Ngữ',
-    whatIsIt: 'Kiểm soát ngôn ngữ dịch đầu ra và hệ thống phòng thủ chống sót chữ Hán 2 lớp (Dual-Layer Guard).',
-    howToUse: '• Ngôn ngữ đích: Chọn Tiếng Việt, Tiếng Nhật, Tiếng Anh hoặc Tiếng Hàn.\n• Bộ lọc chống lọt chữ Hán 2 lớp:\n  - Lớp 1 (Ép khuôn Prompt): Cấm AI sinh chữ tượng hình Hán trong câu trả lời.\n  - Lớp 2 (Hậu kiểm Regex): Tự động quét regex [\\u4e00-\\u9fa5] để chuyển đổi triệt để sang âm Hán-Việt chuẩn, bản dịch sạch 100% tiếng Việt!\n• Ngữ cảnh nối chương: Kẹp 250 - 350 ký tự đoạn cuối của chương trước vào đầu chương sau để AI bắt nhịp văn phong và cách xưng hô liền mạch.'
-  },
-
-  'settings_reader_experience': {
-    title: '4. Cài Đặt Trình Đọc & Trải Nghiệm Đọc',
-    category: 'Giao Diện & Đọc Truyện',
-    whatIsIt: 'Tùy biến cỡ chữ hiển thị và hành vi màn hình thiết bị khi bạn đọc truyện trực tiếp trên ứng dụng.',
-    howToUse: '• Cỡ chữ mặc định: Tùy chọn từ 14 đến 22 để phù hợp với kích thước màn hình và tầm mắt của bạn.\n• Giữ sáng màn hình khi đọc: Kích hoạt cờ hệ thống FLAG_KEEP_SCREEN_ON giúp màn hình không bao giờ bị tối hoặc tự khóa trong lúc bạn đang đọc một chương truyện dài.',
-    proTip: 'Cài đặt này sẽ được lưu cố định cho các lần mở app sau.'
-  },
-
-  'settings_god_mode': {
-    title: '5. Kiểm Soát 5 Lớp Chạy Ngầm (God-Mode)',
-    category: 'Độ Bền Bỉ Hệ Thống Android',
-    whatIsIt: 'Kiến trúc dịch ngầm độc quyền giúp ứng dụng dịch liên tục hàng nghìn chương ngay cả khi tắt màn hình, khóa máy hoặc máy ít RAM.',
-    howToUse: '• Lớp 1 (Foreground Service): Hiển thị tiến trình dịch liên tục trên thanh thông báo hệ thống.\n• Lớp 2 (CPU WakeLock): Giữ chip xử lý chạy ngầm, chống Deep Sleep khi tắt màn hình.\n• Lớp 3 (Bỏ qua tối ưu pin Doze Mode): Miễn nhiễm với cơ chế tự ngắt ứng dụng của Android.\n• Lớp 4 (WorkManager Watchdog): Tự động kiểm tra và hồi sinh tiến trình sau 15 giây nếu bị Android vô tình giải phóng RAM.\n• Lớp 5 (Root OOM Score -1000): Thiết lập độ ưu tiên tối thượng tương đương tiến trình nhân hệ thống (dành cho máy Root).',
-    proTip: 'Bạn hoàn toàn có thể cắm sạc, khóa màn hình và đi ngủ, sáng dậy sẽ có hàng trăm chương truyện đã dịch xong!'
-  },
-  'foreground_service': {
-    title: '5. Kiểm Soát 5 Lớp Chạy Ngầm (God-Mode)',
-    category: 'Độ Bền Bỉ Hệ Thống Android',
-    whatIsIt: 'Kiến trúc dịch ngầm độc quyền giúp ứng dụng dịch liên tục hàng nghìn chương ngay cả khi tắt màn hình, khóa máy hoặc máy ít RAM.',
-    howToUse: '• Lớp 1 (Foreground Service): Hiển thị tiến trình dịch liên tục trên thanh thông báo hệ thống.\n• Lớp 2 (CPU WakeLock): Giữ chip xử lý chạy ngầm, chống Deep Sleep khi tắt màn hình.\n• Lớp 3 (Bỏ qua tối ưu pin Doze Mode): Miễn nhiễm với cơ chế tự ngắt ứng dụng của Android.\n• Lớp 4 (WorkManager Watchdog): Tự động kiểm tra và hồi sinh tiến trình sau 15 giây nếu bị Android vô tình giải phóng RAM.\n• Lớp 5 (Root OOM Score -1000): Thiết lập độ ưu tiên tối thượng tương đương tiến trình nhân hệ thống (dành cho máy Root).'
-  },
-
   'settings_projects_manager': {
-    title: 'Quản Lý & Lưu Trữ Đa Dự Án Truyện',
-    category: 'Quản Lý Tác Phẩm',
-    whatIsIt: 'Quản lý nhiều bộ truyện độc lập cùng lúc trên một thiết bị mà không bị lẫn lộn dữ liệu.',
-    howToUse: '• Mỗi dự án lưu giữ riêng biệt: toàn bộ các chương thô, bản dịch đã hoàn thành và từ điển Master Glossary riêng của bộ đó.\n• Bấm nút "Chuyển sang" để tiếp tục dịch hoặc đọc một bộ truyện khác.\n• Bấm "Tạo Mới" để bắt đầu một bộ truyện mới.\n• Nút "Xóa vĩnh viễn dự án": Chỉ xóa nội dung của bộ truyện đang chọn. Kho Key API và các Thẻ Prompt ở Tab 1 được bảo toàn vĩnh cửu 100%!',
-    proTip: 'Bạn có thể lưu trữ hàng chục bộ truyện cùng lúc mà không lo mất dữ liệu.'
+    title: 'Quản Lý Dự Án Truyện',
+    category: 'Quản Lý Dự Án',
+    whatIsIt: 'Giúp bạn dịch cùng lúc nhiều bộ truyện khác nhau mà không bị lẫn lộn.',
+    howToUse: '• Bấm "Chuyển Dự Án" để đổi sang truyện khác.\n• Bấm "+ Tạo Mới" để bắt đầu một bộ truyện mới.\n• Xóa dự án chỉ xóa nội dung truyện đó, kho Key API và Thẻ Prompt được giữ nguyên 100%.',
+    proTip: 'Mỗi truyện sẽ có một kho từ điển và danh sách chương riêng biệt.'
   },
-
+  'settings_glossary_learning': {
+    title: 'Tự Động Gom Từ Điển (AI Auto-Learning)',
+    category: 'Bộ Lọc Từ Điển',
+    whatIsIt: 'Máy sẽ tự động phát hiện tên nhân vật mới trong truyện và lưu vào từ điển.',
+    howToUse: '• Độ dài chữ Hán tối thiểu: Nên để 2 hoặc 3 ký tự (tránh lưu chữ rác 1 từ).\n• Tần suất lặp lại: Nên để 2 đến 4 lần (để chỉ lưu các nhân vật quan trọng).',
+    proTip: 'Bật tính năng này giúp bạn không cần phải tự gõ từ điển bằng tay.'
+  },
+  'settings_min_term_length': {
+    title: 'Độ Dài Chữ Hán Tối Thiểu',
+    category: 'Lọc Từ Điển',
+    whatIsIt: 'Quy định từ tiếng Trung phải có từ bao nhiêu chữ trở lên thì mới được lưu vào từ điển.',
+    howToUse: '• KHUYÊN DÙNG: Đặt là 2 hoặc 3 ký tự.\n• TẠI SAO: Nếu đặt 1 ký tự, máy sẽ lưu cả những chữ thông thường như "tôi", "nó", "đi" làm hỏng bản dịch.',
+    proTip: 'Nên để mặc định là 2 ký tự.'
+  },
+  'settings_min_frequency': {
+    title: 'Tần Suất Lặp Lại Tối Thiểu',
+    category: 'Lọc Từ Điển',
+    whatIsIt: 'Từ tiếng Trung đó phải xuất hiện bao nhiêu lần trong chương thì mới được coi là tên nhân vật.',
+    howToUse: '• KHUYÊN DÙNG: Đặt từ 2 đến 4 lần.\n• TẠI SAO: Tránh lưu những từ người qua đường chỉ xuất hiện 1 lần rồi biến mất.',
+    proTip: 'Nên để mặc định là 2 hoặc 3 lần.'
+  },
+  'settings_conflict_policy': {
+    title: 'Xử Lý Khi Trùng Tên Nhân Vật (Xung Đột Nghĩa)',
+    category: 'Quy Tắc Tên',
+    whatIsIt: 'Khi chương sau xuất hiện một từ đã có ở chương trước nhưng nghĩa dịch hơi khác nhau.',
+    howToUse: '• KHUYÊN DÙNG: Chọn "Giữ Cũ - Bỏ Mới".\n• TẠI SAO: Để tên nhân vật từ chương 1 không bao giờ bị đổi sang tên khác ở chương 100.',
+    proTip: 'Luôn chọn "Giữ Cũ" để tên nhân vật xuyên suốt và đồng nhất.'
+  },
+  'settings_translation_anti_hanzi': {
+    title: 'Chống Lọt Chữ Hán (2 Lớp)',
+    category: 'Lọc Chữ Sót',
+    whatIsIt: 'Tự động rà soát và chuyển sạch toàn bộ chữ tiếng Trung còn sót lại sang tiếng Việt.',
+    howToUse: '• KHUYÊN DÙNG: NÊN BẬT (Nút gạt xanh ngọc).\n• TÁC DỤNG: Đảm bảo bản dịch 100% tiếng Việt, không bị lẫn chữ tượng hình.',
+    proTip: 'Hãy luôn BẬT tính năng này để có trải nghiệm đọc truyện hoàn hảo.'
+  },
+  'settings_anti_hanzi': {
+    title: 'Bộ Lọc Chống Lọt Chữ Hán',
+    category: 'Lọc Chữ Sót',
+    whatIsIt: 'Rà soát và chuyển sạch toàn bộ chữ Hán sót sang tiếng Việt.',
+    howToUse: 'Gạt nút sang BẬT (Màu xanh ngọc) để kích hoạt bảo vệ 2 lớp.',
+    proTip: 'Khuyên dùng luôn BẬT cho truyện dịch tiếng Việt.'
+  },
+  'settings_auto_heal': {
+    title: 'Tự Động Sửa Lỗi Khi Mất Mạng (Auto-Heal)',
+    category: 'Tự Động Cứu Hộ',
+    whatIsIt: 'Nếu đang dịch mà bị rớt mạng hoặc AI trả về thiếu câu, app sẽ tự đổi chìa khóa (Key) khác để dịch lại ngay.',
+    howToUse: '• KHUYÊN DÙNG: NÊN BẬT (Nút gạt xanh ngọc).\n• TÁC DỤNG: Bạn không cần phải ngồi canh máy bấm dịch lại từng câu.',
+    proTip: 'BẬT tính năng này giúp bạn có thể cắm máy dịch tự động cả đêm.'
+  },
+  'settings_target_language': {
+    title: 'Ngôn Ngữ Đích',
+    category: 'Ngôn Ngữ',
+    whatIsIt: 'Chọn ngôn ngữ bạn muốn dịch sang (Tiếng Việt, Tiếng Nhật, Tiếng Anh, Tiếng Hàn).',
+    howToUse: '• Mặc định là Tiếng Việt.\n• Nếu chọn Tiếng Nhật, app sẽ cho phép sinh chữ Kanji mượt mà.',
+    proTip: 'Chọn Tiếng Việt để đọc truyện dịch tốt nhất.'
+  },
+  'settings_god_mode': {
+    title: 'Dịch Ngầm Chống Tắt Máy (God-Mode)',
+    category: 'Chạy Ngầm',
+    whatIsIt: 'Hệ thống giúp máy tiếp tục dịch ngay cả khi bạn tắt màn hình, khóa máy hoặc chuyển sang ứng dụng khác.',
+    howToUse: '• Hoàn toàn tự động kích hoạt.\n• Không lo bị Android tự tắt app khi thiếu RAM.',
+    proTip: 'Bạn có thể khóa máy đi ngủ, sáng dậy truyện đã dịch xong.'
+  },
+  'settings_api_rotation': {
+    title: 'Thời Gian Nghỉ Giữa Các Chương',
+    category: 'Tốc Độ Dịch',
+    whatIsIt: 'Khoảng thời gian nghỉ ngắn (1 - 3 giây) giữa các chương để tránh bị Google chặn mạng vì gửi lệnh quá nhanh.',
+    howToUse: '• Khuyên để từ 1 đến 2 giây là tối ưu nhất.',
+    proTip: 'Để 2 giây giúp bảo vệ API Key sống lâu và ổn định.'
+  },
   'export_full_txt': {
-    title: 'Xuất Toàn Văn Tác Phẩm (.txt / .epub)',
-    category: 'Xuất Dữ Liệu Hoàn Tất',
-    whatIsIt: 'Gộp toàn bộ tất cả các chương đã dịch thành một file văn bản hoàn chỉnh (.txt) duy nhất.',
-    howToUse: 'Bấm nút "📥 Xuất Toàn Văn (.txt)" để lưu truyện về máy. File sau khi tải có thể nạp vào máy đọc sách Kindle, Kobo hoặc các ứng dụng đọc truyện trên điện thoại.'
+    title: 'Xuất Toàn Văn Truyện (.txt)',
+    category: 'Lưu File',
+    whatIsIt: 'Gộp tất cả các chương đã dịch thành 1 file .txt duy nhất lưu vào máy.',
+    howToUse: '• File lưu trong thư mục Download của điện thoại.\n• Đọc mượt trên mọi máy đọc sách Kindle, Kobo hoặc app đọc truyện.',
+    proTip: 'File xuất ra định dạng chuẩn, không bao giờ bị lỗi font.'
   }
 };
