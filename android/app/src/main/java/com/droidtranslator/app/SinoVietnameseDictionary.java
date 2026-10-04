@@ -32,13 +32,23 @@ public class SinoVietnameseDictionary {
             {"圣", "Thánh"}, {"皇", "Hoàng"}, {"帝", "Đế"}, {"尊", "Tôn"},
             {"丹", "Đan"}, {"阵", "Trận"}, {"符", "Phù"}, {"器", "Khí"},
             {"鼎", "Đỉnh"}, {"塔", "Tháp"}, {"殿", "Điện"}, {"阁", "Các"},
-            {"城", "Thành"}, {"国", "Quốc"}, {"界", "Giới"}, {"域", "Vực"}
+            {"城", "Thành"}, {"国", "Quốc"}, {"界", "Giới"}, {"域", "Vực"},
+            {"璇", "Tuyền"}, {"武", "Vũ"}, {"道", "Đạo"}, {"君", "Quân"}
         };
         for (String[] p : pairs) {
             if (p[0].length() > 0) {
                 SINO_MAP.put(p[0].charAt(0), p[1]);
             }
         }
+    }
+
+    public static String lookup(char c) {
+        return SINO_MAP.get(c);
+    }
+
+    public static String lookup(String s) {
+        if (s == null || s.isEmpty()) return null;
+        return SINO_MAP.get(s.charAt(0));
     }
 
     public static String transliterateLeftoverHanzi(String text) {
