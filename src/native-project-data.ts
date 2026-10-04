@@ -1190,11 +1190,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * HanziSweeperEngine: Bộ quét Thông Minh 3 Nhóm (Phân Luồng Rác & Neo Ngữ Cảnh)
+ * HanziSweeperEngine: Bộ quét Thông Minh 3 Nhóm (Phân Luồng Rác, Neo Ngữ Cảnh, Auto-Chunking & Auto-Loop)
  * - Nhóm 1: Từ lai dính chữ Hán (Ngư璇, Diệp辰, Hàn宗)
  * - Nhóm 2: Cụm chữ Hán từ 2 ký tự trở lên (天道, 玄冥, 仙帝)
- * - Nhóm 3: Chữ Hán đơn độc lập (璇, 辰, 宗) kèm neo ngữ cảnh 3-5 từ xung quanh
- * Ghi đè toàn cục theo nguyên tắc Longest-Match-First để chống nhầm lẫn tuyệt đối.
+ * - Nhóm 3: Chữ Hán đơn độc lập (璇, 辰, 宗) kèm neo ngữ cảnh xung quanh
+ * - Auto-Chunking: Tự động chia gói ~500 mục (~5.000 tokens) tránh tràn trần maxOutputTokens của AI.
+ * - Ghi đè toàn cục theo nguyên tắc Longest-Match-First để chống nhầm lẫn tuyệt đối.
  */
 public class HanziSweeperEngine {
 
@@ -1260,6 +1261,60 @@ public class HanziSweeperEngine {
         }
 
         return result;
+    }
+
+    /**
+     * Chia nhỏ kết quả quét thành các gói ~500 mục (~5.000 tokens) để không vượt trần output của AI
+     */
+    public static List<TriagedScanResult> splitTriagedScan(TriagedScanResult fullScan, int maxItemsPerChunk) {
+        List<TriagedScanResult> chunks = new ArrayList<>();
+        if (fullScan == null || fullScan.isEmpty()) {
+            return chunks;
+        }
+
+        int limit = maxItemsPerChunk > 0 ? maxItemsPerChunk : 500;
+
+        TriagedScanResult current = new TriagedScanResult();
+        int currentCount = 0;
+
+        // 1. Phân phối Nhóm 1
+        for (String w : fullScan.mixedWords) {
+            if (currentCount >= limit) {
+                chunks.add(current);
+                current = new TriagedScanResult();
+                currentCount = 0;
+            }
+            current.mixedWords.add(w);
+            currentCount++;
+        }
+
+        // 2. Phân phối Nhóm 2
+        for (String w : fullScan.multiHanziWords) {
+            if (currentCount >= limit) {
+                chunks.add(current);
+                current = new TriagedScanResult();
+                currentCount = 0;
+            }
+            current.multiHanziWords.add(w);
+            currentCount++;
+        }
+
+        // 3. Phân phối Nhóm 3
+        for (Map.Entry<String, String> e : fullScan.singleHanziContext.entrySet()) {
+            if (currentCount >= limit) {
+                chunks.add(current);
+                current = new TriagedScanResult();
+                currentCount = 0;
+            }
+            current.singleHanziContext.put(e.getKey(), e.getValue());
+            currentCount++;
+        }
+
+        if (!current.isEmpty()) {
+            chunks.add(current);
+        }
+
+        return chunks;
     }
 
     private static boolean isMixedWord(String s) {
@@ -3429,76 +3484,101 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             isPolishing = true;
             try {
-                // 1. Quét Offline phân loại 3 nhóm thông minh (Từ lai, Hán >= 2 ký tự, Hán đơn kèm ngữ cảnh)
-                HanziSweeperEngine.TriagedScanResult triagedScan = HanziSweeperEngine.scanTriagedArtifacts(translatedChapters);
-
-                if (triagedScan.isEmpty()) {
-                    mainHandler.post(() -> {
-                        appendLog("🎉 [LÀM MƯỢT FINAL] Toàn bộ bản dịch đã sạch 100% tiếng Việt, không có bất kỳ chữ Hán nào sót lại!");
-                        Toast.makeText(MainActivity.this, "🎉 Bản dịch đã sạch 100% tiếng Việt!", Toast.LENGTH_LONG).show();
-                    });
-                    isPolishing = false;
-                    return;
-                }
-
-                mainHandler.post(() -> {
-                    appendLog("⚡ [LÀM MƯỢT 3 NHÓM] Phát hiện " + triagedScan.totalUniqueCount() + " mục (Nhóm 1 Từ lai: " + triagedScan.mixedWords.size() + ", Nhóm 2 Cụm Hán: " + triagedScan.multiHanziWords.size() + ", Nhóm 3 Hán đơn kèm ngữ cảnh: " + triagedScan.singleHanziContext.size() + "). Đang gửi Batch JSON duy nhất đến model " + polishModel + "...");
-                    Toast.makeText(MainActivity.this, "Đang làm mượt " + triagedScan.totalUniqueCount() + " mục qua " + polishModel + "...", Toast.LENGTH_SHORT).show();
-                });
-
-                // 2. Tạo prompt Batch 3 nhóm
-                String batchPrompt = HanziSweeperEngine.buildTriagedPrompt(triagedScan);
-
-                // 3. Gửi 1 request duy nhất đến model chuyên biệt (Gemini 3.6 Flash / 2.5 Flash)
+                int loopIteration = 0;
+                int totalCumulativeFixedWords = 0;
+                int totalCumulativeReplacements = 0;
                 String targetPolishModel = (polishModel != null && !polishModel.isEmpty()) ? polishModel : "gemini-3.6-flash";
 
-                String[] aiResponse = engine.translateChapter(
-                        batchPrompt,
-                        null,
-                        "Bạn là chuyên gia dịch thuật tiểu thuyết và Hán Việt. Chỉ trả về JSON Object thuần túy.",
-                        Collections.emptyMap(),
-                        targetPolishModel,
-                        "Tiếng Việt",
-                        false,
-                        2,
-                        1,
-                        null,
-                        msg -> mainHandler.post(() -> appendLog(msg))
-                );
+                while (loopIteration < 20) {
+                    loopIteration++;
+                    final int currentRound = loopIteration;
 
-                String rawJson = (aiResponse != null && aiResponse.length > 0) ? aiResponse[0] : "";
-                Map<String, String> translationMap = HanziSweeperEngine.parseJsonResponse(rawJson);
+                    // 1. Quét Offline phân loại 3 nhóm thông minh
+                    HanziSweeperEngine.TriagedScanResult triagedScan = HanziSweeperEngine.scanTriagedArtifacts(translatedChapters);
+                    int remainingCount = triagedScan.totalUniqueCount();
 
-                if (translationMap.isEmpty()) {
+                    if (triagedScan.isEmpty() || remainingCount == 0) {
+                        mainHandler.post(() -> {
+                            appendLog("🎉 [LÀM MƯỢT HOÀN TẤT 100%] Toàn bộ bản dịch đã sạch 100% tiếng Việt, không còn bất kỳ chữ Hán nào sót lại!");
+                            Toast.makeText(MainActivity.this, "🎉 Bản dịch đã sạch 100% tiếng Việt!", Toast.LENGTH_LONG).show();
+                        });
+                        break;
+                    }
+
+                    // 2. Chia nhỏ thành các gói ~500 mục (~5.000 tokens)
+                    List<HanziSweeperEngine.TriagedScanResult> chunks = HanziSweeperEngine.splitTriagedScan(triagedScan, 500);
+                    int totalChunks = chunks.size();
+
                     mainHandler.post(() -> {
-                        appendLog("⚠️ Không trích xuất được bảng dịch từ AI. Vui lòng thử lại!");
-                        Toast.makeText(MainActivity.this, "Làm mượt không thành công, vui lòng thử lại.", Toast.LENGTH_SHORT).show();
+                        appendLog("⚡ [LÀM MƯỢT ĐỢT " + currentRound + "] Phát hiện " + remainingCount + " mục (Từ lai: " + triagedScan.mixedWords.size() + ", Cụm Hán: " + triagedScan.multiHanziWords.size() + ", Hán đơn: " + triagedScan.singleHanziContext.size() + "). Tự động chia làm " + totalChunks + " gói (~5.000 tokens/gói) gửi model " + targetPolishModel + "...");
+                        Toast.makeText(MainActivity.this, "Đang xử lý đợt " + currentRound + ": " + remainingCount + " mục qua " + totalChunks + " gói...", Toast.LENGTH_SHORT).show();
                     });
-                    isPolishing = false;
-                    return;
+
+                    int wordsFixedThisRound = 0;
+
+                    for (int cIdx = 0; cIdx < totalChunks; cIdx++) {
+                        HanziSweeperEngine.TriagedScanResult chunk = chunks.get(cIdx);
+                        int currentChunkNumber = cIdx + 1;
+
+                        mainHandler.post(() -> {
+                            appendLog("⏳ [GÓI " + currentChunkNumber + "/" + totalChunks + "] Đang gửi " + chunk.totalUniqueCount() + " mục đến " + targetPolishModel + "...");
+                        });
+
+                        String batchPrompt = HanziSweeperEngine.buildTriagedPrompt(chunk);
+
+                        String[] aiResponse = engine.translateChapter(
+                                batchPrompt,
+                                null,
+                                "Bạn là chuyên gia dịch thuật tiểu thuyết và Hán Việt. Chỉ trả về JSON Object thuần túy.",
+                                Collections.emptyMap(),
+                                targetPolishModel,
+                                "Tiếng Việt",
+                                false,
+                                2,
+                                1,
+                                null,
+                                msg -> mainHandler.post(() -> appendLog(msg))
+                        );
+
+                        String rawJson = (aiResponse != null && aiResponse.length > 0) ? aiResponse[0] : "";
+                        Map<String, String> translationMap = HanziSweeperEngine.parseJsonResponse(rawJson);
+
+                        if (!translationMap.isEmpty()) {
+                            int replacedCount = HanziSweeperEngine.applyGlobalReplacements(translatedChapters, translationMap);
+                            wordsFixedThisRound += translationMap.size();
+                            totalCumulativeFixedWords += translationMap.size();
+                            totalCumulativeReplacements += replacedCount;
+
+                            mainHandler.post(() -> {
+                                updateProgressUI();
+                                refreshChapterListView();
+                                appendLog("✅ [GÓI " + currentChunkNumber + "/" + totalChunks + "] Đã làm mượt " + translationMap.size() + " từ (" + replacedCount + " vị trí).");
+                            });
+                        }
+                    }
+
+                    // Lưu dữ liệu sau mỗi đợt
+                    saveCurrentProjectData();
+
+                    // Nếu đợt này không sửa được từ nào (do AI lỗi hoặc mạng), dừng vòng lặp để tránh lặp vô tận
+                    if (wordsFixedThisRound == 0) {
+                        mainHandler.post(() -> {
+                            appendLog("⚠️ Không thể trích xuất thêm bản dịch từ AI trong đợt này. Tạm dừng tiến trình.");
+                        });
+                        break;
+                    }
                 }
 
-                // 4. Ghi đè toàn cục (Longest Match First)
-                int replacedCount = HanziSweeperEngine.applyGlobalReplacements(translatedChapters, translationMap);
-
-                // 5. Lưu bền vững vào đĩa
-                saveCurrentProjectData();
-
+                // Cập nhật giao diện sau khi kết thúc toàn bộ vòng lặp
+                final int finalFixed = totalCumulativeFixedWords;
+                final int finalRepl = totalCumulativeReplacements;
                 mainHandler.post(() -> {
                     updateProgressUI();
                     refreshChapterListView();
-
-                    StringBuilder sbReport = new StringBuilder("✨ [HOÀN TẤT LÀM MƯỢT] Đã sửa " + translationMap.size() + " từ rác (" + replacedCount + " vị trí) trên toàn bộ tác phẩm:\\n");
-                    int previewCount = Math.min(translationMap.size(), 10);
-                    int count = 0;
-                    for (Map.Entry<String, String> e : translationMap.entrySet()) {
-                        sbReport.append("[").append(e.getKey()).append(" ➔ ").append(e.getValue()).append("] ");
-                        count++;
-                        if (count >= previewCount) break;
+                    if (finalFixed > 0) {
+                        appendLog("🏆 [TỔNG KẾT] Đã tự động làm mượt tổng cộng " + finalFixed + " từ rác (" + finalRepl + " vị trí) trên toàn bộ tác phẩm!");
+                        Toast.makeText(MainActivity.this, "🎉 Hoàn tất làm mượt tổng cộng " + finalFixed + " từ rác!", Toast.LENGTH_LONG).show();
                     }
-                    if (translationMap.size() > 10) sbReport.append("...");
-                    appendLog(sbReport.toString());
-                    Toast.makeText(MainActivity.this, "🎉 Đã làm mượt xong " + translationMap.size() + " từ rác trên toàn bộ bản dịch!", Toast.LENGTH_LONG).show();
                 });
 
             } catch (Exception e) {

@@ -1210,7 +1210,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       return;
     }
 
-    addLog(`⚡ [LÀM MƯỢT 3 NHÓM] Phát hiện ${totalCount} mục (Nhóm 1 Từ lai: ${group1Mixed.size}, Nhóm 2 Cụm Hán: ${group2Multi.size}, Nhóm 3 Hán đơn kèm ngữ cảnh: ${group3SingleContext.size}). Đang gửi Batch JSON duy nhất đến model ${polishModel}...`);
+    const numChunks = Math.ceil(totalCount / 500);
+    addLog(`⚡ [LÀM MƯỢT 3 NHÓM] Phát hiện ${totalCount} mục (Nhóm 1 Từ lai: ${group1Mixed.size}, Nhóm 2 Cụm Hán: ${group2Multi.size}, Nhóm 3 Hán đơn kèm ngữ cảnh: ${group3SingleContext.size}). Tự động chia làm ${numChunks} gói (~5.000 tokens/gói) gửi model ${polishModel}...`);
 
     setTimeout(() => {
       const mapping: Record<string, string> = {};
@@ -1272,7 +1273,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       }));
 
       setIsPolishing(false);
-      addLog(`✨ [HOÀN TẤT LÀM MƯỢT] Đã sửa ${sortedKeys.length} từ rác (${totalReplacements} vị trí) qua model ${polishModel}! Bản dịch đạt chuẩn 100% tiếng Việt.`);
+      addLog(`🏆 [TỔNG KẾT] Đã tự động làm mượt tổng cộng ${sortedKeys.length} từ rác (${totalReplacements} vị trí) qua ${numChunks} gói! Bản dịch đạt chuẩn 100% tiếng Việt.`);
     }, 1200);
   };
 

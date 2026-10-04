@@ -11,11 +11,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * HanziSweeperEngine: Bộ quét Thông Minh 3 Nhóm (Phân Luồng Rác & Neo Ngữ Cảnh)
+ * HanziSweeperEngine: Bộ quét Thông Minh 3 Nhóm (Phân Luồng Rác, Neo Ngữ Cảnh, Auto-Chunking & Auto-Loop)
  * - Nhóm 1: Từ lai dính chữ Hán (Ngư璇, Diệp辰, Hàn宗)
  * - Nhóm 2: Cụm chữ Hán từ 2 ký tự trở lên (天道, 玄冥, 仙帝)
- * - Nhóm 3: Chữ Hán đơn độc lập (璇, 辰, 宗) kèm neo ngữ cảnh 3-5 từ xung quanh
- * Ghi đè toàn cục theo nguyên tắc Longest-Match-First để chống nhầm lẫn tuyệt đối.
+ * - Nhóm 3: Chữ Hán đơn độc lập (璇, 辰, 宗) kèm neo ngữ cảnh xung quanh
+ * - Auto-Chunking: Tự động chia gói ~500 mục (~5.000 tokens) tránh tràn trần maxOutputTokens của AI.
+ * - Ghi đè toàn cục theo nguyên tắc Longest-Match-First để chống nhầm lẫn tuyệt đối.
  */
 public class HanziSweeperEngine {
 
@@ -81,6 +82,60 @@ public class HanziSweeperEngine {
         }
 
         return result;
+    }
+
+    /**
+     * Chia nhỏ kết quả quét thành các gói ~500 mục (~5.000 tokens) để không vượt trần output của AI
+     */
+    public static List<TriagedScanResult> splitTriagedScan(TriagedScanResult fullScan, int maxItemsPerChunk) {
+        List<TriagedScanResult> chunks = new ArrayList<>();
+        if (fullScan == null || fullScan.isEmpty()) {
+            return chunks;
+        }
+
+        int limit = maxItemsPerChunk > 0 ? maxItemsPerChunk : 500;
+
+        TriagedScanResult current = new TriagedScanResult();
+        int currentCount = 0;
+
+        // 1. Phân phối Nhóm 1
+        for (String w : fullScan.mixedWords) {
+            if (currentCount >= limit) {
+                chunks.add(current);
+                current = new TriagedScanResult();
+                currentCount = 0;
+            }
+            current.mixedWords.add(w);
+            currentCount++;
+        }
+
+        // 2. Phân phối Nhóm 2
+        for (String w : fullScan.multiHanziWords) {
+            if (currentCount >= limit) {
+                chunks.add(current);
+                current = new TriagedScanResult();
+                currentCount = 0;
+            }
+            current.multiHanziWords.add(w);
+            currentCount++;
+        }
+
+        // 3. Phân phối Nhóm 3
+        for (Map.Entry<String, String> e : fullScan.singleHanziContext.entrySet()) {
+            if (currentCount >= limit) {
+                chunks.add(current);
+                current = new TriagedScanResult();
+                currentCount = 0;
+            }
+            current.singleHanziContext.put(e.getKey(), e.getValue());
+            currentCount++;
+        }
+
+        if (!current.isEmpty()) {
+            chunks.add(current);
+        }
+
+        return chunks;
     }
 
     private static boolean isMixedWord(String s) {
