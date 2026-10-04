@@ -1018,45 +1018,88 @@ public class MainActivity extends AppCompatActivity {
 
     private void initUI() {
         rootFrame = new FrameLayout(this);
-        rootFrame.setBackgroundColor(Color.parseColor("#0A0A0A"));
+        rootFrame.setBackgroundColor(Color.parseColor("#0B0F17"));
 
         mainContentLayout = new LinearLayout(this);
         mainContentLayout.setOrientation(LinearLayout.VERTICAL);
 
-        // Header Bar
+        // 1. TOP HEADER GLASS BAR
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setPadding(32, 24, 32, 24);
-        header.setBackgroundColor(Color.parseColor("#141414"));
+        header.setPadding(dp(18), dp(12), dp(18), dp(12));
+        GradientDrawable hBg = new GradientDrawable();
+        hBg.setColor(Color.parseColor("#131B2A"));
+        hBg.setCornerRadius(dp(0));
+        hBg.setStroke(dp(1), Color.parseColor("#1F2E47"));
+        header.setBackground(hBg);
         header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText("DroidTranslator Native");
-        tvTitle.setTextColor(Color.WHITE);
-        tvTitle.setTextSize(17);
-        tvTitle.setTypeface(null, Typeface.BOLD);
-        header.addView(tvTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        // App Wordmark & Native Pill
+        LinearLayout brandLayout = new LinearLayout(this);
+        brandLayout.setOrientation(LinearLayout.HORIZONTAL);
+        brandLayout.setGravity(Gravity.CENTER_VERTICAL);
 
+        TextView tvLogoIcon = new TextView(this);
+        tvLogoIcon.setText("⚡");
+        tvLogoIcon.setTextSize(16);
+        brandLayout.addView(tvLogoIcon);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(" DroidTranslator");
+        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextSize(16.5f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        brandLayout.addView(tvTitle);
+
+        TextView tvNativeBadge = new TextView(this);
+        tvNativeBadge.setText("NATIVE");
+        tvNativeBadge.setTextColor(Color.parseColor("#34D399"));
+        tvNativeBadge.setTextSize(9.5f);
+        tvNativeBadge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tvNativeBadge.setPadding(dp(6), dp(2), dp(6), dp(2));
+        GradientDrawable nbBg = new GradientDrawable();
+        nbBg.setColor(Color.parseColor("#064E3B"));
+        nbBg.setCornerRadius(dp(6));
+        nbBg.setStroke(dp(1), Color.parseColor("#10B981"));
+        tvNativeBadge.setBackground(nbBg);
+        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        nlp.leftMargin = dp(8);
+        brandLayout.addView(tvNativeBadge, nlp);
+
+        header.addView(brandLayout, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        // Guide Button
         Button btnHeaderHelp = new Button(this);
         btnHeaderHelp.setText("❓ Hướng Dẫn");
         btnHeaderHelp.setTextColor(Color.WHITE);
-        btnHeaderHelp.setTextSize(11);
+        btnHeaderHelp.setTextSize(11f);
         btnHeaderHelp.setTypeface(null, Typeface.BOLD);
-        GradientDrawable hBg = new GradientDrawable();
-        hBg.setColor(Color.parseColor("#2563EB"));
-        hBg.setCornerRadius(16);
-        btnHeaderHelp.setBackground(hBg);
-        btnHeaderHelp.setPadding(20, 8, 20, 8);
-        btnHeaderHelp.setOnClickListener(v -> showHowToUseDialog());
+        btnHeaderHelp.setBackground(createButtonDrawable("#1E293B", 20f));
+        btnHeaderHelp.setPadding(dp(12), dp(6), dp(12), dp(6));
+        btnHeaderHelp.setMinHeight(dp(32));
+        btnHeaderHelp.setMinimumHeight(dp(32));
+        btnHeaderHelp.setStateListAnimator(null);
+        btnHeaderHelp.setOnClickListener(v -> {
+            triggerHaptic();
+            showHowToUseDialog();
+        });
         header.addView(btnHeaderHelp);
 
+        // Root / God-Mode Badge
         TextView tvBadge = new TextView(this);
-        tvBadge.setText(RootController.isRootAvailable() ? "ROOT #" : "GOD-MODE");
+        tvBadge.setText(RootController.isRootAvailable() ? "ROOT #" : "OOM -1000");
         tvBadge.setTextColor(Color.parseColor("#F59E0B"));
-        tvBadge.setTextSize(11);
+        tvBadge.setTextSize(10f);
         tvBadge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        tvBadge.setPadding(12, 6, 12, 6);
-        header.addView(tvBadge);
+        tvBadge.setPadding(dp(8), dp(4), dp(8), dp(4));
+        GradientDrawable bdgBg = new GradientDrawable();
+        bdgBg.setColor(Color.parseColor("#451A03"));
+        bdgBg.setCornerRadius(dp(6));
+        bdgBg.setStroke(dp(1), Color.parseColor("#D97706"));
+        tvBadge.setBackground(bdgBg);
+        LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bLp.leftMargin = dp(8);
+        header.addView(tvBadge, bLp);
 
         mainContentLayout.addView(header);
 
@@ -1078,30 +1121,68 @@ public class MainActivity extends AppCompatActivity {
         containerLayout.addView(tabReaderView);
         containerLayout.addView(tabSettingsView);
 
-        // Bottom Navigation TabLayout
-        tabLayout = new TabLayout(this);
-        tabLayout.setBackgroundColor(Color.parseColor("#141414"));
-        tabLayout.setTabTextColors(Color.parseColor("#888888"), Color.parseColor("#3B82F6"));
-        tabLayout.setSelectedTabIndicatorColor(Color.parseColor("#3B82F6"));
+        // 2. FLOATING BOTTOM NAVIGATION BAR
+        LinearLayout bottomBarContainer = new LinearLayout(this);
+        bottomBarContainer.setOrientation(LinearLayout.HORIZONTAL);
+        bottomBarContainer.setGravity(Gravity.CENTER_VERTICAL);
+        bottomBarContainer.setPadding(dp(6), dp(6), dp(6), dp(6));
+        
+        GradientDrawable barBg = new GradientDrawable();
+        barBg.setColor(Color.parseColor("#141C2E"));
+        barBg.setCornerRadius(dp(26));
+        barBg.setStroke(dp(1.2f), Color.parseColor("#263854"));
+        bottomBarContainer.setBackground(barBg);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            bottomBarContainer.setElevation(dp(12));
+        }
 
-        tabLayout.addTab(tabLayout.newTab().setText("Key & Prompt"));
-        tabLayout.addTab(tabLayout.newTab().setText("Dịch & Từ điển"));
-        tabLayout.addTab(tabLayout.newTab().setText("Bản dịch & Đọc"));
-        tabLayout.addTab(tabLayout.newTab().setText("Cài đặt"));
+        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(64)
+        );
+        barLp.setMargins(dp(14), dp(4), dp(14), dp(10));
+        bottomBarContainer.setLayoutParams(barLp);
 
-        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                switchTab(tab.getPosition());
-            }
-            @Override public void onTabUnselected(TabLayout.Tab tab) {}
-            @Override
-            public void onTabReselected(TabLayout.Tab tab) {
-                switchTab(tab.getPosition());
-            }
-        });
+        final String[][] tabData = {
+                {"🔑", "Key & Prompt"},
+                {"⚡", "Dịch & Từ điển"},
+                {"📚", "Bản dịch & Đọc"},
+                {"⚙️", "Cài đặt"}
+        };
 
-        mainContentLayout.addView(tabLayout);
+        final List<LinearLayout> tabItemViews = new ArrayList<>();
+
+        for (int i = 0; i < tabData.length; i++) {
+            final int tabIdx = i;
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(dp(4), dp(6), dp(4), dp(6));
+
+            TextView icon = new TextView(this);
+            icon.setText(tabData[i][0]);
+            icon.setTextSize(16f);
+            icon.setGravity(Gravity.CENTER);
+            item.addView(icon);
+
+            TextView label = new TextView(this);
+            label.setText(tabData[i][1]);
+            label.setTextSize(10.5f);
+            label.setTypeface(null, Typeface.BOLD);
+            label.setGravity(Gravity.CENTER);
+            label.setPadding(0, dp(2), 0, 0);
+            item.addView(label);
+
+            item.setOnClickListener(v -> {
+                triggerHaptic();
+                switchTab(tabIdx);
+                updateFloatingTabSelection(tabItemViews, tabIdx);
+            });
+
+            tabItemViews.add(item);
+            bottomBarContainer.addView(item, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.0f));
+        }
+
+        mainContentLayout.addView(bottomBarContainer);
         rootFrame.addView(mainContentLayout, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         // Khởi tạo Trình Đọc Toàn Màn Hình Overlay (mặc định GONE)
@@ -1112,6 +1193,28 @@ public class MainActivity extends AppCompatActivity {
 
         // Mặc định mở Tab 1 (Key & Prompt)
         switchTab(0);
+        updateFloatingTabSelection(tabItemViews, 0);
+    }
+
+    private void updateFloatingTabSelection(List<LinearLayout> tabItemViews, int selectedIdx) {
+        for (int i = 0; i < tabItemViews.size(); i++) {
+            LinearLayout item = tabItemViews.get(i);
+            TextView icon = (TextView) item.getChildAt(0);
+            TextView label = (TextView) item.getChildAt(1);
+            boolean isSel = (i == selectedIdx);
+
+            if (isSel) {
+                GradientDrawable activeBg = new GradientDrawable();
+                activeBg.setColor(Color.parseColor("#1F2D44"));
+                activeBg.setCornerRadius(dp(20));
+                activeBg.setStroke(dp(1), Color.parseColor("#38BDF8"));
+                item.setBackground(activeBg);
+                label.setTextColor(Color.parseColor("#38BDF8"));
+            } else {
+                item.setBackground(null);
+                label.setTextColor(Color.parseColor("#94A3B8"));
+            }
+        }
     }
 
     private void switchTab(int index) {
@@ -1138,104 +1241,113 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================================
     private void createTabKeysView() {
         tabKeysView = new ScrollView(this);
+        tabKeysView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(32, 24, 32, 32);
+        content.setPadding(dp(16), dp(16), dp(16), dp(80));
 
-        // 1. CHỌN DÒNG MODEL GEMINI
-        LinearLayout rowMHead = new LinearLayout(this);
-        rowMHead.setOrientation(LinearLayout.HORIZONTAL);
-        rowMHead.setGravity(Gravity.CENTER_VERTICAL);
-        TextView tvModelHead = new TextView(this);
-        tvModelHead.setText("1. Chọn Dòng Model Gemini:");
-        tvModelHead.setTextColor(Color.WHITE);
-        tvModelHead.setTextSize(15);
-        tvModelHead.setTypeface(null, Typeface.BOLD);
-        rowMHead.addView(tvModelHead);
-        rowMHead.addView(createHelpButton("select_model"));
-        content.addView(rowMHead);
-
-        tvSelectedModel = new TextView(this);
-        tvSelectedModel.setText("Model đang chọn: " + currentModel);
-        tvSelectedModel.setTextColor(Color.parseColor("#60A5FA"));
-        tvSelectedModel.setPadding(0, 4, 0, 12);
-        content.addView(tvSelectedModel);
-
-        String[] models = {"gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-pro"};
-        LinearLayout rowM = new LinearLayout(this);
-        rowM.setOrientation(LinearLayout.HORIZONTAL);
-        for (String m : models) {
-            String label = m.replace("gemini-", "");
-            Button b = createButton(label, "#1E293B");
-            b.setOnClickListener(v -> {
-                currentModel = m;
-                tvSelectedModel.setText("Model đang chọn: " + currentModel);
-                Toast.makeText(this, "Đã chọn " + m, Toast.LENGTH_SHORT).show();
-            });
-            rowM.addView(b, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-        }
-        content.addView(rowM);
-
-        // Custom Model ID Input
-        LinearLayout rowCustom = new LinearLayout(this);
-        rowCustom.setOrientation(LinearLayout.HORIZONTAL);
-        rowCustom.setPadding(0, 12, 0, 24);
-
-        EditText edtCustomModel = new EditText(this);
-        edtCustomModel.setHint("Nhập model tùy biến (VD: gemini-3.5-flash-lite)...");
-        edtCustomModel.setHintTextColor(Color.parseColor("#666666"));
-        edtCustomModel.setTextColor(Color.WHITE);
-        edtCustomModel.setBackgroundColor(Color.parseColor("#171717"));
-        edtCustomModel.setPadding(16, 16, 16, 16);
-        rowCustom.addView(edtCustomModel, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        View sc1 = new View(this);
-        rowCustom.addView(sc1, new LinearLayout.LayoutParams(12, 1));
-
-        Button btnSetCustom = createButton("Dùng Model Này", "#2563EB");
-        btnSetCustom.setOnClickListener(v -> {
-            String cm = edtCustomModel.getText().toString().trim();
-            if (!cm.isEmpty()) {
-                currentModel = cm;
-                tvSelectedModel.setText("Model đang chọn: " + currentModel);
-                Toast.makeText(this, "Đã kích hoạt model: " + cm, Toast.LENGTH_SHORT).show();
-            }
+        // BANNER HƯỚNG DẪN TỪ A-Z (GLOWING GLASS)
+        LinearLayout bannerGuide = new LinearLayout(this);
+        bannerGuide.setOrientation(LinearLayout.HORIZONTAL);
+        bannerGuide.setGravity(Gravity.CENTER_VERTICAL);
+        bannerGuide.setPadding(dp(16), dp(14), dp(16), dp(14));
+        GradientDrawable bgBanner = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{
+                Color.parseColor("#172554"), Color.parseColor("#1E3A8A")
         });
-        rowCustom.addView(btnSetCustom);
-        content.addView(rowCustom);
+        bgBanner.setCornerRadius(dp(18));
+        bgBanner.setStroke(dp(1.2f), Color.parseColor("#3B82F6"));
+        bannerGuide.setBackground(bgBanner);
+        LinearLayout.LayoutParams bglp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bglp.setMargins(0, 0, 0, dp(14));
+        bannerGuide.setLayoutParams(bglp);
 
-        // 2. MULTI-KEY POOL & TEST KEY
-        LinearLayout keyHeaderRow = new LinearLayout(this);
-        keyHeaderRow.setOrientation(LinearLayout.HORIZONTAL);
-        keyHeaderRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView tvGuideIcon = new TextView(this);
+        tvGuideIcon.setText("📖");
+        tvGuideIcon.setTextSize(20);
+        bannerGuide.addView(tvGuideIcon);
+
+        LinearLayout guideTextCol = new LinearLayout(this);
+        guideTextCol.setOrientation(LinearLayout.VERTICAL);
+        guideTextCol.setPadding(dp(12), 0, dp(12), 0);
+
+        TextView tvGuideTitle = new TextView(this);
+        tvGuideTitle.setText("Cẩm Nang Hướng Dẫn Sử Dụng (Từ A-Z)");
+        tvGuideTitle.setTextColor(Color.WHITE);
+        tvGuideTitle.setTextSize(13.5f);
+        tvGuideTitle.setTypeface(null, Typeface.BOLD);
+        guideTextCol.addView(tvGuideTitle);
+
+        TextView tvGuideSub = new TextView(this);
+        tvGuideSub.setText("Nhấn để xem cách lấy key, chọn model, dịch bù & xuất file");
+        tvGuideSub.setTextColor(Color.parseColor("#93C5FD"));
+        tvGuideSub.setTextSize(11f);
+        guideTextCol.addView(tvGuideSub);
+
+        bannerGuide.addView(guideTextCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        TextView tvGuideArrow = new TextView(this);
+        tvGuideArrow.setText("➔");
+        tvGuideArrow.setTextColor(Color.parseColor("#60A5FA"));
+        tvGuideArrow.setTextSize(16);
+        bannerGuide.addView(tvGuideArrow);
+
+        bannerGuide.setOnClickListener(v -> {
+            triggerHaptic();
+            showHowToUseDialog();
+        });
+        content.addView(bannerGuide);
+
+        // CARD 1: MULTI-KEY GEMINI POOL
+        LinearLayout cardKeyPool = createCard();
+
+        LinearLayout rowKeyHead = new LinearLayout(this);
+        rowKeyHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowKeyHead.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvKeyIcon = new TextView(this);
+        tvKeyIcon.setText("🔑 ");
+        tvKeyIcon.setTextSize(15);
+        rowKeyHead.addView(tvKeyIcon);
 
         TextView tvKeyHead = new TextView(this);
-        tvKeyHead.setText("2. Multi-Key Gemini Pool:");
+        tvKeyHead.setText("Multi-Key Gemini Pool");
         tvKeyHead.setTextColor(Color.WHITE);
-        tvKeyHead.setTextSize(15);
+        tvKeyHead.setTextSize(14.5f);
         tvKeyHead.setTypeface(null, Typeface.BOLD);
-        keyHeaderRow.addView(tvKeyHead);
-        keyHeaderRow.addView(createHelpButton("key_pool"));
+        rowKeyHead.addView(tvKeyHead);
+        rowKeyHead.addView(createHelpButton("key_pool"));
 
         View keySpacer = new View(this);
-        keyHeaderRow.addView(keySpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
+        rowKeyHead.addView(keySpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
 
-        Button btnTestAll = createButton("Test Tất Cả", "#B45309");
-        btnTestAll.setOnClickListener(v -> testAllKeys());
-        keyHeaderRow.addView(btnTestAll);
-        content.addView(keyHeaderRow);
+        Button btnTestAll = createButton("⟳ Test tất cả key", "#78350F");
+        btnTestAll.setTextSize(11f);
+        btnTestAll.setTextColor(Color.parseColor("#FDE68A"));
+        btnTestAll.setMinHeight(dp(36));
+        btnTestAll.setPadding(dp(12), dp(6), dp(12), dp(6));
+        btnTestAll.setOnClickListener(v -> {
+            triggerHaptic();
+            testAllKeys();
+        });
+        rowKeyHead.addView(btnTestAll);
+        cardKeyPool.addView(rowKeyHead);
 
         edtNewKey = new EditText(this);
-        edtNewKey.setHint("Dán API Key (Hỗ trợ nạp hàng loạt: mỗi dòng 1 key, tự động tách thẻ)...");
-        edtNewKey.setHintTextColor(Color.parseColor("#666666"));
+        edtNewKey.setHint("Dán Gemini API Key (Mỗi dòng 1 key, tự động tách thẻ)...");
+        edtNewKey.setHintTextColor(Color.parseColor("#64748B"));
         edtNewKey.setTextColor(Color.WHITE);
-        edtNewKey.setBackgroundColor(Color.parseColor("#171717"));
-        edtNewKey.setPadding(20, 16, 20, 16);
+        edtNewKey.setBackground(createInputDrawable());
+        edtNewKey.setPadding(dp(14), dp(12), dp(14), dp(12));
         edtNewKey.setMinLines(2);
-        content.addView(edtNewKey);
+        edtNewKey.setTextSize(13f);
+        LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        elp.setMargins(0, dp(12), 0, dp(10));
+        edtNewKey.setLayoutParams(elp);
+        cardKeyPool.addView(edtNewKey);
 
-        Button btnAddKey = createButton("Thêm API Key Vào Pool", "#D97706");
+        Button btnAddKey = createGradientButton("+ Thêm API Key Vào Pool", Color.parseColor("#FF6B00"), Color.parseColor("#FFA100"));
         btnAddKey.setOnClickListener(v -> {
+            triggerHaptic();
             String k = edtNewKey.getText().toString().trim();
             if (!k.isEmpty()) {
                 String nl = String.valueOf((char) 10);
@@ -1256,26 +1368,175 @@ public class MainActivity extends AppCompatActivity {
                 }
                 edtNewKey.setText("");
                 refreshKeyList();
-                Toast.makeText(this, "Đã nạp thành công " + countAdded + " Key vào Pool!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "🎉 Đã nạp thành công " + countAdded + " Key vào Pool!", Toast.LENGTH_SHORT).show();
             }
         });
-        content.addView(btnAddKey);
+        cardKeyPool.addView(btnAddKey);
 
         llKeyList = new LinearLayout(this);
         llKeyList.setOrientation(LinearLayout.VERTICAL);
-        llKeyList.setPadding(0, 12, 0, 24);
-        content.addView(llKeyList);
-        refreshKeyList();
+        llKeyList.setPadding(0, dp(10), 0, dp(4));
+        cardKeyPool.addView(llKeyList);
+        content.addView(cardKeyPool);
 
-        // 3. THẺ PROMPT PHONG CÁCH
+        // CARD 2: CHỌN DÒNG MODEL GEMINI
+        LinearLayout cardModel = createCard();
+
+        LinearLayout rowMHead = new LinearLayout(this);
+        rowMHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowMHead.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvMIcon = new TextView(this);
+        tvMIcon.setText("✨ ");
+        tvMIcon.setTextSize(15);
+        rowMHead.addView(tvMIcon);
+
+        TextView tvModelHead = new TextView(this);
+        tvModelHead.setText("Chọn Dòng Model Gemini");
+        tvModelHead.setTextColor(Color.WHITE);
+        tvModelHead.setTextSize(14.5f);
+        tvModelHead.setTypeface(null, Typeface.BOLD);
+        rowMHead.addView(tvModelHead);
+        rowMHead.addView(createHelpButton("select_model"));
+
+        View mSpacer = new View(this);
+        rowMHead.addView(mSpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
+
+        tvSelectedModel = new TextView(this);
+        tvSelectedModel.setText(currentModel);
+        tvSelectedModel.setTextColor(Color.parseColor("#38BDF8"));
+        tvSelectedModel.setTextSize(11.5f);
+        tvSelectedModel.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tvSelectedModel.setPadding(dp(8), dp(4), dp(8), dp(4));
+        GradientDrawable smBg = new GradientDrawable();
+        smBg.setColor(Color.parseColor("#0C4A6E"));
+        smBg.setCornerRadius(dp(6));
+        smBg.setStroke(dp(1), Color.parseColor("#0284C7"));
+        tvSelectedModel.setBackground(smBg);
+        rowMHead.addView(tvSelectedModel);
+        cardModel.addView(rowMHead);
+
+        // Danh sách thẻ Model chọn đẹp mắt
+        final String[][] modelList = {
+                {"gemini-3.6-flash", "3.6 Flash", "Model Siêu Cấp 2026", "Chuyên gia xử lý Hán Việt & Làm mượt toàn văn tuyệt đối"},
+                {"gemini-2.5-flash", "2.5 Flash", "Mặc định - Siêu tốc", "Cân bằng tốc độ và độ mượt văn phong hoàn hảo"},
+                {"gemini-2.5-flash-lite", "2.5 Flash Lite", "Tiết kiệm Quota", "Rất nhanh, hạn ngạch dồi dào, ít tốn RPM/TPM"},
+                {"gemini-2.5-pro", "2.5 Pro", "Chuyên sâu", "Dành cho chương văn học phức tạp cần lập luận sâu"}
+        };
+
+        final List<LinearLayout> modelCardsViews = new ArrayList<>();
+
+        for (String[] mInfo : modelList) {
+            final String mId = mInfo[0];
+            final String mTitle = mInfo[1];
+            final String mTag = mInfo[2];
+            final String mDesc = mInfo[3];
+
+            LinearLayout mCard = new LinearLayout(this);
+            mCard.setOrientation(LinearLayout.VERTICAL);
+            mCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+            LinearLayout.LayoutParams mclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            mclp.setMargins(0, dp(8), 0, 0);
+            mCard.setLayoutParams(mclp);
+
+            LinearLayout mRowTop = new LinearLayout(this);
+            mRowTop.setOrientation(LinearLayout.HORIZONTAL);
+            mRowTop.setGravity(Gravity.CENTER_VERTICAL);
+
+            TextView tvName = new TextView(this);
+            tvName.setText(mTitle);
+            tvName.setTextColor(Color.WHITE);
+            tvName.setTextSize(13.5f);
+            tvName.setTypeface(null, Typeface.BOLD);
+            mRowTop.addView(tvName);
+
+            TextView tvTag = new TextView(this);
+            tvTag.setText(mTag);
+            tvTag.setTextColor(Color.parseColor("#94A3B8"));
+            tvTag.setTextSize(10f);
+            tvTag.setPadding(dp(6), dp(2), dp(6), dp(2));
+            GradientDrawable tagBg = new GradientDrawable();
+            tagBg.setColor(Color.parseColor("#1E293B"));
+            tagBg.setCornerRadius(dp(4));
+            tvTag.setBackground(tagBg);
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            tlp.leftMargin = dp(8);
+            mRowTop.addView(tvTag, tlp);
+
+            mCard.addView(mRowTop);
+
+            TextView tvDesc = new TextView(this);
+            tvDesc.setText(mDesc);
+            tvDesc.setTextColor(Color.parseColor("#64748B"));
+            tvDesc.setTextSize(11f);
+            tvDesc.setPadding(0, dp(4), 0, 0);
+            mCard.addView(tvDesc);
+
+            mCard.setOnClickListener(v -> {
+                triggerHaptic();
+                currentModel = mId;
+                tvSelectedModel.setText(currentModel);
+                updateModelCardsSelection(modelCardsViews, modelList, currentModel);
+                Toast.makeText(this, "Đã chọn: " + mTitle, Toast.LENGTH_SHORT).show();
+            });
+
+            modelCardsViews.add(mCard);
+            cardModel.addView(mCard);
+        }
+
+        updateModelCardsSelection(modelCardsViews, modelList, currentModel);
+
+        // Custom Model ID Input
+        LinearLayout rowCustom = new LinearLayout(this);
+        rowCustom.setOrientation(LinearLayout.HORIZONTAL);
+        rowCustom.setGravity(Gravity.CENTER_VERTICAL);
+        rowCustom.setPadding(0, dp(12), 0, 0);
+
+        EditText edtCustomModel = new EditText(this);
+        edtCustomModel.setHint("Model tùy biến (VD: gemini-3.5-flash)...");
+        edtCustomModel.setHintTextColor(Color.parseColor("#64748B"));
+        edtCustomModel.setTextColor(Color.WHITE);
+        edtCustomModel.setBackground(createInputDrawable());
+        edtCustomModel.setPadding(dp(12), dp(10), dp(12), dp(10));
+        edtCustomModel.setTextSize(12f);
+        rowCustom.addView(edtCustomModel, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        Button btnSetCustom = createButton("Dùng", "#1D4ED8");
+        btnSetCustom.setTextSize(11.5f);
+        btnSetCustom.setMinHeight(dp(40));
+        btnSetCustom.setPadding(dp(12), dp(6), dp(12), dp(6));
+        LinearLayout.LayoutParams bclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bclp.leftMargin = dp(8);
+        btnSetCustom.setLayoutParams(bclp);
+        btnSetCustom.setOnClickListener(v -> {
+            triggerHaptic();
+            String cm = edtCustomModel.getText().toString().trim();
+            if (!cm.isEmpty()) {
+                currentModel = cm;
+                tvSelectedModel.setText(currentModel);
+                Toast.makeText(this, "Đã kích hoạt model: " + cm, Toast.LENGTH_SHORT).show();
+            }
+        });
+        rowCustom.addView(btnSetCustom);
+        cardModel.addView(rowCustom);
+        content.addView(cardModel);
+
+        // CARD 3: THẺ PROMPT PHONG CÁCH
+        LinearLayout cardPrompt = createCard();
+
         LinearLayout promptHeaderRow = new LinearLayout(this);
         promptHeaderRow.setOrientation(LinearLayout.HORIZONTAL);
         promptHeaderRow.setGravity(Gravity.CENTER_VERTICAL);
 
+        TextView tvPrIcon = new TextView(this);
+        tvPrIcon.setText("🎭 ");
+        tvPrIcon.setTextSize(15);
+        promptHeaderRow.addView(tvPrIcon);
+
         TextView tvPromptHead = new TextView(this);
-        tvPromptHead.setText("3. Thẻ Prompt Dịch Thuật:");
+        tvPromptHead.setText("Thẻ Phong Cách Dịch");
         tvPromptHead.setTextColor(Color.WHITE);
-        tvPromptHead.setTextSize(15);
+        tvPromptHead.setTextSize(14.5f);
         tvPromptHead.setTypeface(null, Typeface.BOLD);
         promptHeaderRow.addView(tvPromptHead);
         promptHeaderRow.addView(createHelpButton("prompt_cards"));
@@ -1283,18 +1544,38 @@ public class MainActivity extends AppCompatActivity {
         View promptSpacer = new View(this);
         promptHeaderRow.addView(promptSpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
 
-        Button btnAddPrompt = createButton("+ Thêm Prompt", "#2563EB");
-        btnAddPrompt.setOnClickListener(v -> showPromptDialog(null));
+        Button btnAddPrompt = createButton("+ Thêm", "#1E293B");
+        btnAddPrompt.setTextSize(11f);
+        btnAddPrompt.setMinHeight(dp(36));
+        btnAddPrompt.setPadding(dp(12), dp(6), dp(12), dp(6));
+        btnAddPrompt.setOnClickListener(v -> {
+            triggerHaptic();
+            showPromptDialog(null);
+        });
         promptHeaderRow.addView(btnAddPrompt);
-        content.addView(promptHeaderRow);
+        cardPrompt.addView(promptHeaderRow);
 
         llPromptCards = new LinearLayout(this);
         llPromptCards.setOrientation(LinearLayout.VERTICAL);
-        llPromptCards.setPadding(0, 12, 0, 16);
-        content.addView(llPromptCards);
-        refreshPromptList();
+        llPromptCards.setPadding(0, dp(10), 0, 0);
+        cardPrompt.addView(llPromptCards);
+        content.addView(cardPrompt);
 
         tabKeysView.addView(content);
+        refreshKeyList();
+        refreshPromptList();
+    }
+
+    private void updateModelCardsSelection(List<LinearLayout> modelCardsViews, String[][] modelList, String selectedModel) {
+        for (int i = 0; i < modelCardsViews.size(); i++) {
+            LinearLayout card = modelCardsViews.get(i);
+            boolean isSel = modelList[i][0].equals(selectedModel);
+            GradientDrawable cBg = new GradientDrawable();
+            cBg.setColor(Color.parseColor(isSel ? "#132338" : "#0D1420"));
+            cBg.setCornerRadius(dp(14));
+            cBg.setStroke(dp(isSel ? 1.5f : 1f), Color.parseColor(isSel ? "#38BDF8" : "#1E2D44"));
+            card.setBackground(cBg);
+        }
     }
 
     private void testAllKeys() {
@@ -1316,30 +1597,60 @@ public class MainActivity extends AppCompatActivity {
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(20, 14, 20, 14);
+            row.setPadding(dp(12), dp(10), dp(12), dp(10));
             row.setGravity(Gravity.CENTER_VERTICAL);
             GradientDrawable rowBg = new GradientDrawable();
-            rowBg.setColor(Color.parseColor("#161B22"));
-            rowBg.setCornerRadius(18f);
-            rowBg.setStroke(2, Color.parseColor("#30363D"));
+            rowBg.setColor(Color.parseColor("#0E1624"));
+            rowBg.setCornerRadius(dp(12));
+            rowBg.setStroke(dp(1), Color.parseColor("#1C2A40"));
             row.setBackground(rowBg);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, 0, 0, 8);
+            lp.setMargins(0, 0, 0, dp(8));
             row.setLayoutParams(lp);
+
+            TextView tvIdx = new TextView(this);
+            tvIdx.setText("#" + (idx + 1) + " ");
+            tvIdx.setTextColor(Color.parseColor("#64748B"));
+            tvIdx.setTextSize(12f);
+            tvIdx.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            row.addView(tvIdx);
 
             TextView tvK = new TextView(this);
             String masked = item.key.length() > 8 ? "..." + item.key.substring(item.key.length() - 8) : item.key;
-            tvK.setText("Key #" + (idx + 1) + ": " + masked + " (" + item.state + ")");
+            tvK.setText(masked);
             tvK.setTextColor(Color.WHITE);
+            tvK.setTextSize(12.5f);
+            tvK.setTypeface(Typeface.MONOSPACE);
             row.addView(tvK, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
-            Button btnTest = createButton("Test", "#374151");
+            TextView tvStatus = new TextView(this);
+            boolean isActive = "ACTIVE".equalsIgnoreCase(item.state);
+            tvStatus.setText(isActive ? "ACTIVE" : item.state);
+            tvStatus.setTextColor(Color.parseColor(isActive ? "#34D399" : "#F87171"));
+            tvStatus.setTextSize(10f);
+            tvStatus.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            tvStatus.setPadding(dp(6), dp(3), dp(6), dp(3));
+            GradientDrawable stBg = new GradientDrawable();
+            stBg.setColor(Color.parseColor(isActive ? "#064E3B" : "#450A0A"));
+            stBg.setCornerRadius(dp(6));
+            stBg.setStroke(dp(1), Color.parseColor(isActive ? "#10B981" : "#EF4444"));
+            tvStatus.setBackground(stBg);
+            row.addView(tvStatus);
+
+            Button btnTest = createButton("⟳", "#1E293B");
+            btnTest.setTextSize(11f);
+            btnTest.setMinHeight(dp(32));
+            btnTest.setPadding(dp(8), dp(4), dp(8), dp(4));
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            tlp.leftMargin = dp(6);
+            btnTest.setLayoutParams(tlp);
             btnTest.setOnClickListener(v -> {
+                triggerHaptic();
                 btnTest.setText("...");
                 new Thread(() -> {
                     boolean ok = engine.testKey(item);
                     mainHandler.post(() -> {
-                        btnTest.setText("Test");
+                        btnTest.setText("⟳");
                         refreshKeyList();
                         Toast.makeText(MainActivity.this, ok ? "✅ Key hoạt động tốt!" : "❌ Key lỗi hoặc hết hạn!", Toast.LENGTH_SHORT).show();
                     });
@@ -1347,8 +1658,15 @@ public class MainActivity extends AppCompatActivity {
             });
             row.addView(btnTest);
 
-            Button btnDel = createButton("Xóa", "#7F1D1D");
+            Button btnDel = createButton("✕", "#7F1D1D");
+            btnDel.setTextSize(11f);
+            btnDel.setMinHeight(dp(32));
+            btnDel.setPadding(dp(8), dp(4), dp(8), dp(4));
+            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dlp.leftMargin = dp(6);
+            btnDel.setLayoutParams(dlp);
             btnDel.setOnClickListener(v -> {
+                triggerHaptic();
                 apiKeys.remove(idx);
                 refreshKeyList();
             });
@@ -1470,9 +1788,10 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================================
     private void createTabTranslateView() {
         tabTranslateView = new ScrollView(this);
+        tabTranslateView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(32, 24, 32, 32);
+        content.setPadding(dp(16), dp(16), dp(16), dp(80));
 
         // =====================================================================
         // MỤC 1: NHẬP & BÓC TÁCH FILE TRUYỆN GỐC (Card 1)
@@ -1483,10 +1802,15 @@ public class MainActivity extends AppCompatActivity {
         rowInputHeader.setOrientation(LinearLayout.HORIZONTAL);
         rowInputHeader.setGravity(Gravity.CENTER_VERTICAL);
 
+        TextView tvInpIcon = new TextView(this);
+        tvInpIcon.setText("📂 ");
+        tvInpIcon.setTextSize(15);
+        rowInputHeader.addView(tvInpIcon);
+
         TextView tvInputTitle = new TextView(this);
-        tvInputTitle.setText("1. Nhập & Bóc Tách File Truyện Gốc");
+        tvInputTitle.setText("Nhập & Bóc Tách File Truyện Gốc");
         tvInputTitle.setTextColor(Color.WHITE);
-        tvInputTitle.setTextSize(15);
+        tvInputTitle.setTextSize(14.5f);
         tvInputTitle.setTypeface(null, Typeface.BOLD);
         rowInputHeader.addView(tvInputTitle);
         rowInputHeader.addView(createHelpButton("novel_raw_input"));
@@ -1499,24 +1823,36 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout rowProjHeader = new LinearLayout(this);
         rowProjHeader.setOrientation(LinearLayout.HORIZONTAL);
         rowProjHeader.setGravity(Gravity.CENTER_VERTICAL);
-        rowProjHeader.setPadding(0, 12, 0, 8);
+        rowProjHeader.setPadding(0, dp(12), 0, dp(10));
 
         tvCurrentProjectName = new TextView(this);
         tvCurrentProjectName.setText("📖 Dự án: " + currentProjectName);
-        tvCurrentProjectName.setTextColor(Color.parseColor("#60A5FA"));
-        tvCurrentProjectName.setTextSize(13);
+        tvCurrentProjectName.setTextColor(Color.parseColor("#38BDF8"));
+        tvCurrentProjectName.setTextSize(13f);
         tvCurrentProjectName.setTypeface(null, Typeface.BOLD);
         rowProjHeader.addView(tvCurrentProjectName, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         Button btnSwitchProj = createButton("Đổi Truyện", "#1E293B");
-        btnSwitchProj.setOnClickListener(v -> showSwitchProjectDialog());
+        btnSwitchProj.setTextSize(11f);
+        btnSwitchProj.setMinHeight(dp(36));
+        btnSwitchProj.setPadding(dp(10), dp(4), dp(10), dp(4));
+        btnSwitchProj.setOnClickListener(v -> {
+            triggerHaptic();
+            showSwitchProjectDialog();
+        });
         rowProjHeader.addView(btnSwitchProj);
 
-        View sproj = new View(this);
-        rowProjHeader.addView(sproj, new LinearLayout.LayoutParams(8, 1));
-
-        Button btnNewProj = createButton("+ Dự Án Mới", "#2563EB");
-        btnNewProj.setOnClickListener(v -> showNewProjectDialog());
+        Button btnNewProj = createButton("+ Dự Án Mới", "#1D4ED8");
+        btnNewProj.setTextSize(11f);
+        btnNewProj.setMinHeight(dp(36));
+        btnNewProj.setPadding(dp(10), dp(4), dp(10), dp(4));
+        LinearLayout.LayoutParams nplp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        nplp.leftMargin = dp(6);
+        btnNewProj.setLayoutParams(nplp);
+        btnNewProj.setOnClickListener(v -> {
+            triggerHaptic();
+            showNewProjectDialog();
+        });
         rowProjHeader.addView(btnNewProj);
 
         cardInput.addView(rowProjHeader);
@@ -1524,49 +1860,64 @@ public class MainActivity extends AppCompatActivity {
         // Nạp văn bản truyện thô
         edtRawText = new EditText(this);
         edtRawText.setTextColor(Color.WHITE);
-        edtRawText.setBackgroundColor(Color.parseColor("#171717"));
-        edtRawText.setPadding(20, 16, 20, 16);
+        edtRawText.setBackground(createInputDrawable());
+        edtRawText.setPadding(dp(14), dp(12), dp(14), dp(12));
         edtRawText.setHint("Dán truyện hoặc bấm Chọn File .txt...");
-        edtRawText.setHintTextColor(Color.parseColor("#666666"));
+        edtRawText.setHintTextColor(Color.parseColor("#64748B"));
         edtRawText.setLines(3);
+        edtRawText.setTextSize(13f);
         cardInput.addView(edtRawText);
 
-        // Hàng nút: Chọn file từ bộ nhớ
-        LinearLayout fileRow = new LinearLayout(this);
-        fileRow.setOrientation(LinearLayout.HORIZONTAL);
-        fileRow.setPadding(0, 8, 0, 0);
+        // Nút Chọn file từ bộ nhớ
+        Button btnPickFile = createButton("📁 CHỌN FILE .TXT / .EPUB TỪ BỘ NHỚ", "#1E293B");
+        btnPickFile.setMinHeight(dp(44));
+        btnPickFile.setTextSize(12.5f);
+        LinearLayout.LayoutParams pflp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        pflp.setMargins(0, dp(10), 0, 0);
+        btnPickFile.setLayoutParams(pflp);
+        btnPickFile.setOnClickListener(v -> {
+            triggerHaptic();
+            openFilePicker();
+        });
+        cardInput.addView(btnPickFile);
 
-        Button btnPickFile = createButton("📂 Chọn File .txt / .epub Từ Bộ Nhớ", "#1E293B");
-        btnPickFile.setOnClickListener(v -> openFilePicker());
-        fileRow.addView(btnPickFile, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-        cardInput.addView(fileRow);
-
-        // Hàng tách chương: Theo tác giả vs Theo số ký tự tùy chỉnh
+        // Hàng tách chương: Tách Tác Giả (Regex) vs Tách Theo Ký Tự
         LinearLayout splitOptRow = new LinearLayout(this);
         splitOptRow.setOrientation(LinearLayout.HORIZONTAL);
-        splitOptRow.setPadding(0, 8, 0, 0);
+        splitOptRow.setPadding(0, dp(10), 0, 0);
         splitOptRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        Button btnSplitAuthor = createButton("Tách Tác Giả (Regex)", "#047857");
-        btnSplitAuthor.setOnClickListener(v -> splitRawText(false));
-        splitOptRow.addView(btnSplitAuthor);
-
-        View ssp = new View(this);
-        splitOptRow.addView(ssp, new LinearLayout.LayoutParams(8, 1));
+        Button btnSplitAuthor = createButton("TÁCH TÁC GIẢ (REGEX)", "#065F46");
+        btnSplitAuthor.setTextSize(11f);
+        btnSplitAuthor.setMinHeight(dp(40));
+        btnSplitAuthor.setPadding(dp(10), dp(4), dp(10), dp(4));
+        btnSplitAuthor.setOnClickListener(v -> {
+            triggerHaptic();
+            splitRawText(false);
+        });
+        splitOptRow.addView(btnSplitAuthor, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f));
 
         edtChunkSize = new EditText(this);
         edtChunkSize.setText("3500");
         edtChunkSize.setTextColor(Color.WHITE);
-        edtChunkSize.setBackgroundColor(Color.parseColor("#171717"));
-        edtChunkSize.setPadding(10, 8, 10, 8);
+        edtChunkSize.setBackground(createInputDrawable());
+        edtChunkSize.setPadding(dp(8), dp(6), dp(8), dp(6));
         edtChunkSize.setHint("Ký tự");
-        splitOptRow.addView(edtChunkSize, new LinearLayout.LayoutParams(140, ViewGroup.LayoutParams.WRAP_CONTENT));
+        edtChunkSize.setGravity(Gravity.CENTER);
+        edtChunkSize.setTextSize(12f);
+        LinearLayout.LayoutParams cslp = new LinearLayout.LayoutParams(dp(70), ViewGroup.LayoutParams.WRAP_CONTENT);
+        cslp.setMargins(dp(6), 0, dp(6), 0);
+        edtChunkSize.setLayoutParams(cslp);
+        splitOptRow.addView(edtChunkSize);
 
-        View ssp2 = new View(this);
-        splitOptRow.addView(ssp2, new LinearLayout.LayoutParams(8, 1));
-
-        Button btnSplitChars = createButton("Tách Theo Ký Tự", "#0369A1");
-        btnSplitChars.setOnClickListener(v -> splitRawText(true));
+        Button btnSplitChars = createButton("TÁCH THEO KÝ TỰ", "#0369A1");
+        btnSplitChars.setTextSize(11f);
+        btnSplitChars.setMinHeight(dp(40));
+        btnSplitChars.setPadding(dp(10), dp(4), dp(10), dp(4));
+        btnSplitChars.setOnClickListener(v -> {
+            triggerHaptic();
+            splitRawText(true);
+        });
         splitOptRow.addView(btnSplitChars, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         cardInput.addView(splitOptRow);
@@ -1581,10 +1932,15 @@ public class MainActivity extends AppCompatActivity {
         rowProgHead.setOrientation(LinearLayout.HORIZONTAL);
         rowProgHead.setGravity(Gravity.CENTER_VERTICAL);
 
+        TextView tvPrgIcon = new TextView(this);
+        tvPrgIcon.setText("⚡ ");
+        tvPrgIcon.setTextSize(15);
+        rowProgHead.addView(tvPrgIcon);
+
         TextView tvProgTitle = new TextView(this);
-        tvProgTitle.setText("2. Tiến Độ Dịch Thuật & Điều Khiển");
+        tvProgTitle.setText("Tiến Độ Dịch Thuật & Điều Khiển");
         tvProgTitle.setTextColor(Color.WHITE);
-        tvProgTitle.setTextSize(15);
+        tvProgTitle.setTextSize(14.5f);
         tvProgTitle.setTypeface(null, Typeface.BOLD);
         rowProgHead.addView(tvProgTitle);
         rowProgHead.addView(createHelpButton("range_progress"));
@@ -1594,90 +1950,110 @@ public class MainActivity extends AppCompatActivity {
         cardProgress.addView(rowProgHead);
 
         tvProgressText = new TextView(this);
-        tvProgressText.setTextColor(Color.parseColor("#93C5FD"));
-        tvProgressText.setTextSize(13);
+        tvProgressText.setTextColor(Color.parseColor("#38BDF8"));
+        tvProgressText.setTextSize(13.5f);
         tvProgressText.setTypeface(null, Typeface.BOLD);
-        tvProgressText.setPadding(0, 8, 0, 4);
+        tvProgressText.setPadding(0, dp(10), 0, dp(6));
         tvProgressText.setText("Tiến độ: " + translatedChapters.size() + " / " + rawChapters.size() + " chương");
         cardProgress.addView(tvProgressText);
 
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(Math.max(rawChapters.size(), 1));
         progressBar.setProgress(translatedChapters.size());
+        progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#10B981")));
+        progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#1E293B")));
+        progressBar.setMinimumHeight(dp(10));
         cardProgress.addView(progressBar);
 
         // Range inputs: Từ chương -> Đến chương
         LinearLayout rangeRow = new LinearLayout(this);
         rangeRow.setOrientation(LinearLayout.HORIZONTAL);
-        rangeRow.setPadding(0, 12, 0, 8);
+        rangeRow.setPadding(0, dp(12), 0, dp(8));
         rangeRow.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView tvF = new TextView(this);
         tvF.setText("Từ chương: ");
-        tvF.setTextColor(Color.parseColor("#CCCCCC"));
+        tvF.setTextColor(Color.parseColor("#94A3B8"));
+        tvF.setTextSize(12.5f);
         rangeRow.addView(tvF);
 
         edtFromChap = new EditText(this);
         edtFromChap.setText("1");
         edtFromChap.setTextColor(Color.WHITE);
-        edtFromChap.setBackgroundColor(Color.parseColor("#171717"));
-        edtFromChap.setPadding(12, 8, 12, 8);
+        edtFromChap.setBackground(createInputDrawable());
+        edtFromChap.setPadding(dp(12), dp(8), dp(12), dp(8));
+        edtFromChap.setTextSize(13f);
+        edtFromChap.setGravity(Gravity.CENTER);
         rangeRow.addView(edtFromChap, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
-        View srf = new View(this);
-        rangeRow.addView(srf, new LinearLayout.LayoutParams(16, 1));
-
         TextView tvT = new TextView(this);
-        tvT.setText("Đến chương: ");
-        tvT.setTextColor(Color.parseColor("#CCCCCC"));
+        tvT.setText("  Đến chương: ");
+        tvT.setTextColor(Color.parseColor("#94A3B8"));
+        tvT.setTextSize(12.5f);
         rangeRow.addView(tvT);
 
         edtToChap = new EditText(this);
         edtToChap.setText(String.valueOf(Math.max(rawChapters.size(), 1)));
         edtToChap.setTextColor(Color.WHITE);
-        edtToChap.setBackgroundColor(Color.parseColor("#171717"));
-        edtToChap.setPadding(12, 8, 12, 8);
+        edtToChap.setBackground(createInputDrawable());
+        edtToChap.setPadding(dp(12), dp(8), dp(12), dp(8));
+        edtToChap.setTextSize(13f);
+        edtToChap.setGravity(Gravity.CENTER);
         rangeRow.addView(edtToChap, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         cardProgress.addView(rangeRow);
 
-        // 3 Nút: Dịch Range, Tạm dừng / Tiếp tục, Hủy
+        // 3 Nút Điều Khiển: Dịch Range, Tạm dừng, Hủy
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
-        btnRow.setPadding(0, 8, 0, 0);
+        btnRow.setPadding(0, dp(8), 0, 0);
 
-        btnStartRange = createButton("Dịch Range", "#2563EB");
-        btnStartRange.setOnClickListener(v -> startRangeTranslation());
-        btnRow.addView(btnStartRange, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        btnStartRange = createGradientButton("DỊCH RANGE", Color.parseColor("#0284C7"), Color.parseColor("#00D2FF"));
+        btnStartRange.setOnClickListener(v -> {
+            triggerHaptic();
+            startRangeTranslation();
+        });
+        btnRow.addView(btnStartRange, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f));
 
-        View sb1 = new View(this);
-        btnRow.addView(sb1, new LinearLayout.LayoutParams(8, 1));
+        btnPauseResume = createButton("TẠM DỪNG", "#D97706");
+        btnPauseResume.setMinHeight(dp(48));
+        LinearLayout.LayoutParams prlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+        prlp.setMargins(dp(6), 0, dp(6), 0);
+        btnPauseResume.setLayoutParams(prlp);
+        btnPauseResume.setOnClickListener(v -> {
+            triggerHaptic();
+            togglePauseResume();
+        });
+        btnRow.addView(btnPauseResume);
 
-        btnPauseResume = createButton("Tạm dừng", "#D97706");
-        btnPauseResume.setOnClickListener(v -> togglePauseResume());
-        btnRow.addView(btnPauseResume, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        View sb2 = new View(this);
-        btnRow.addView(sb2, new LinearLayout.LayoutParams(8, 1));
-
-        btnCancelTrans = createButton("Hủy", "#7F1D1D");
-        btnCancelTrans.setOnClickListener(v -> cancelTranslation());
-        btnRow.addView(btnCancelTrans, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        btnCancelTrans = createButton("HỦY", "#7F1D1D");
+        btnCancelTrans.setMinHeight(dp(48));
+        btnCancelTrans.setOnClickListener(v -> {
+            triggerHaptic();
+            cancelTranslation();
+        });
+        btnRow.addView(btnCancelTrans, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.8f));
 
         cardProgress.addView(btnRow);
 
-        View spGap = new View(this);
-        cardProgress.addView(spGap, new LinearLayout.LayoutParams(1, 10));
-
-        btnFillGaps = createButton("⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)", "#059669");
-        btnFillGaps.setOnClickListener(v -> startFillGapsTranslation());
+        btnFillGaps = createGradientButton("⚡ DỊCH BÙ CHƯƠNG SÓT (NÉ CÁC CHƯƠNG ĐÃ DỊCH)", Color.parseColor("#10B981"), Color.parseColor("#059669"));
+        LinearLayout.LayoutParams fglp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        fglp.setMargins(0, dp(10), 0, 0);
+        btnFillGaps.setLayoutParams(fglp);
+        btnFillGaps.setOnClickListener(v -> {
+            triggerHaptic();
+            startFillGapsTranslation();
+        });
         cardProgress.addView(btnFillGaps);
 
-        View spPol = new View(this);
-        cardProgress.addView(spPol, new LinearLayout.LayoutParams(1, 10));
-
-        btnFinalPolish = createButton("✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)", "#7C3AED");
-        btnFinalPolish.setOnClickListener(v -> executeFinalGlobalPolish());
+        btnFinalPolish = createGradientButton("✨ LÀM MƯỢT BẢN DỊCH FINAL (QUÉT SẠCH CHỮ HÁN)", Color.parseColor("#8B5CF6"), Color.parseColor("#6366F1"));
+        LinearLayout.LayoutParams fplp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        fplp.setMargins(0, dp(10), 0, 0);
+        btnFinalPolish.setLayoutParams(fplp);
+        btnFinalPolish.setOnClickListener(v -> {
+            triggerHaptic();
+            executeFinalGlobalPolish();
+        });
         cardProgress.addView(btnFinalPolish);
 
         content.addView(cardProgress);
@@ -1691,10 +2067,15 @@ public class MainActivity extends AppCompatActivity {
         rowGlossHead.setOrientation(LinearLayout.HORIZONTAL);
         rowGlossHead.setGravity(Gravity.CENTER_VERTICAL);
 
+        TextView tvGlIcon = new TextView(this);
+        tvGlIcon.setText("📖 ");
+        tvGlIcon.setTextSize(15);
+        rowGlossHead.addView(tvGlIcon);
+
         tvGlossaryHeader = new TextView(this);
-        tvGlossaryHeader.setText("3. Kho Thuật Ngữ Master Glossary (" + masterGlossary.size() + " từ):");
+        tvGlossaryHeader.setText("Từ Điển Master Glossary (" + masterGlossary.size() + " từ):");
         tvGlossaryHeader.setTextColor(Color.WHITE);
-        tvGlossaryHeader.setTextSize(14);
+        tvGlossaryHeader.setTextSize(14f);
         tvGlossaryHeader.setTypeface(null, Typeface.BOLD);
         rowGlossHead.addView(tvGlossaryHeader);
         rowGlossHead.addView(createHelpButton("master_glossary"));
@@ -1705,13 +2086,13 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout rowAddG = new LinearLayout(this);
         rowAddG.setOrientation(LinearLayout.HORIZONTAL);
-        rowAddG.setPadding(0, 10, 0, 0);
+        rowAddG.setPadding(0, dp(10), 0, 0);
 
         edtGlossaryKey = createStyledEditText("Từ gốc (林辰)");
         rowAddG.addView(edtGlossaryKey, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         View sg = new View(this);
-        rowAddG.addView(sg, new LinearLayout.LayoutParams(12, 1));
+        rowAddG.addView(sg, new LinearLayout.LayoutParams(dp(8), 1));
 
         edtGlossaryVal = createStyledEditText("Nghĩa (Lâm Thần)");
         rowAddG.addView(edtGlossaryVal, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
@@ -1720,10 +2101,11 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout rowGButtons = new LinearLayout(this);
         rowGButtons.setOrientation(LinearLayout.HORIZONTAL);
-        rowGButtons.setPadding(0, 10, 0, 8);
+        rowGButtons.setPadding(0, dp(10), 0, dp(4));
 
         Button btnAddG = createButton("+ Thêm Từ", "#059669");
         btnAddG.setOnClickListener(v -> {
+            triggerHaptic();
             String k = edtGlossaryKey.getText().toString().trim();
             String val = edtGlossaryVal.getText().toString().trim();
             if (!k.isEmpty() && !val.isEmpty()) {
@@ -1737,18 +2119,21 @@ public class MainActivity extends AppCompatActivity {
         });
         rowGButtons.addView(btnAddG, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f));
 
-        View sgb1 = new View(this);
-        rowGButtons.addView(sgb1, new LinearLayout.LayoutParams(8, 1));
-
         Button btnImportG = createButton("📥 Nạp .txt", "#1D4ED8");
-        btnImportG.setOnClickListener(v -> openGlossaryFilePicker());
-        rowGButtons.addView(btnImportG, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        View sgb2 = new View(this);
-        rowGButtons.addView(sgb2, new LinearLayout.LayoutParams(8, 1));
+        btnImportG.setOnClickListener(v -> {
+            triggerHaptic();
+            openGlossaryFilePicker();
+        });
+        LinearLayout.LayoutParams iglp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+        iglp.setMargins(dp(6), 0, dp(6), 0);
+        btnImportG.setLayoutParams(iglp);
+        rowGButtons.addView(btnImportG);
 
         Button btnExportG = createButton("📤 Xuất", "#374151");
-        btnExportG.setOnClickListener(v -> exportGlossaryData());
+        btnExportG.setOnClickListener(v -> {
+            triggerHaptic();
+            exportGlossaryData();
+        });
         rowGButtons.addView(btnExportG, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.8f));
 
         cardGloss.addView(rowGButtons);
@@ -2780,57 +3165,74 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================================
     private void createTabReaderView() {
         tabReaderView = new ScrollView(this);
+        tabReaderView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(32, 24, 32, 32);
+        content.setPadding(dp(16), dp(16), dp(16), dp(80));
+
+        // CARD 1: THƯ VIỆN & CÔNG CỤ DỊCH BÙ
+        LinearLayout cardToolbar = createCard();
 
         LinearLayout rowTab3Head = new LinearLayout(this);
         rowTab3Head.setOrientation(LinearLayout.HORIZONTAL);
         rowTab3Head.setGravity(Gravity.CENTER_VERTICAL);
 
+        TextView tvRdIcon = new TextView(this);
+        tvRdIcon.setText("📚 ");
+        tvRdIcon.setTextSize(15);
+        rowTab3Head.addView(tvRdIcon);
+
         tvChapterCountInfo = new TextView(this);
-        tvChapterCountInfo.setTextColor(Color.parseColor("#60A5FA"));
-        tvChapterCountInfo.setTextSize(14);
+        tvChapterCountInfo.setTextColor(Color.WHITE);
+        tvChapterCountInfo.setTextSize(14.5f);
         tvChapterCountInfo.setTypeface(null, Typeface.BOLD);
-        tvChapterCountInfo.setText("Kho Chương Đã Dịch & Trình Đọc AMOLED:");
+        tvChapterCountInfo.setText("Kho Chương Đã Dịch & Trình Đọc AMOLED");
         rowTab3Head.addView(tvChapterCountInfo, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
         rowTab3Head.addView(createHelpButton("chapter_auditor"));
-        content.addView(rowTab3Head);
+        cardToolbar.addView(rowTab3Head);
 
         TextView tvDesc = new TextView(this);
         tvDesc.setText("Phân trang 100 chương/trang chống khựng máy. Trạng thái đọc độc lập 100%, hỗ trợ AMOLED/Sepia.");
-        tvDesc.setTextColor(Color.parseColor("#9CA3AF"));
-        tvDesc.setTextSize(11);
-        tvDesc.setPadding(0, 4, 0, 12);
-        content.addView(tvDesc);
+        tvDesc.setTextColor(Color.parseColor("#64748B"));
+        tvDesc.setTextSize(11f);
+        tvDesc.setPadding(0, dp(6), 0, dp(12));
+        cardToolbar.addView(tvDesc);
 
-        Button btnExportTab3 = createButton("📥 Xuất Toàn Văn Tác Phẩm (.txt) Vào Download", "#059669");
-        btnExportTab3.setOnClickListener(v -> exportFullNovelData());
-        content.addView(btnExportTab3);
+        Button btnExportTab3 = createGradientButton("📥 XUẤT TOÀN VĂN TÁC PHẨM (.TXT) VÀO DOWNLOAD", Color.parseColor("#059669"), Color.parseColor("#10B981"));
+        btnExportTab3.setOnClickListener(v -> {
+            triggerHaptic();
+            exportFullNovelData();
+        });
+        cardToolbar.addView(btnExportTab3);
 
-        View spGap3 = new View(this);
-        content.addView(spGap3, new LinearLayout.LayoutParams(1, 10));
-
-        btnFillGapsTab3 = createButton("⚡ Dịch Bù Toàn Bộ Chương Còn Thiếu (Né Đã Dịch)", "#0D9488");
+        btnFillGapsTab3 = createGradientButton("⚡ DỊCH BÙ TOÀN BỘ CHƯƠNG CÒN THIẾU (NÉ ĐÃ DỊCH)", Color.parseColor("#0D9488"), Color.parseColor("#14B8A6"));
+        LinearLayout.LayoutParams fg3lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        fg3lp.setMargins(0, dp(10), 0, 0);
+        btnFillGapsTab3.setLayoutParams(fg3lp);
         btnFillGapsTab3.setOnClickListener(v -> {
+            triggerHaptic();
             switchTab(1);
             startFillGapsTranslation();
         });
-        content.addView(btnFillGapsTab3);
+        cardToolbar.addView(btnFillGapsTab3);
 
-        View spPol3 = new View(this);
-        content.addView(spPol3, new LinearLayout.LayoutParams(1, 10));
+        btnFinalPolishTab3 = createGradientButton("✨ LÀM MƯỢT TOÀN VĂN BẢN DỊCH (QUÉT SẠCH CHỮ HÁN)", Color.parseColor("#7C3AED"), Color.parseColor("#A855F7"));
+        LinearLayout.LayoutParams fp3lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        fp3lp.setMargins(0, dp(10), 0, 0);
+        btnFinalPolishTab3.setLayoutParams(fp3lp);
+        btnFinalPolishTab3.setOnClickListener(v -> {
+            triggerHaptic();
+            executeFinalGlobalPolish();
+        });
+        cardToolbar.addView(btnFinalPolishTab3);
+        content.addView(cardToolbar);
 
-        btnFinalPolishTab3 = createButton("✨ Làm Mượt Toàn Văn Bản Dịch (Quét Sạch Chữ Hán)", "#7C3AED");
-        btnFinalPolishTab3.setOnClickListener(v -> executeFinalGlobalPolish());
-        content.addView(btnFinalPolishTab3);
-
-        View spExp = new View(this);
-        content.addView(spExp, new LinearLayout.LayoutParams(1, 14));
-
+        // CARD 2: DANH SÁCH CHƯƠNG & PHÂN TRANG
+        LinearLayout cardChapters = createCard();
         llChapterList = new LinearLayout(this);
         llChapterList.setOrientation(LinearLayout.VERTICAL);
-        content.addView(llChapterList);
+        cardChapters.addView(llChapterList);
+        content.addView(cardChapters);
 
         tabReaderView.addView(content);
         refreshChapterListView();
@@ -2843,8 +3245,10 @@ public class MainActivity extends AppCompatActivity {
         if (rawChapters.isEmpty()) {
             TextView tvEmpty = new TextView(this);
             tvEmpty.setText("Chưa có chương nào. Hãy nạp file ở Thẻ 2 (Dịch & Từ điển)!");
-            tvEmpty.setTextColor(Color.parseColor("#666666"));
-            tvEmpty.setPadding(0, 32, 0, 0);
+            tvEmpty.setTextColor(Color.parseColor("#64748B"));
+            tvEmpty.setTextSize(13f);
+            tvEmpty.setGravity(Gravity.CENTER);
+            tvEmpty.setPadding(0, dp(24), 0, dp(24));
             llChapterList.addView(tvEmpty);
             return;
         }
@@ -2856,13 +3260,16 @@ public class MainActivity extends AppCompatActivity {
         // Hàng điều khiển phân trang chương chống giật lag
         LinearLayout pagRow = new LinearLayout(this);
         pagRow.setOrientation(LinearLayout.HORIZONTAL);
-        pagRow.setPadding(0, 0, 0, 16);
+        pagRow.setPadding(0, 0, 0, dp(12));
         pagRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        Button btnPrevPage = createButton("◀ Trước", "#1E293B");
+        Button btnPrevPage = createButton("◀ TRƯỚC", "#1E293B");
+        btnPrevPage.setTextSize(11f);
+        btnPrevPage.setMinHeight(dp(38));
         btnPrevPage.setEnabled(chapterListPage > 0);
         btnPrevPage.setOnClickListener(v -> {
             if (chapterListPage > 0) {
+                triggerHaptic();
                 chapterListPage--;
                 refreshChapterListView();
             }
@@ -2871,14 +3278,19 @@ public class MainActivity extends AppCompatActivity {
 
         TextView tvPageInfo = new TextView(this);
         tvPageInfo.setGravity(Gravity.CENTER);
-        tvPageInfo.setTextColor(Color.parseColor("#93C5FD"));
+        tvPageInfo.setTextColor(Color.parseColor("#38BDF8"));
+        tvPageInfo.setTextSize(12.5f);
+        tvPageInfo.setTypeface(null, Typeface.BOLD);
         tvPageInfo.setText("Trang " + (chapterListPage + 1) + " / " + totalPages + " (" + totalChapters + " chương)");
         pagRow.addView(tvPageInfo, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
-        Button btnNextPage = createButton("Sau ▶", "#1E293B");
+        Button btnNextPage = createButton("SAU ▶", "#1E293B");
+        btnNextPage.setTextSize(11f);
+        btnNextPage.setMinHeight(dp(38));
         btnNextPage.setEnabled(chapterListPage < totalPages - 1);
         btnNextPage.setOnClickListener(v -> {
             if (chapterListPage < totalPages - 1) {
+                triggerHaptic();
                 chapterListPage++;
                 refreshChapterListView();
             }
@@ -2896,13 +3308,15 @@ public class MainActivity extends AppCompatActivity {
 
             LinearLayout item = new LinearLayout(this);
             item.setOrientation(LinearLayout.HORIZONTAL);
+            item.setPadding(dp(14), dp(12), dp(14), dp(12));
+            item.setGravity(Gravity.CENTER_VERTICAL);
             GradientDrawable itemBg = new GradientDrawable();
-            itemBg.setColor(Color.parseColor(isCurrent ? "#172554" : (isDone ? "#064E3B" : "#161B22")));
-            itemBg.setCornerRadius(18f);
-            itemBg.setStroke(2, Color.parseColor(isCurrent ? "#3B82F6" : (isDone ? "#059669" : "#30363D")));
+            itemBg.setColor(Color.parseColor(isCurrent ? "#172554" : (isDone ? "#0D1E16" : "#0E1624")));
+            itemBg.setCornerRadius(dp(12));
+            itemBg.setStroke(dp(1), Color.parseColor(isCurrent ? "#3B82F6" : (isDone ? "#059669" : "#1C2A40")));
             item.setBackground(itemBg);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, 0, 0, 8);
+            lp.setMargins(0, 0, 0, dp(8));
             item.setLayoutParams(lp);
 
             TextView tvName = new TextView(this);
@@ -2910,15 +3324,25 @@ public class MainActivity extends AppCompatActivity {
             String firstLine = rawChapters.get(idx).split(nl)[0];
             tvName.setText("Chương " + (idx + 1) + ": " + (firstLine.length() > 30 ? firstLine.substring(0, 30) : firstLine));
             tvName.setTextColor(Color.WHITE);
+            tvName.setTextSize(13f);
+            tvName.setTypeface(null, Typeface.BOLD);
             item.addView(tvName, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
             TextView tvStatus = new TextView(this);
-            tvStatus.setText(isCurrent ? "⚡ Đang dịch" : (isDone ? "✓ Đã dịch" : "Chờ"));
-            tvStatus.setTextColor(Color.parseColor(isCurrent ? "#93C5FD" : (isDone ? "#34D399" : "#6B7280")));
-            tvStatus.setTypeface(null, Typeface.BOLD);
+            tvStatus.setText(isCurrent ? "⚡ Đang dịch" : (isDone ? "✓ Đã dịch" : "Chờ dịch"));
+            tvStatus.setTextColor(Color.parseColor(isCurrent ? "#60A5FA" : (isDone ? "#34D399" : "#64748B")));
+            tvStatus.setTextSize(10.5f);
+            tvStatus.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            tvStatus.setPadding(dp(6), dp(3), dp(6), dp(3));
+            GradientDrawable stBg = new GradientDrawable();
+            stBg.setColor(Color.parseColor(isCurrent ? "#1E3A8A" : (isDone ? "#064E3B" : "#1E293B")));
+            stBg.setCornerRadius(dp(6));
+            stBg.setStroke(dp(1), Color.parseColor(isCurrent ? "#3B82F6" : (isDone ? "#10B981" : "#334155")));
+            tvStatus.setBackground(stBg);
             item.addView(tvStatus);
 
             item.setOnClickListener(v -> {
+                triggerHaptic();
                 if (isDone) {
                     openFullScreenReader(idx);
                 } else {
@@ -3246,17 +3670,17 @@ public class MainActivity extends AppCompatActivity {
         btnLangEn.setText((isEn ? "✓ " : "") + "English");
         btnLangKo.setText((isKo ? "✓ " : "") + "한국어");
 
-        btnLangVi.setBackground(createButtonDrawable(isVi ? "#2563EB" : "#1E293B", 18f));
-        btnLangJa.setBackground(createButtonDrawable(isJa ? "#2563EB" : "#1E293B", 18f));
-        btnLangEn.setBackground(createButtonDrawable(isEn ? "#2563EB" : "#1E293B", 18f));
-        btnLangKo.setBackground(createButtonDrawable(isKo ? "#2563EB" : "#1E293B", 18f));
+        btnLangVi.setBackground(createButtonDrawable(isVi ? "#1D4ED8" : "#1E293B", 14f));
+        btnLangJa.setBackground(createButtonDrawable(isJa ? "#1D4ED8" : "#1E293B", 14f));
+        btnLangEn.setBackground(createButtonDrawable(isEn ? "#1D4ED8" : "#1E293B", 14f));
+        btnLangKo.setBackground(createButtonDrawable(isKo ? "#1D4ED8" : "#1E293B", 14f));
     }
 
     private void updateMinTermButtonStyles() {
         for (int i = 0; i < minTermButtons.size(); i++) {
             int len = i + 1;
             Button b = minTermButtons.get(i);
-            b.setBackground(createButtonDrawable(minTermLength == len ? "#059669" : "#1E293B", 18f));
+            b.setBackground(createButtonDrawable(minTermLength == len ? "#059669" : "#1E293B", 12f));
         }
     }
 
@@ -3264,24 +3688,31 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < minFreqButtons.size(); i++) {
             int freq = i + 1;
             Button b = minFreqButtons.get(i);
-            b.setBackground(createButtonDrawable(minFrequency == freq ? "#059669" : "#1E293B", 18f));
+            b.setBackground(createButtonDrawable(minFrequency == freq ? "#059669" : "#1E293B", 12f));
         }
     }
 
     private void createTabSettingsView() {
         tabSettingsView = new ScrollView(this);
+        tabSettingsView.setOverScrollMode(View.OVER_SCROLL_ALWAYS);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(32, 24, 32, 32);
+        content.setPadding(dp(16), dp(16), dp(16), dp(80));
 
         // 1. Quản Lý Dự Án & Xóa Dự Án
         LinearLayout rowS1Head = new LinearLayout(this);
         rowS1Head.setOrientation(LinearLayout.HORIZONTAL);
         rowS1Head.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvPrIcon = new TextView(this);
+        tvPrIcon.setText("⚙️ ");
+        tvPrIcon.setTextSize(15);
+        rowS1Head.addView(tvPrIcon);
+
         TextView tvProjTitle = new TextView(this);
-        tvProjTitle.setText("1. Quản Lý Dự Án Hiện Tại:");
+        tvProjTitle.setText("Quản Lý Dự Án Hiện Tại");
         tvProjTitle.setTextColor(Color.WHITE);
-        tvProjTitle.setTextSize(15);
+        tvProjTitle.setTextSize(14.5f);
         tvProjTitle.setTypeface(null, Typeface.BOLD);
         rowS1Head.addView(tvProjTitle);
         rowS1Head.addView(createHelpButton("settings_projects_manager"));
@@ -3290,44 +3721,58 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout cardProj = createCard();
         tvSettingsProjName = new TextView(this);
         tvSettingsProjName.setText("• Dự án: " + currentProjectName);
-        tvSettingsProjName.setTextColor(Color.parseColor("#93C5FD"));
+        tvSettingsProjName.setTextColor(Color.parseColor("#38BDF8"));
+        tvSettingsProjName.setTextSize(14f);
         tvSettingsProjName.setTypeface(null, Typeface.BOLD);
         cardProj.addView(tvSettingsProjName);
 
         tvSettingsProjStats = new TextView(this);
         tvSettingsProjStats.setText("• Đã dịch: " + translatedChapters.size() + "/" + rawChapters.size() + " chương · Glossary: " + masterGlossary.size() + " từ");
-        tvSettingsProjStats.setTextColor(Color.parseColor("#9CA3AF"));
-        tvSettingsProjStats.setPadding(0, 4, 0, 12);
+        tvSettingsProjStats.setTextColor(Color.parseColor("#94A3B8"));
+        tvSettingsProjStats.setTextSize(12f);
+        tvSettingsProjStats.setPadding(0, dp(4), 0, dp(12));
         cardProj.addView(tvSettingsProjStats);
 
         LinearLayout rowProjBtns = new LinearLayout(this);
         rowProjBtns.setOrientation(LinearLayout.HORIZONTAL);
 
-        Button btnSwitch = createButton("Chuyển Dự Án", "#1E293B");
-        btnSwitch.setOnClickListener(v -> showSwitchProjectDialog());
+        Button btnSwitch = createButton("CHUYỂN DỰ ÁN", "#1E293B");
+        btnSwitch.setMinHeight(dp(44));
+        btnSwitch.setOnClickListener(v -> {
+            triggerHaptic();
+            showSwitchProjectDialog();
+        });
         rowProjBtns.addView(btnSwitch, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
-        View sp1 = new View(this);
-        rowProjBtns.addView(sp1, new LinearLayout.LayoutParams(12, 1));
-
-        Button btnNewProj = createButton("+ Tạo Mới", "#2563EB");
-        btnNewProj.setOnClickListener(v -> showNewProjectDialog());
-        rowProjBtns.addView(btnNewProj, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        Button btnNewProj = createGradientButton("+ TẠO MỚI", Color.parseColor("#0284C7"), Color.parseColor("#00D2FF"));
+        btnNewProj.setMinHeight(dp(44));
+        LinearLayout.LayoutParams nplp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+        nplp.leftMargin = dp(8);
+        btnNewProj.setLayoutParams(nplp);
+        btnNewProj.setOnClickListener(v -> {
+            triggerHaptic();
+            showNewProjectDialog();
+        });
+        rowProjBtns.addView(btnNewProj);
 
         cardProj.addView(rowProjBtns);
 
-        // Nút Xóa Dự Án Màu Đỏ Cực Kỳ An Toàn
-        Button btnDeleteProj = createButton("🗑️ Xóa Vĩnh Viễn Dự Án Này", "#7F1D1D");
-        btnDeleteProj.setOnClickListener(v -> showDeleteProjectConfirmationDialog());
+        // Nút Xóa Dự Án Màu Đỏ Ruby Cực Kỳ An Toàn
+        Button btnDeleteProj = createButton("🗑️ XÓA VĨNH VIỄN DỰ ÁN NÀY", "#7F1D1D");
+        btnDeleteProj.setMinHeight(dp(46));
+        btnDeleteProj.setOnClickListener(v -> {
+            triggerHaptic();
+            showDeleteProjectConfirmationDialog();
+        });
         LinearLayout.LayoutParams lpDel = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lpDel.setMargins(0, 10, 0, 0);
+        lpDel.setMargins(0, dp(10), 0, 0);
         cardProj.addView(btnDeleteProj, lpDel);
 
         TextView tvDelHint = new TextView(this);
         tvDelHint.setText("💡 Khi xóa dự án, chỉ dữ liệu của truyện này bị xóa. Toàn bộ kho Key API và Thẻ Prompt ở Tab 1 được BẢO TOÀN VĨNH CỬU 100%.");
-        tvDelHint.setTextColor(Color.parseColor("#6B7280"));
-        tvDelHint.setTextSize(10);
-        tvDelHint.setPadding(0, 8, 0, 0);
+        tvDelHint.setTextColor(Color.parseColor("#64748B"));
+        tvDelHint.setTextSize(10.5f);
+        tvDelHint.setPadding(0, dp(8), 0, 0);
         cardProj.addView(tvDelHint);
 
         content.addView(cardProj);
@@ -3770,35 +4215,62 @@ public class MainActivity extends AppCompatActivity {
         return tv;
     }
 
+    private void triggerHaptic() {
+        try {
+            if (rootFrame != null) {
+                rootFrame.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+            }
+        } catch (Exception ignored) {}
+    }
+
     private GradientDrawable createCardDrawable() {
         GradientDrawable gd = new GradientDrawable();
-        gd.setColor(Color.parseColor("#161B22"));
-        gd.setCornerRadius(24f);
-        gd.setStroke(2, Color.parseColor("#30363D"));
+        gd.setColor(Color.parseColor("#131B2A"));
+        gd.setCornerRadius(dp(20));
+        gd.setStroke(dp(1), Color.parseColor("#1F2E47"));
         return gd;
     }
 
-    private GradientDrawable createButtonDrawable(String hexColor, float radius) {
+    private android.graphics.drawable.Drawable createButtonDrawable(String hexColor, float radiusDp) {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor(hexColor));
-        gd.setCornerRadius(radius);
+        gd.setCornerRadius(dp(radiusDp));
+        gd.setStroke(dp(1), Color.parseColor("#2D3F5E"));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            return new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(Color.parseColor("#33FFFFFF")),
+                    gd, null
+            );
+        }
+        return gd;
+    }
+
+    private android.graphics.drawable.Drawable createGradientButtonDrawable(int startColor, int endColor, float radiusDp) {
+        GradientDrawable gd = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{startColor, endColor});
+        gd.setCornerRadius(dp(radiusDp));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            return new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(Color.parseColor("#40FFFFFF")),
+                    gd, null
+            );
+        }
         return gd;
     }
 
     private GradientDrawable createInputDrawable() {
         GradientDrawable gd = new GradientDrawable();
-        gd.setColor(Color.parseColor("#0D1117"));
-        gd.setCornerRadius(18f);
-        gd.setStroke(2, Color.parseColor("#30363D"));
+        gd.setColor(Color.parseColor("#0B0F17"));
+        gd.setCornerRadius(dp(14));
+        gd.setStroke(dp(1.2f), Color.parseColor("#22314C"));
         return gd;
     }
 
     private GradientDrawable createBadgeDrawable(String hexBg, String hexStroke) {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor(hexBg));
-        gd.setCornerRadius(30f);
+        gd.setCornerRadius(dp(30));
         if (hexStroke != null) {
-            gd.setStroke(2, Color.parseColor(hexStroke));
+            gd.setStroke(dp(1), Color.parseColor(hexStroke));
         }
         return gd;
     }
@@ -3806,10 +4278,10 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout createCard() {
         LinearLayout l = new LinearLayout(this);
         l.setOrientation(LinearLayout.VERTICAL);
-        l.setPadding(28, 24, 28, 24);
+        l.setPadding(dp(18), dp(16), dp(18), dp(16));
         l.setBackground(createCardDrawable());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, 0, 18);
+        lp.setMargins(0, 0, 0, dp(14));
         l.setLayoutParams(lp);
         return l;
     }
@@ -3818,10 +4290,24 @@ public class MainActivity extends AppCompatActivity {
         Button b = new Button(this);
         b.setText(text);
         b.setTextColor(Color.WHITE);
-        b.setTextSize(12);
+        b.setTextSize(12.5f);
         b.setTypeface(null, Typeface.BOLD);
-        b.setBackground(createButtonDrawable(colorHex, 18f));
-        b.setPadding(20, 12, 20, 12);
+        b.setBackground(createButtonDrawable(colorHex, 14f));
+        b.setPadding(dp(16), dp(12), dp(16), dp(12));
+        b.setMinHeight(dp(44));
+        b.setStateListAnimator(null);
+        return b;
+    }
+
+    private Button createGradientButton(String text, int startColor, int endColor) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(13f);
+        b.setTypeface(null, Typeface.BOLD);
+        b.setBackground(createGradientButtonDrawable(startColor, endColor, 14f));
+        b.setPadding(dp(18), dp(13), dp(18), dp(13));
+        b.setMinHeight(dp(48));
         b.setStateListAnimator(null);
         return b;
     }
@@ -3829,11 +4315,12 @@ public class MainActivity extends AppCompatActivity {
     private EditText createStyledEditText(String hint) {
         EditText edt = new EditText(this);
         edt.setHint(hint);
-        edt.setHintTextColor(Color.parseColor("#6B7280"));
+        edt.setHintTextColor(Color.parseColor("#64748B"));
         edt.setTextColor(Color.WHITE);
         edt.setBackground(createInputDrawable());
-        edt.setPadding(20, 14, 20, 14);
-        edt.setTextSize(13);
+        edt.setPadding(dp(14), dp(12), dp(14), dp(12));
+        edt.setTextSize(13.5f);
+        edt.setMinHeight(dp(46));
         return edt;
     }
 }

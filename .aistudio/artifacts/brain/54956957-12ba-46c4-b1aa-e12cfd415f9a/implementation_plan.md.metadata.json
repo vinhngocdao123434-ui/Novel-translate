@@ -1,6 +1,6 @@
 {
-  "summary":  "Cập nhật kế hoạch làm rõ thuật toán quét Offline toàn diện: bóc tách cả chữ Trung đứng độc lập (như 璇, 天道) lẫn các từ Hán - Việt bị dính liền (như Ngư璇, Diệp辰), lọc trùng offline trước khi gửi API batch lên Gemini 3.6 Flash.",
-  "updatedAt":  "2026-10-04T03:51:48.069957716Z",
+  "summary":  "Kế hoạch đại tu toàn diện giao diện DroidTranslator Native (100% Pure Java & XML Drawables) theo chuẩn OLED Dark Glass, Floating Bottom Nav, hiệu ứng vuốt chạm mượt mà chuẩn Flutter/Material 3.",
+  "updatedAt":  "2026-10-04T15:41:56.630634636Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
