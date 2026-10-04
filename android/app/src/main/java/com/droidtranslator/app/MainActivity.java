@@ -35,6 +35,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -4167,12 +4168,12 @@ public class MainActivity extends AppCompatActivity {
         cardAdv.addView(rowPM);
 
         // Xuất toàn văn tác phẩm
-        Button btnExport = createGradientButton("📥 XUẤT TOÀN VĂN TÁC PHẨM (.TXT)", Color.parseColor("#059669"), Color.parseColor("#10B981"));
+        Button btnExport = createGradientButton("📥 XUẤT TÁC PHẨM (TXT, EPUB, HTML, MOBI, AZW3)", Color.parseColor("#059669"), Color.parseColor("#10B981"));
         btnExport.setTextSize(12f);
         btnExport.setMinHeight(dp(44));
         btnExport.setOnClickListener(v -> {
             triggerHaptic();
-            exportFullNovelData();
+            showExportFormatDialog();
         });
         LinearLayout.LayoutParams explp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         explp.setMargins(0, dp(12), 0, 0);
@@ -4325,6 +4326,10 @@ public class MainActivity extends AppCompatActivity {
 
         row.addView(stepper);
         return row;
+    }
+
+    private void exportFullNovelData() {
+        showExportFormatDialog();
     }
 
     private void showExportFormatDialog() {
