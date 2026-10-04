@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch đại tu toàn diện giao diện DroidTranslator Native (100% Pure Java & XML Drawables) theo chuẩn OLED Dark Glass, Floating Bottom Nav, hiệu ứng vuốt chạm mượt mà chuẩn Flutter/Material 3.",
-  "updatedAt":  "2026-10-04T15:41:56.630634636Z",
+  "summary":  "Kế hoạch tinh chỉnh màu sắc OLED True Black & Dark Charcoal, đại tu Header 3 tầng và dàn phẳng hàng Key item 100% chuẩn pixel-perfect so với mockup preview.",
+  "updatedAt":  "2026-10-04T15:58:37.560798042Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

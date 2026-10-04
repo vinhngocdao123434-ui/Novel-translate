@@ -1,116 +1,68 @@
-# Kế Hoạch Đại Tu Giao Diện DroidTranslator Native (100% Pure Java & XML)
+# Kế Hoạch Tinh Chỉnh Màu Sắc OLED True Black & Khắc Phục Layout Pixel-Perfect Y Hệt Preview
 
-Đại tu toàn diện giao diện ứng dụng Android Native thuần Java từ phong cách thô sơ cũ sang thiết kế **OLED Dark Glass** cao cấp, tinh tế, mượt mà như Flutter, tương đồng 100% với bản Web Preview nhưng chạy Native 100% không tốn RAM.
+Khắc phục triệt để sự khác biệt về thị giác giữa bản Preview và bản APK thực tế: chuyển từ tông xanh thô (Navy) sang **OLED Pitch Black (`#08090C`) & Dark Charcoal (`#12131A`)**, tái cấu trúc Header 3 tầng sang trọng và dàn phẳng danh sách Key trên một dòng duy nhất.
 
 ---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Toàn bộ các quyết định đã được xác nhận qua phỏng vấn người dùng:
-> - **Phong cách thiết kế**: OLED Dark Glass với bo góc 20dp, viền Glow tinh tế và màu sắc hiện đại.
-> - **Cảm giác vuốt chạm**: Flutter-like Physics với chuyển cảnh mượt mà, phản hồi rung Haptic và hiệu ứng Ripple bo góc.
-> - **Thanh điều hướng**: Floating Navigation Bar bo tròn nổi phía trên đáy màn hình với icon phát sáng.
+> Toàn bộ các điểm khác biệt then chốt đã được làm rõ:
+> - **Màu sắc nền & thẻ**: Chuyển sang OLED True Black (`#08090C`) và thẻ màu than chì Charcoal (`#12131A`) với viền siêu mảnh mờ `#1E202E`.
+> - **Dàn trang API Key Item**: Loại bỏ các khối nút bấm vuông to tướng gây tràn dòng; chuyển thành 1 dòng ngang duy nhất với Badge số `#1`, Text Key rút gọn, Pill `ACTIVE` xanh ngọc, nút `⟳ Test` nhỏ gọn và nút thùng rác `🗑` tinh tế.
+> - **Header 3 Tầng Pixel-Perfect**:
+>   - *Tầng 1 (Status)*: `🟢 God-Mode: • Sẵn sàng` + `ROOT #` + `5 Lớp`.
+>   - *Tầng 2 (Branding & Action)*: Logo App có khung bo tròn + `DroidTranslator` (chữ `Translator` màu xanh ngọc gradient) + `NATIVE` badge + phụ đề `Android 16 Kernel Engine` + Nút `❓ Hướng Dẫn` + Badge `🛡️ OOM -1000`.
+>   - *Tầng 3 (Dự án)*: Thanh chọn `📑 Tiến trình: [Tên truyện ▾]` + Nút `+ Tiến trình mới` màu xanh biển rực rỡ.
+> - **Bottom Bar**: Nền đen tuyền, Icon & Text màu Vàng Kim Amber (`#F59E0B`) cho tab đang chọn, loại bỏ viền bo sáng màu xanh to bè.
 
 ---
 
-### 1. Overview & Core Concept
+### 1. Phân Tích Lỗi Sai Khiến APK Bị "Phèn" & Giải Pháp
 
-- **Mục tiêu**: Nâng tầm trải nghiệm người dùng trên thiết bị Android thực tế, biến DroidTranslator từ giao diện hình hộp đơn giản thành một ứng dụng dịch truyện hiện đại, sang xịn mịn, trực quan và nịnh mắt.
-- **Đối tượng**: Người đọc và dịch tiểu thuyết chuyên nghiệp dịch liên tục hàng trăm chương, cần giao diện tối ưu ban đêm (OLED Dark), không mỏi mắt, thao tác 1 tay thuận tiện.
-- **Giá trị cốt lõi**: Tốc độ xử lý Native siêu tốc (0% lag) kết hợp cùng visual đẳng cấp Flutter/iOS.
-
----
-
-### 2. User Experience & Visual Design
-
-#### A. Hệ Thống Màu & Gradient (OLED Dark Glass Palette)
-- **Background Canvas**: `#0B0F17` (Deep Midnight OLED).
-- **Surface / Card Background**: `#131B2A` kết hợp stroke viền phát sáng nhẹ `1dp solid #1F2E47` và `20dp` corner radius.
-- **Primary Accent**: Gradient Cam Rực Rỡ `#FF6B00` $\rightarrow$ `#FFA100` cho nút Dịch & Nạp Key.
-- **Secondary Accent**: Gradient Xanh Ngọc / Cyan `#00D2FF` $\rightarrow$ `#0072FF` cho Model & Tiến trình.
-- **Success & Status**: `#10B981` (Emerald) với hiệu ứng Glow mờ.
-- **Danger Zone**: `#EF4444` với viền cảnh báo tinh tế `#7F1D1D`.
-
-#### B. Nâng Cấp Tương Tác & Cảm Giác Vuốt Chạm (Tactile & Physics)
-- **Haptic Feedback**: Rung siêu nhẹ (`performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)`) khi bấm phím, chọn model hoặc chuyển tab.
-- **Ripple & Press State**: Toàn bộ nút bấm và card sử dụng `RippleDrawable` với góc bo tròn mềm mại, độ co nhẹ (`scale 0.98`) khi nhấn giữ.
-- **OverScroll Physics**: Tích hợp cuộn đàn hồi mượt mà cho toàn bộ `NestedScrollView` và `RecyclerView`.
-- **Floating Bottom Navigation**: Thanh điều hướng nổi dạng Capsule bo góc `28dp`, đổ bóng `Elevation 12dp`, nền Glassmorphism mờ `#162032DD` với indicator phát sáng dưới icon active.
+| Vấn đề trên APK cũ | Lý do khiến giao diện thô | Giải pháp khắc phục 100% như Preview |
+| :--- | :--- | :--- |
+| **Màu nền bị ám xanh Navy** | Dùng mã màu `#0B0F17` & `#131B2A` với viền xanh đậm `#1F2E47` | Đổi sang OLED Black `#08090C`, Card `#12131A`, viền `#1E202E` |
+| **Hàng Key bị tràn chữ 4 dòng** | 2 nút Test & Xóa chiếm tới 50% bề ngang, ép TextView bị bó hẹp | Đổi layout thành 1 dòng ngang cố định, nút icon gọn gàng |
+| **Header bị kéo giãn dị dạng** | Badge `NATIVE` chiếm chiều cao lớn, thiếu logo app và phân tầng | Tái lập Header 3 tầng chuẩn pixel-perfect với icon và subtitle |
+| **Thanh Bottom Bar** | Viền xanh cyan dày cộm quanh nút active | Đổi sang phong cách Tối Giản Vàng Kim (Gold/Amber) cao cấp |
 
 ---
 
-### 3. Chi Tiết Các Tab Giao Diện Mới
+### 2. Sơ Đồ Cấu Trúc Header & Key Item Mới
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  [⚡ DroidTranslator]  • God-Mode: Sẵn sàng   [ROOT #]   │ Header Status Glass
-├──────────────────────────────────────────────────────────┤
-│ ┌──────────────────────────────────────────────────────┐ │
-│ │ 📖 Dự án: Đại Quản Gia Ma Hoàng         [+ Đổi Truyện]│ │ Project Pill Card
-│ └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│ ┌──────────────────────────────────────────────────────┐ │
-│ │ 🔑 Multi-Key Pool (12 Keys)           [▶ Test Tất Cả]│ │
-│ │ [ Dán Key tại đây...                               ] │ │
-│ │ [       + THÊM API KEY VÀO POOL (GRADIENT)        ] │ │ Card Bo Góc 20dp
-│ │  1. ...XYZ12345    [ ACTIVE ]   [⟳]   [🗑]          │ │ Viền Glow 1dp
-│ │  2. ...ABC67890    [ ACTIVE ]   [⟳]   [🗑]          │ │
-│ └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│ ┌──────────────────────────────────────────────────────┐ │
-│ │ ✨ Chọn Dòng Model Gemini              [gemini-2.5-pro] │ │ Model Card
-│ │ [3.6 Flash - Siêu Cấp 2026] [2.5 Flash - Mặc Định]  │ │
-│ └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│     ┌──────────────────────────────────────────────┐     │
-│     │  🔑 Key&Prompt  ⚡ Dịch  📚 Thư Viện  ⚙️ Cài Đặt │     │ Floating Bottom Bar
-│     └──────────────────────────────────────────────┘     │
-└──────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ 🟢 God-Mode: • Sẵn sàng            [ROOT #]  [5 Lớp]       │ Tầng 1: System Status
+├────────────────────────────────────────────────────────────┤
+│ ┌──┐ DroidTranslator [NATIVE]       [❓ Hướng Dẫn]          │ Tầng 2: Brand Lockup
+│ │⚡│ Android 16 Kernel Engine       [🛡️ OOM -1000]         │ & Core Badges
+│ └──┘                                                       │
+├────────────────────────────────────────────────────────────┤
+│ [📑 Tiến trình: Dai Quan Gia M... ▾]     [+ Tiến trình mới] │ Tầng 3: Project Bar
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│  [1]  ...XYZ12345        [ACTIVE]   [⟳ Test]   [🗑]        │ Hàng Key 1 dòng ngang
+└────────────────────────────────────────────────────────────┘
 ```
 
-#### Tab 1: Key & Prompt Pool
-- Nâng cấp ô nhập Key thành Card Glass bo cong 20dp, placeholder rõ ràng.
-- Danh sách Key dạng Card Item bo góc 14dp, gắn Badge trạng thái Active màu xanh ngọc phát sáng, nút Test và nút Xóa bo tròn gọn gàng.
-- Khu vực chọn Model dạng danh sách thẻ chọn (Selection Cards) với icon AI, subtitle mô tả ưu điểm từng model.
-
-#### Tab 2: Dịch Thuật & Glossary AI
-- Box nhập file & chọn tệp dạng Drag/Drop Area phong cách hiện đại với nút chọn file to bản.
-- Thanh hiển thị tiến độ dịch dạng Gradient Progress Bar mượt mà, số chương hoàn thành dạng lớn trực quan.
-- Cụm nút điều khiển Dịch / Tạm Dừng / Hủy dạng Gradient nổi bật.
-- Bảng Master Glossary thu gọn với phân trang mượt mà.
-
-#### Tab 3: Kho Bản Dịch & AMOLED Reader
-- Danh sách chương dạng Card List sang trọng, trạng thái "Đã Dịch" / "Chưa Dịch" hiển thị bằng icon tinh tế thay vì bảng chữ màu xanh đơn điệu.
-- Bộ đọc truyện AMOLED Reader Fullscreen với cử chỉ vuốt lật chương tự nhiên, chỉnh cỡ chữ, nền Sepia / OLED Black.
-
-#### Tab 4: Cài Đặt & Quản Lý Dự Án
-- Cụm Switch & Slider thiết kế bo cong hiện đại.
-- Thẻ thông tin dự án hiện tại với nút Xóa màu đỏ Ruby sang trọng, có hộp thoại xác nhận kiểu Bottom Sheet.
-
 ---
 
-### 4. Technical Architecture & File Modifications
+### 3. Kế Hoạch Thay Đổi Chi Tiết
 
-#### A. Kiến trúc Giao Diện Native (Pure Java + XML Drawables)
-- **Không dùng thư viện bên ngoài nặng nề**: Tận dụng triệt để `MaterialCardView`, `ShapeAppearanceModel`, `LayerDrawable`, `GradientDrawable`, `StateListDrawable` chuẩn Android Jetpack.
-- **Tối ưu RAM & Rendering**: Không phân bổ bitmap thừa, 100% vector drawables và XML gradients nhẹ < 50KB, giữ nguyên chuẩn OOM -1000 siêu nhẹ.
-
-#### B. Các Tệp Sẽ Được Nâng Cấp:
-1. `android/app/src/main/res/values/colors.xml`: Bổ sung toàn bộ bảng màu OLED Dark Glass (`colorGlassSurface`, `colorGlassBorder`, `colorAccentGradientStart`, `colorAccentGradientEnd`, v.v.).
-2. `android/app/src/main/res/values/styles.xml`: Định nghĩa style bo góc `ShapeAppearance.App.LargeCard` (20dp), `ShapeAppearance.App.Pill` (50dp).
-3. `android/app/src/main/res/drawable/`: Tạo bộ drawable mới:
-   - `bg_card_glass.xml` (Card kính viền glow)
-   - `bg_btn_gradient_primary.xml` (Nút bấm gradient cam)
-   - `bg_floating_bottom_bar.xml` (Thanh bar nổi bo tròn)
-   - `bg_badge_active.xml` (Badge trạng thái phát sáng)
-   - `ripple_round_card.xml` (Hiệu ứng chạm mềm mại)
-4. `android/app/src/main/res/layout/activity_main.xml`: Thiết kế lại layout phân tầng hiện đại, tích hợp Floating Bottom Navigation Bar.
-5. `android/app/src/main/java/com/droidtranslator/app/MainActivity.java`: Cập nhật logic render giao diện mới, animation chuyển tab, haptic feedback và ripple tương tác.
-6. `src/native-project-data.ts`: Đồng bộ hóa toàn bộ mã nguồn APK mới vào hệ thống preview và bộ cài.
-
----
-
-### 5. Kế Hoạch Triển Khai (Verification & Execution)
-- Chạy kiểm tra Java Syntax và tính toàn vẹn XML sau khi viết code.
-- Chạy `compile_applet` và `lint_applet` để đảm bảo hệ thống không có bất kỳ lỗi nào.
+1. **`colors.xml`**: Cập nhật toàn bộ mã màu về hệ True OLED Dark:
+   - `bgCanvas`: `#08090C`
+   - `cardSurface`: `#12131A`
+   - `cardBorder`: `#1E202E`
+   - `cardSurfaceInner`: `#171922`
+   - `accentGold`: `#F59E0B`
+   - `accentTeal`: `#10B981`
+   - `textPrimary`: `#FFFFFF`
+   - `textSecondary`: `#94A3B8`
+   - `textMuted`: `#64748B`
+2. **`MainActivity.java`**:
+   - Viết lại phần `initUI` dựng đúng Header 3 tầng, icon app dạng rounded avatar.
+   - Sửa `refreshKeyList()`: dùng `TextView` cho số thứ tự dạng badge vuông bo tròn `dp(6)`, key text 1 dòng `singleLine=true`, badge `ACTIVE` thu nhỏ, nút `⟳ Test` dạng pill nhỏ, nút `🗑` nhỏ gọn.
+   - Sửa `FloatingBottomBar`: Icon và text màu Vàng Kim `#F59E0B` khi active, không dùng viền bao quanh to thô.
+3. **Đồng bộ hóa & Kiểm thử**: Chạy `verify-java-final.mjs` và cập nhật `src/native-project-data.ts`.

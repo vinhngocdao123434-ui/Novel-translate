@@ -1018,93 +1018,235 @@ public class MainActivity extends AppCompatActivity {
 
     private void initUI() {
         rootFrame = new FrameLayout(this);
-        rootFrame.setBackgroundColor(Color.parseColor("#0B0F17"));
+        rootFrame.setBackgroundColor(Color.parseColor("#08090C"));
 
         mainContentLayout = new LinearLayout(this);
         mainContentLayout.setOrientation(LinearLayout.VERTICAL);
 
-        // 1. TOP HEADER GLASS BAR
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setPadding(dp(18), dp(12), dp(18), dp(12));
+        // =====================================================================
+        // HEADER 3 TẦNG SANG TRỌNG CHUẨN PIXEL-PERFECT (NHƯ BẢN PREVIEW)
+        // =====================================================================
+        LinearLayout headerRoot = new LinearLayout(this);
+        headerRoot.setOrientation(LinearLayout.VERTICAL);
+        headerRoot.setPadding(dp(16), dp(10), dp(16), dp(10));
         GradientDrawable hBg = new GradientDrawable();
-        hBg.setColor(Color.parseColor("#131B2A"));
-        hBg.setCornerRadius(dp(0));
-        hBg.setStroke(dp(1), Color.parseColor("#1F2E47"));
-        header.setBackground(hBg);
-        header.setGravity(Gravity.CENTER_VERTICAL);
+        hBg.setColor(Color.parseColor("#0D0E15"));
+        hBg.setStroke(dp(1), Color.parseColor("#171922"));
+        headerRoot.setBackground(hBg);
 
-        // App Wordmark & Native Pill
-        LinearLayout brandLayout = new LinearLayout(this);
-        brandLayout.setOrientation(LinearLayout.HORIZONTAL);
-        brandLayout.setGravity(Gravity.CENTER_VERTICAL);
+        // TẦNG 1: SYSTEM STATUS BAR
+        LinearLayout tier1 = new LinearLayout(this);
+        tier1.setOrientation(LinearLayout.HORIZONTAL);
+        tier1.setGravity(Gravity.CENTER_VERTICAL);
+        tier1.setPadding(0, 0, 0, dp(6));
 
-        TextView tvLogoIcon = new TextView(this);
-        tvLogoIcon.setText("⚡");
-        tvLogoIcon.setTextSize(16);
-        brandLayout.addView(tvLogoIcon);
+        TextView tvGodDot = new TextView(this);
+        tvGodDot.setText("🟢 ");
+        tvGodDot.setTextSize(10);
+        tier1.addView(tvGodDot);
 
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText(" DroidTranslator");
-        tvTitle.setTextColor(Color.WHITE);
-        tvTitle.setTextSize(16.5f);
-        tvTitle.setTypeface(null, Typeface.BOLD);
-        brandLayout.addView(tvTitle);
+        TextView tvGodTitle = new TextView(this);
+        tvGodTitle.setText("God-Mode: ");
+        tvGodTitle.setTextColor(Color.parseColor("#FFFFFF"));
+        tvGodTitle.setTextSize(11f);
+        tvGodTitle.setTypeface(null, Typeface.BOLD);
+        tier1.addView(tvGodTitle);
+
+        TextView tvGodStatus = new TextView(this);
+        tvGodStatus.setText("• Sẵn sàng");
+        tvGodStatus.setTextColor(Color.parseColor("#94A3B8"));
+        tvGodStatus.setTextSize(11f);
+        tier1.addView(tvGodStatus, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        TextView tvRootBadge = new TextView(this);
+        tvRootBadge.setText("ROOT #");
+        tvRootBadge.setTextColor(Color.parseColor("#F59E0B"));
+        tvRootBadge.setTextSize(9.5f);
+        tvRootBadge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tvRootBadge.setPadding(dp(6), dp(2), dp(6), dp(2));
+        GradientDrawable rBg = new GradientDrawable();
+        rBg.setColor(Color.parseColor("#451A03"));
+        rBg.setCornerRadius(dp(4));
+        rBg.setStroke(dp(1), Color.parseColor("#D97706"));
+        tvRootBadge.setBackground(rBg);
+        tier1.addView(tvRootBadge);
+
+        TextView tv5Layers = new TextView(this);
+        tv5Layers.setText("5 Lớp");
+        tv5Layers.setTextColor(Color.parseColor("#38BDF8"));
+        tv5Layers.setTextSize(9.5f);
+        tv5Layers.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tv5Layers.setPadding(dp(6), dp(2), dp(6), dp(2));
+        GradientDrawable l5Bg = new GradientDrawable();
+        l5Bg.setColor(Color.parseColor("#0C4A6E"));
+        l5Bg.setCornerRadius(dp(4));
+        l5Bg.setStroke(dp(1), Color.parseColor("#0284C7"));
+        tv5Layers.setBackground(l5Bg);
+        LinearLayout.LayoutParams l5lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        l5lp.leftMargin = dp(6);
+        tier1.addView(tv5Layers, l5lp);
+
+        headerRoot.addView(tier1);
+
+        // TẦNG 2: BRAND LOCKUP & CORE BADGES
+        LinearLayout tier2 = new LinearLayout(this);
+        tier2.setOrientation(LinearLayout.HORIZONTAL);
+        tier2.setGravity(Gravity.CENTER_VERTICAL);
+        tier2.setPadding(0, dp(4), 0, dp(6));
+
+        // App Icon Avatar Container
+        FrameLayout iconAvatar = new FrameLayout(this);
+        GradientDrawable iaBg = new GradientDrawable();
+        iaBg.setColor(Color.parseColor("#171922"));
+        iaBg.setCornerRadius(dp(8));
+        iaBg.setStroke(dp(1), Color.parseColor("#10B981"));
+        iconAvatar.setBackground(iaBg);
+        iconAvatar.setPadding(dp(6), dp(6), dp(6), dp(6));
+        TextView tvAvatarIcon = new TextView(this);
+        tvAvatarIcon.setText("📖");
+        tvAvatarIcon.setTextSize(14);
+        tvAvatarIcon.setGravity(Gravity.CENTER);
+        iconAvatar.addView(tvAvatarIcon, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+        tier2.addView(iconAvatar, new LinearLayout.LayoutParams(dp(36), dp(36)));
+
+        // App Titles Column
+        LinearLayout brandCol = new LinearLayout(this);
+        brandCol.setOrientation(LinearLayout.VERTICAL);
+        brandCol.setPadding(dp(8), 0, dp(8), 0);
+
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvTitleMain = new TextView(this);
+        tvTitleMain.setText("Droid");
+        tvTitleMain.setTextColor(Color.WHITE);
+        tvTitleMain.setTextSize(15f);
+        tvTitleMain.setTypeface(null, Typeface.BOLD);
+        titleRow.addView(tvTitleMain);
+
+        TextView tvTitleSub = new TextView(this);
+        tvTitleSub.setText("Translator ");
+        tvTitleSub.setTextColor(Color.parseColor("#10B981"));
+        tvTitleSub.setTextSize(15f);
+        tvTitleSub.setTypeface(null, Typeface.BOLD);
+        titleRow.addView(tvTitleSub);
 
         TextView tvNativeBadge = new TextView(this);
         tvNativeBadge.setText("NATIVE");
         tvNativeBadge.setTextColor(Color.parseColor("#34D399"));
-        tvNativeBadge.setTextSize(9.5f);
+        tvNativeBadge.setTextSize(8.5f);
         tvNativeBadge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        tvNativeBadge.setPadding(dp(6), dp(2), dp(6), dp(2));
+        tvNativeBadge.setPadding(dp(4), dp(1), dp(4), dp(1));
         GradientDrawable nbBg = new GradientDrawable();
         nbBg.setColor(Color.parseColor("#064E3B"));
-        nbBg.setCornerRadius(dp(6));
+        nbBg.setCornerRadius(dp(4));
         nbBg.setStroke(dp(1), Color.parseColor("#10B981"));
         tvNativeBadge.setBackground(nbBg);
-        LinearLayout.LayoutParams nlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        nlp.leftMargin = dp(8);
-        brandLayout.addView(tvNativeBadge, nlp);
+        titleRow.addView(tvNativeBadge);
+        brandCol.addView(titleRow);
 
-        header.addView(brandLayout, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        TextView tvSubEng = new TextView(this);
+        tvSubEng.setText("Android 16 Kernel Engine");
+        tvSubEng.setTextColor(Color.parseColor("#64748B"));
+        tvSubEng.setTextSize(10f);
+        brandCol.addView(tvSubEng);
+        tier2.addView(brandCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
-        // Guide Button
+        // Hướng dẫn Button
         Button btnHeaderHelp = new Button(this);
         btnHeaderHelp.setText("❓ Hướng Dẫn");
-        btnHeaderHelp.setTextColor(Color.WHITE);
-        btnHeaderHelp.setTextSize(11f);
+        btnHeaderHelp.setTextColor(Color.parseColor("#D1D5DB"));
+        btnHeaderHelp.setTextSize(10.5f);
         btnHeaderHelp.setTypeface(null, Typeface.BOLD);
-        btnHeaderHelp.setBackground(createButtonDrawable("#1E293B", 20f));
-        btnHeaderHelp.setPadding(dp(12), dp(6), dp(12), dp(6));
-        btnHeaderHelp.setMinHeight(dp(32));
-        btnHeaderHelp.setMinimumHeight(dp(32));
+        btnHeaderHelp.setBackground(createButtonDrawable("#181A22", 14f));
+        btnHeaderHelp.setPadding(dp(8), dp(4), dp(8), dp(4));
+        btnHeaderHelp.setMinHeight(dp(30));
+        btnHeaderHelp.setMinimumHeight(dp(30));
         btnHeaderHelp.setStateListAnimator(null);
         btnHeaderHelp.setOnClickListener(v -> {
             triggerHaptic();
             showHowToUseDialog();
         });
-        header.addView(btnHeaderHelp);
+        tier2.addView(btnHeaderHelp);
 
-        // Root / God-Mode Badge
-        TextView tvBadge = new TextView(this);
-        tvBadge.setText(RootController.isRootAvailable() ? "ROOT #" : "OOM -1000");
-        tvBadge.setTextColor(Color.parseColor("#F59E0B"));
-        tvBadge.setTextSize(10f);
-        tvBadge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        tvBadge.setPadding(dp(8), dp(4), dp(8), dp(4));
-        GradientDrawable bdgBg = new GradientDrawable();
-        bdgBg.setColor(Color.parseColor("#451A03"));
-        bdgBg.setCornerRadius(dp(6));
-        bdgBg.setStroke(dp(1), Color.parseColor("#D97706"));
-        tvBadge.setBackground(bdgBg);
-        LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bLp.leftMargin = dp(8);
-        header.addView(tvBadge, bLp);
+        // OOM -1000 Badge
+        TextView tvOomBadge = new TextView(this);
+        tvOomBadge.setText("🛡️ OOM -1000");
+        tvOomBadge.setTextColor(Color.parseColor("#34D399"));
+        tvOomBadge.setTextSize(9.5f);
+        tvOomBadge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tvOomBadge.setPadding(dp(6), dp(4), dp(6), dp(4));
+        GradientDrawable oomBg = new GradientDrawable();
+        oomBg.setColor(Color.parseColor("#064E3B"));
+        oomBg.setCornerRadius(dp(6));
+        oomBg.setStroke(dp(1), Color.parseColor("#10B981"));
+        tvOomBadge.setBackground(oomBg);
+        LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        olp.leftMargin = dp(6);
+        tier2.addView(tvOomBadge, olp);
 
-        mainContentLayout.addView(header);
+        headerRoot.addView(tier2);
+
+        // TẦNG 3: TIẾN TRÌNH / DỰ ÁN SELECTOR
+        LinearLayout tier3 = new LinearLayout(this);
+        tier3.setOrientation(LinearLayout.HORIZONTAL);
+        tier3.setGravity(Gravity.CENTER_VERTICAL);
+        tier3.setPadding(0, dp(4), 0, 0);
+
+        LinearLayout projPill = new LinearLayout(this);
+        projPill.setOrientation(LinearLayout.HORIZONTAL);
+        projPill.setGravity(Gravity.CENTER_VERTICAL);
+        projPill.setPadding(dp(10), dp(6), dp(10), dp(6));
+        GradientDrawable ppBg = new GradientDrawable();
+        ppBg.setColor(Color.parseColor("#141620"));
+        ppBg.setCornerRadius(dp(14));
+        ppBg.setStroke(dp(1), Color.parseColor("#1E202E"));
+        projPill.setBackground(ppBg);
+
+        TextView tvPrIcon = new TextView(this);
+        tvPrIcon.setText("📑 ");
+        tvPrIcon.setTextSize(12);
+        projPill.addView(tvPrIcon);
+
+        TextView tvPrLabel = new TextView(this);
+        tvPrLabel.setText("Tiến trình: ");
+        tvPrLabel.setTextColor(Color.parseColor("#64748B"));
+        tvPrLabel.setTextSize(11.5f);
+        projPill.addView(tvPrLabel);
+
+        tvCurrentProjectName = new TextView(this);
+        tvCurrentProjectName.setText(currentProjectName + " ▾");
+        tvCurrentProjectName.setTextColor(Color.parseColor("#38BDF8"));
+        tvCurrentProjectName.setTextSize(11.5f);
+        tvCurrentProjectName.setTypeface(null, Typeface.BOLD);
+        projPill.addView(tvCurrentProjectName);
+
+        projPill.setOnClickListener(v -> {
+            triggerHaptic();
+            showSwitchProjectDialog();
+        });
+        tier3.addView(projPill, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        Button btnNewProjTop = createButton("+ Tiến trình mới", "#1D4ED8");
+        btnNewProjTop.setTextSize(11f);
+        btnNewProjTop.setMinHeight(dp(32));
+        btnNewProjTop.setPadding(dp(10), dp(4), dp(10), dp(4));
+        LinearLayout.LayoutParams ntlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        ntlp.leftMargin = dp(8);
+        btnNewProjTop.setLayoutParams(ntlp);
+        btnNewProjTop.setOnClickListener(v -> {
+            triggerHaptic();
+            showNewProjectDialog();
+        });
+        tier3.addView(btnNewProjTop);
+
+        headerRoot.addView(tier3);
+        mainContentLayout.addView(headerRoot);
 
         // Container cho nội dung 4 Tab
         containerLayout = new FrameLayout(this);
+        containerLayout.setBackgroundColor(Color.parseColor("#08090C"));
         LinearLayout.LayoutParams containerParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1.0f
         );
@@ -1121,31 +1263,33 @@ public class MainActivity extends AppCompatActivity {
         containerLayout.addView(tabReaderView);
         containerLayout.addView(tabSettingsView);
 
-        // 2. FLOATING BOTTOM NAVIGATION BAR
+        // =====================================================================
+        // 2. BOTTOM NAVIGATION BAR - LUXURY GOLD/AMBER PILL (NHƯ PREVIEW)
+        // =====================================================================
         LinearLayout bottomBarContainer = new LinearLayout(this);
         bottomBarContainer.setOrientation(LinearLayout.HORIZONTAL);
         bottomBarContainer.setGravity(Gravity.CENTER_VERTICAL);
-        bottomBarContainer.setPadding(dp(6), dp(6), dp(6), dp(6));
+        bottomBarContainer.setPadding(dp(4), dp(4), dp(4), dp(4));
         
         GradientDrawable barBg = new GradientDrawable();
-        barBg.setColor(Color.parseColor("#141C2E"));
-        barBg.setCornerRadius(dp(26));
-        barBg.setStroke(dp(1.2f), Color.parseColor("#263854"));
+        barBg.setColor(Color.parseColor("#0C0D13"));
+        barBg.setCornerRadius(dp(22));
+        barBg.setStroke(dp(1), Color.parseColor("#1A1C26"));
         bottomBarContainer.setBackground(barBg);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            bottomBarContainer.setElevation(dp(12));
+            bottomBarContainer.setElevation(dp(8));
         }
 
         LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(64)
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(60)
         );
-        barLp.setMargins(dp(14), dp(4), dp(14), dp(10));
+        barLp.setMargins(dp(12), dp(2), dp(12), dp(8));
         bottomBarContainer.setLayoutParams(barLp);
 
         final String[][] tabData = {
                 {"🔑", "Key & Prompt"},
                 {"⚡", "Dịch & Từ điển"},
-                {"📚", "Bản dịch & Đọc"},
+                {"📖", "Bản dịch & Đọc"},
                 {"⚙️", "Cài đặt"}
         };
 
@@ -1156,20 +1300,20 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout item = new LinearLayout(this);
             item.setOrientation(LinearLayout.VERTICAL);
             item.setGravity(Gravity.CENTER);
-            item.setPadding(dp(4), dp(6), dp(4), dp(6));
+            item.setPadding(dp(2), dp(4), dp(2), dp(4));
 
             TextView icon = new TextView(this);
             icon.setText(tabData[i][0]);
-            icon.setTextSize(16f);
+            icon.setTextSize(15f);
             icon.setGravity(Gravity.CENTER);
             item.addView(icon);
 
             TextView label = new TextView(this);
             label.setText(tabData[i][1]);
-            label.setTextSize(10.5f);
+            label.setTextSize(10f);
             label.setTypeface(null, Typeface.BOLD);
             label.setGravity(Gravity.CENTER);
-            label.setPadding(0, dp(2), 0, 0);
+            label.setPadding(0, dp(1), 0, 0);
             item.addView(label);
 
             item.setOnClickListener(v -> {
@@ -1205,14 +1349,14 @@ public class MainActivity extends AppCompatActivity {
 
             if (isSel) {
                 GradientDrawable activeBg = new GradientDrawable();
-                activeBg.setColor(Color.parseColor("#1F2D44"));
-                activeBg.setCornerRadius(dp(20));
-                activeBg.setStroke(dp(1), Color.parseColor("#38BDF8"));
+                activeBg.setColor(Color.parseColor("#151720"));
+                activeBg.setCornerRadius(dp(16));
+                activeBg.setStroke(dp(1), Color.parseColor("#262938"));
                 item.setBackground(activeBg);
-                label.setTextColor(Color.parseColor("#38BDF8"));
+                label.setTextColor(Color.parseColor("#F59E0B"));
             } else {
                 item.setBackground(null);
-                label.setTextColor(Color.parseColor("#94A3B8"));
+                label.setTextColor(Color.parseColor("#64748B"));
             }
         }
     }
@@ -1250,45 +1394,73 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout bannerGuide = new LinearLayout(this);
         bannerGuide.setOrientation(LinearLayout.HORIZONTAL);
         bannerGuide.setGravity(Gravity.CENTER_VERTICAL);
-        bannerGuide.setPadding(dp(16), dp(14), dp(16), dp(14));
+        bannerGuide.setPadding(dp(14), dp(12), dp(14), dp(12));
         GradientDrawable bgBanner = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{
-                Color.parseColor("#172554"), Color.parseColor("#1E3A8A")
+                Color.parseColor("#111C38"), Color.parseColor("#182852")
         });
-        bgBanner.setCornerRadius(dp(18));
-        bgBanner.setStroke(dp(1.2f), Color.parseColor("#3B82F6"));
+        bgBanner.setCornerRadius(dp(16));
+        bgBanner.setStroke(dp(1), Color.parseColor("#2563EB"));
         bannerGuide.setBackground(bgBanner);
         LinearLayout.LayoutParams bglp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bglp.setMargins(0, 0, 0, dp(14));
         bannerGuide.setLayoutParams(bglp);
 
-        TextView tvGuideIcon = new TextView(this);
-        tvGuideIcon.setText("📖");
-        tvGuideIcon.setTextSize(20);
-        bannerGuide.addView(tvGuideIcon);
+        // Circular Question Icon Container
+        FrameLayout qContainer = new FrameLayout(this);
+        GradientDrawable qBg = new GradientDrawable();
+        qBg.setColor(Color.parseColor("#1E3A8A"));
+        qBg.setCornerRadius(dp(20));
+        qContainer.setBackground(qBg);
+        TextView tvQ = new TextView(this);
+        tvQ.setText("?");
+        tvQ.setTextColor(Color.parseColor("#60A5FA"));
+        tvQ.setTextSize(13);
+        tvQ.setTypeface(null, Typeface.BOLD);
+        tvQ.setGravity(Gravity.CENTER);
+        qContainer.addView(tvQ, new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+        bannerGuide.addView(qContainer, new LinearLayout.LayoutParams(dp(28), dp(28)));
 
         LinearLayout guideTextCol = new LinearLayout(this);
         guideTextCol.setOrientation(LinearLayout.VERTICAL);
-        guideTextCol.setPadding(dp(12), 0, dp(12), 0);
+        guideTextCol.setPadding(dp(10), 0, dp(8), 0);
+
+        LinearLayout gTitleRow = new LinearLayout(this);
+        gTitleRow.setOrientation(LinearLayout.HORIZONTAL);
+        gTitleRow.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView tvGuideTitle = new TextView(this);
-        tvGuideTitle.setText("Cẩm Nang Hướng Dẫn Sử Dụng (Từ A-Z)");
+        tvGuideTitle.setText("Cẩm Nang Hướng Dẫn Sử Dụng");
         tvGuideTitle.setTextColor(Color.WHITE);
-        tvGuideTitle.setTextSize(13.5f);
+        tvGuideTitle.setTextSize(13f);
         tvGuideTitle.setTypeface(null, Typeface.BOLD);
-        guideTextCol.addView(tvGuideTitle);
+        gTitleRow.addView(tvGuideTitle);
+
+        TextView tvAzTag = new TextView(this);
+        tvAzTag.setText("Từ A-Z");
+        tvAzTag.setTextColor(Color.parseColor("#93C5FD"));
+        tvAzTag.setTextSize(9.5f);
+        tvAzTag.setPadding(dp(4), dp(1), dp(4), dp(1));
+        GradientDrawable azBg = new GradientDrawable();
+        azBg.setColor(Color.parseColor("#1E3A8A"));
+        azBg.setCornerRadius(dp(4));
+        tvAzTag.setBackground(azBg);
+        LinearLayout.LayoutParams azlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        azlp.leftMargin = dp(6);
+        gTitleRow.addView(tvAzTag, azlp);
+        guideTextCol.addView(gTitleRow);
 
         TextView tvGuideSub = new TextView(this);
-        tvGuideSub.setText("Nhấn để xem cách lấy key, chọn model, dịch bù & xuất file");
+        tvGuideSub.setText("Nhấn để xem cách lấy key, chọn model, dịch bù và xuất file");
         tvGuideSub.setTextColor(Color.parseColor("#93C5FD"));
-        tvGuideSub.setTextSize(11f);
+        tvGuideSub.setTextSize(10.5f);
         guideTextCol.addView(tvGuideSub);
 
         bannerGuide.addView(guideTextCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         TextView tvGuideArrow = new TextView(this);
-        tvGuideArrow.setText("➔");
+        tvGuideArrow.setText("›");
         tvGuideArrow.setTextColor(Color.parseColor("#60A5FA"));
-        tvGuideArrow.setTextSize(16);
+        tvGuideArrow.setTextSize(18);
         bannerGuide.addView(tvGuideArrow);
 
         bannerGuide.setOnClickListener(v -> {
@@ -1305,14 +1477,14 @@ public class MainActivity extends AppCompatActivity {
         rowKeyHead.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView tvKeyIcon = new TextView(this);
-        tvKeyIcon.setText("🔑 ");
-        tvKeyIcon.setTextSize(15);
+        tvKeyIcon.setText("🗝️ ");
+        tvKeyIcon.setTextSize(14);
         rowKeyHead.addView(tvKeyIcon);
 
         TextView tvKeyHead = new TextView(this);
         tvKeyHead.setText("Multi-Key Gemini Pool");
         tvKeyHead.setTextColor(Color.WHITE);
-        tvKeyHead.setTextSize(14.5f);
+        tvKeyHead.setTextSize(14f);
         tvKeyHead.setTypeface(null, Typeface.BOLD);
         rowKeyHead.addView(tvKeyHead);
         rowKeyHead.addView(createHelpButton("key_pool"));
@@ -1320,11 +1492,11 @@ public class MainActivity extends AppCompatActivity {
         View keySpacer = new View(this);
         rowKeyHead.addView(keySpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
 
-        Button btnTestAll = createButton("⟳ Test tất cả key", "#78350F");
-        btnTestAll.setTextSize(11f);
-        btnTestAll.setTextColor(Color.parseColor("#FDE68A"));
-        btnTestAll.setMinHeight(dp(36));
-        btnTestAll.setPadding(dp(12), dp(6), dp(12), dp(6));
+        Button btnTestAll = createButton("⟳ Test tất cả key", "#3B2608");
+        btnTestAll.setTextSize(10.5f);
+        btnTestAll.setTextColor(Color.parseColor("#FBBF24"));
+        btnTestAll.setMinHeight(dp(30));
+        btnTestAll.setPadding(dp(10), dp(4), dp(10), dp(4));
         btnTestAll.setOnClickListener(v -> {
             triggerHaptic();
             testAllKeys();
@@ -1333,19 +1505,21 @@ public class MainActivity extends AppCompatActivity {
         cardKeyPool.addView(rowKeyHead);
 
         edtNewKey = new EditText(this);
-        edtNewKey.setHint("Dán Gemini API Key (Mỗi dòng 1 key, tự động tách thẻ)...");
+        edtNewKey.setHint("Dán Gemini API Key (Mỗi dòng 1 key)...");
         edtNewKey.setHintTextColor(Color.parseColor("#64748B"));
         edtNewKey.setTextColor(Color.WHITE);
         edtNewKey.setBackground(createInputDrawable());
-        edtNewKey.setPadding(dp(14), dp(12), dp(14), dp(12));
+        edtNewKey.setPadding(dp(12), dp(10), dp(12), dp(10));
         edtNewKey.setMinLines(2);
-        edtNewKey.setTextSize(13f);
+        edtNewKey.setTextSize(12.5f);
         LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        elp.setMargins(0, dp(12), 0, dp(10));
+        elp.setMargins(0, dp(10), 0, dp(10));
         edtNewKey.setLayoutParams(elp);
         cardKeyPool.addView(edtNewKey);
 
         Button btnAddKey = createGradientButton("+ Thêm API Key Vào Pool", Color.parseColor("#FF6B00"), Color.parseColor("#FFA100"));
+        btnAddKey.setTextSize(12.5f);
+        btnAddKey.setMinHeight(dp(44));
         btnAddKey.setOnClickListener(v -> {
             triggerHaptic();
             String k = edtNewKey.getText().toString().trim();
@@ -1375,7 +1549,7 @@ public class MainActivity extends AppCompatActivity {
 
         llKeyList = new LinearLayout(this);
         llKeyList.setOrientation(LinearLayout.VERTICAL);
-        llKeyList.setPadding(0, dp(10), 0, dp(4));
+        llKeyList.setPadding(0, dp(10), 0, dp(2));
         cardKeyPool.addView(llKeyList);
         content.addView(cardKeyPool);
 
@@ -1388,13 +1562,13 @@ public class MainActivity extends AppCompatActivity {
 
         TextView tvMIcon = new TextView(this);
         tvMIcon.setText("✨ ");
-        tvMIcon.setTextSize(15);
+        tvMIcon.setTextSize(14);
         rowMHead.addView(tvMIcon);
 
         TextView tvModelHead = new TextView(this);
         tvModelHead.setText("Chọn Dòng Model Gemini");
         tvModelHead.setTextColor(Color.WHITE);
-        tvModelHead.setTextSize(14.5f);
+        tvModelHead.setTextSize(14f);
         tvModelHead.setTypeface(null, Typeface.BOLD);
         rowMHead.addView(tvModelHead);
         rowMHead.addView(createHelpButton("select_model"));
@@ -1405,9 +1579,9 @@ public class MainActivity extends AppCompatActivity {
         tvSelectedModel = new TextView(this);
         tvSelectedModel.setText(currentModel);
         tvSelectedModel.setTextColor(Color.parseColor("#38BDF8"));
-        tvSelectedModel.setTextSize(11.5f);
+        tvSelectedModel.setTextSize(11f);
         tvSelectedModel.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        tvSelectedModel.setPadding(dp(8), dp(4), dp(8), dp(4));
+        tvSelectedModel.setPadding(dp(8), dp(3), dp(8), dp(3));
         GradientDrawable smBg = new GradientDrawable();
         smBg.setColor(Color.parseColor("#0C4A6E"));
         smBg.setCornerRadius(dp(6));
@@ -1416,11 +1590,11 @@ public class MainActivity extends AppCompatActivity {
         rowMHead.addView(tvSelectedModel);
         cardModel.addView(rowMHead);
 
-        // Danh sách thẻ Model chọn đẹp mắt
+        // Danh sách thẻ Model chọn
         final String[][] modelList = {
                 {"gemini-3.6-flash", "3.6 Flash", "Model Siêu Cấp 2026", "Chuyên gia xử lý Hán Việt & Làm mượt toàn văn tuyệt đối"},
-                {"gemini-2.5-flash", "2.5 Flash", "Mặc định - Siêu tốc", "Cân bằng tốc độ và độ mượt văn phong hoàn hảo"},
-                {"gemini-2.5-flash-lite", "2.5 Flash Lite", "Tiết kiệm Quota", "Rất nhanh, hạn ngạch dồi dào, ít tốn RPM/TPM"},
+                {"gemini-2.5-flash", "2.5 Flash", "Mặc định - Siêu tốc", "Cân bằng tốc độ và độ mượt văn phong"},
+                {"gemini-2.5-flash-lite", "2.5 Flash Lite", "Tiết kiệm Quota", "Rất nhanh, ít tốn RPM/TPM"},
                 {"gemini-2.5-pro", "2.5 Pro", "Chuyên sâu", "Dành cho chương văn học phức tạp cần lập luận sâu"}
         };
 
@@ -1434,9 +1608,9 @@ public class MainActivity extends AppCompatActivity {
 
             LinearLayout mCard = new LinearLayout(this);
             mCard.setOrientation(LinearLayout.VERTICAL);
-            mCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+            mCard.setPadding(dp(12), dp(10), dp(12), dp(10));
             LinearLayout.LayoutParams mclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            mclp.setMargins(0, dp(8), 0, 0);
+            mclp.setMargins(0, dp(6), 0, 0);
             mCard.setLayoutParams(mclp);
 
             LinearLayout mRowTop = new LinearLayout(this);
@@ -1446,21 +1620,21 @@ public class MainActivity extends AppCompatActivity {
             TextView tvName = new TextView(this);
             tvName.setText(mTitle);
             tvName.setTextColor(Color.WHITE);
-            tvName.setTextSize(13.5f);
+            tvName.setTextSize(13f);
             tvName.setTypeface(null, Typeface.BOLD);
             mRowTop.addView(tvName);
 
             TextView tvTag = new TextView(this);
             tvTag.setText(mTag);
             tvTag.setTextColor(Color.parseColor("#94A3B8"));
-            tvTag.setTextSize(10f);
-            tvTag.setPadding(dp(6), dp(2), dp(6), dp(2));
+            tvTag.setTextSize(9.5f);
+            tvTag.setPadding(dp(5), dp(1), dp(5), dp(1));
             GradientDrawable tagBg = new GradientDrawable();
-            tagBg.setColor(Color.parseColor("#1E293B"));
+            tagBg.setColor(Color.parseColor("#1C1E2A"));
             tagBg.setCornerRadius(dp(4));
             tvTag.setBackground(tagBg);
             LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            tlp.leftMargin = dp(8);
+            tlp.leftMargin = dp(6);
             mRowTop.addView(tvTag, tlp);
 
             mCard.addView(mRowTop);
@@ -1468,8 +1642,8 @@ public class MainActivity extends AppCompatActivity {
             TextView tvDesc = new TextView(this);
             tvDesc.setText(mDesc);
             tvDesc.setTextColor(Color.parseColor("#64748B"));
-            tvDesc.setTextSize(11f);
-            tvDesc.setPadding(0, dp(4), 0, 0);
+            tvDesc.setTextSize(10.5f);
+            tvDesc.setPadding(0, dp(3), 0, 0);
             mCard.addView(tvDesc);
 
             mCard.setOnClickListener(v -> {
@@ -1490,23 +1664,23 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout rowCustom = new LinearLayout(this);
         rowCustom.setOrientation(LinearLayout.HORIZONTAL);
         rowCustom.setGravity(Gravity.CENTER_VERTICAL);
-        rowCustom.setPadding(0, dp(12), 0, 0);
+        rowCustom.setPadding(0, dp(10), 0, 0);
 
         EditText edtCustomModel = new EditText(this);
         edtCustomModel.setHint("Model tùy biến (VD: gemini-3.5-flash)...");
         edtCustomModel.setHintTextColor(Color.parseColor("#64748B"));
         edtCustomModel.setTextColor(Color.WHITE);
         edtCustomModel.setBackground(createInputDrawable());
-        edtCustomModel.setPadding(dp(12), dp(10), dp(12), dp(10));
-        edtCustomModel.setTextSize(12f);
+        edtCustomModel.setPadding(dp(10), dp(8), dp(10), dp(8));
+        edtCustomModel.setTextSize(11.5f);
         rowCustom.addView(edtCustomModel, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         Button btnSetCustom = createButton("Dùng", "#1D4ED8");
-        btnSetCustom.setTextSize(11.5f);
-        btnSetCustom.setMinHeight(dp(40));
-        btnSetCustom.setPadding(dp(12), dp(6), dp(12), dp(6));
+        btnSetCustom.setTextSize(11f);
+        btnSetCustom.setMinHeight(dp(36));
+        btnSetCustom.setPadding(dp(10), dp(4), dp(10), dp(4));
         LinearLayout.LayoutParams bclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bclp.leftMargin = dp(8);
+        bclp.leftMargin = dp(6);
         btnSetCustom.setLayoutParams(bclp);
         btnSetCustom.setOnClickListener(v -> {
             triggerHaptic();
@@ -1530,13 +1704,13 @@ public class MainActivity extends AppCompatActivity {
 
         TextView tvPrIcon = new TextView(this);
         tvPrIcon.setText("🎭 ");
-        tvPrIcon.setTextSize(15);
+        tvPrIcon.setTextSize(14);
         promptHeaderRow.addView(tvPrIcon);
 
         TextView tvPromptHead = new TextView(this);
         tvPromptHead.setText("Thẻ Phong Cách Dịch");
         tvPromptHead.setTextColor(Color.WHITE);
-        tvPromptHead.setTextSize(14.5f);
+        tvPromptHead.setTextSize(14f);
         tvPromptHead.setTypeface(null, Typeface.BOLD);
         promptHeaderRow.addView(tvPromptHead);
         promptHeaderRow.addView(createHelpButton("prompt_cards"));
@@ -1544,10 +1718,10 @@ public class MainActivity extends AppCompatActivity {
         View promptSpacer = new View(this);
         promptHeaderRow.addView(promptSpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
 
-        Button btnAddPrompt = createButton("+ Thêm", "#1E293B");
-        btnAddPrompt.setTextSize(11f);
-        btnAddPrompt.setMinHeight(dp(36));
-        btnAddPrompt.setPadding(dp(12), dp(6), dp(12), dp(6));
+        Button btnAddPrompt = createButton("+ Thêm", "#1A1C28");
+        btnAddPrompt.setTextSize(10.5f);
+        btnAddPrompt.setMinHeight(dp(30));
+        btnAddPrompt.setPadding(dp(10), dp(4), dp(10), dp(4));
         btnAddPrompt.setOnClickListener(v -> {
             triggerHaptic();
             showPromptDialog(null);
@@ -1557,7 +1731,7 @@ public class MainActivity extends AppCompatActivity {
 
         llPromptCards = new LinearLayout(this);
         llPromptCards.setOrientation(LinearLayout.VERTICAL);
-        llPromptCards.setPadding(0, dp(10), 0, 0);
+        llPromptCards.setPadding(0, dp(8), 0, 0);
         cardPrompt.addView(llPromptCards);
         content.addView(cardPrompt);
 
@@ -1571,9 +1745,9 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout card = modelCardsViews.get(i);
             boolean isSel = modelList[i][0].equals(selectedModel);
             GradientDrawable cBg = new GradientDrawable();
-            cBg.setColor(Color.parseColor(isSel ? "#132338" : "#0D1420"));
-            cBg.setCornerRadius(dp(14));
-            cBg.setStroke(dp(isSel ? 1.5f : 1f), Color.parseColor(isSel ? "#38BDF8" : "#1E2D44"));
+            cBg.setColor(Color.parseColor(isSel ? "#182234" : "#151720"));
+            cBg.setCornerRadius(dp(12));
+            cBg.setStroke(dp(1), Color.parseColor(isSel ? "#0284C7" : "#1E202E"));
             card.setBackground(cBg);
         }
     }
@@ -1597,51 +1771,62 @@ public class MainActivity extends AppCompatActivity {
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(dp(12), dp(10), dp(12), dp(10));
+            row.setPadding(dp(10), dp(8), dp(10), dp(8));
             row.setGravity(Gravity.CENTER_VERTICAL);
             GradientDrawable rowBg = new GradientDrawable();
-            rowBg.setColor(Color.parseColor("#0E1624"));
-            rowBg.setCornerRadius(dp(12));
-            rowBg.setStroke(dp(1), Color.parseColor("#1C2A40"));
+            rowBg.setColor(Color.parseColor("#151720"));
+            rowBg.setCornerRadius(dp(10));
+            rowBg.setStroke(dp(1), Color.parseColor("#1F2230"));
             row.setBackground(rowBg);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, 0, 0, dp(8));
+            lp.setMargins(0, 0, 0, dp(6));
             row.setLayoutParams(lp);
 
             TextView tvIdx = new TextView(this);
-            tvIdx.setText("#" + (idx + 1) + " ");
-            tvIdx.setTextColor(Color.parseColor("#64748B"));
-            tvIdx.setTextSize(12f);
+            tvIdx.setText(String.valueOf(idx + 1));
+            tvIdx.setTextColor(Color.parseColor("#94A3B8"));
+            tvIdx.setTextSize(11f);
             tvIdx.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            tvIdx.setGravity(Gravity.CENTER);
+            GradientDrawable idBg = new GradientDrawable();
+            idBg.setColor(Color.parseColor("#1C1E2A"));
+            idBg.setCornerRadius(dp(6));
+            tvIdx.setBackground(idBg);
+            LinearLayout.LayoutParams idlp = new LinearLayout.LayoutParams(dp(22), dp(22));
+            idlp.rightMargin = dp(8);
+            tvIdx.setLayoutParams(idlp);
             row.addView(tvIdx);
 
             TextView tvK = new TextView(this);
-            String masked = item.key.length() > 8 ? "..." + item.key.substring(item.key.length() - 8) : item.key;
+            String masked = item.key.length() > 8 ? ". . ." + item.key.substring(item.key.length() - 8) : item.key;
             tvK.setText(masked);
             tvK.setTextColor(Color.WHITE);
-            tvK.setTextSize(12.5f);
+            tvK.setTextSize(12f);
             tvK.setTypeface(Typeface.MONOSPACE);
+            tvK.setSingleLine(true);
+            tvK.setEllipsize(android.text.TextUtils.TruncateAt.END);
             row.addView(tvK, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
             TextView tvStatus = new TextView(this);
             boolean isActive = "ACTIVE".equalsIgnoreCase(item.state);
             tvStatus.setText(isActive ? "ACTIVE" : item.state);
-            tvStatus.setTextColor(Color.parseColor(isActive ? "#34D399" : "#F87171"));
-            tvStatus.setTextSize(10f);
+            tvStatus.setTextColor(Color.parseColor(isActive ? "#10B981" : "#EF4444"));
+            tvStatus.setTextSize(9.5f);
             tvStatus.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-            tvStatus.setPadding(dp(6), dp(3), dp(6), dp(3));
+            tvStatus.setPadding(dp(6), dp(2), dp(6), dp(2));
             GradientDrawable stBg = new GradientDrawable();
             stBg.setColor(Color.parseColor(isActive ? "#064E3B" : "#450A0A"));
-            stBg.setCornerRadius(dp(6));
+            stBg.setCornerRadius(dp(4));
             stBg.setStroke(dp(1), Color.parseColor(isActive ? "#10B981" : "#EF4444"));
             tvStatus.setBackground(stBg);
             row.addView(tvStatus);
 
-            Button btnTest = createButton("⟳", "#1E293B");
-            btnTest.setTextSize(11f);
-            btnTest.setMinHeight(dp(32));
-            btnTest.setPadding(dp(8), dp(4), dp(8), dp(4));
-            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            Button btnTest = createButton("⟳ Test", "#1A1C28");
+            btnTest.setTextSize(10.5f);
+            btnTest.setMinHeight(dp(28));
+            btnTest.setPadding(dp(8), dp(2), dp(8), dp(2));
+            btnTest.setTextColor(Color.parseColor("#E2E8F0"));
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(28));
             tlp.leftMargin = dp(6);
             btnTest.setLayoutParams(tlp);
             btnTest.setOnClickListener(v -> {
@@ -1650,7 +1835,7 @@ public class MainActivity extends AppCompatActivity {
                 new Thread(() -> {
                     boolean ok = engine.testKey(item);
                     mainHandler.post(() -> {
-                        btnTest.setText("⟳");
+                        btnTest.setText("⟳ Test");
                         refreshKeyList();
                         Toast.makeText(MainActivity.this, ok ? "✅ Key hoạt động tốt!" : "❌ Key lỗi hoặc hết hạn!", Toast.LENGTH_SHORT).show();
                     });
@@ -1658,11 +1843,12 @@ public class MainActivity extends AppCompatActivity {
             });
             row.addView(btnTest);
 
-            Button btnDel = createButton("✕", "#7F1D1D");
+            Button btnDel = createButton("🗑", "#1A1C28");
             btnDel.setTextSize(11f);
-            btnDel.setMinHeight(dp(32));
-            btnDel.setPadding(dp(8), dp(4), dp(8), dp(4));
-            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            btnDel.setMinHeight(dp(28));
+            btnDel.setPadding(dp(6), dp(2), dp(6), dp(2));
+            btnDel.setTextColor(Color.parseColor("#EF4444"));
+            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(dp(28), dp(28));
             dlp.leftMargin = dp(6);
             btnDel.setLayoutParams(dlp);
             btnDel.setOnClickListener(v -> {
@@ -4225,9 +4411,9 @@ public class MainActivity extends AppCompatActivity {
 
     private GradientDrawable createCardDrawable() {
         GradientDrawable gd = new GradientDrawable();
-        gd.setColor(Color.parseColor("#131B2A"));
-        gd.setCornerRadius(dp(20));
-        gd.setStroke(dp(1), Color.parseColor("#1F2E47"));
+        gd.setColor(Color.parseColor("#12131A"));
+        gd.setCornerRadius(dp(18));
+        gd.setStroke(dp(1), Color.parseColor("#1E202E"));
         return gd;
     }
 
@@ -4235,10 +4421,10 @@ public class MainActivity extends AppCompatActivity {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor(hexColor));
         gd.setCornerRadius(dp(radiusDp));
-        gd.setStroke(dp(1), Color.parseColor("#2D3F5E"));
+        gd.setStroke(dp(1), Color.parseColor("#222533"));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             return new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(Color.parseColor("#33FFFFFF")),
+                    android.content.res.ColorStateList.valueOf(Color.parseColor("#25FFFFFF")),
                     gd, null
             );
         }
@@ -4250,7 +4436,7 @@ public class MainActivity extends AppCompatActivity {
         gd.setCornerRadius(dp(radiusDp));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             return new android.graphics.drawable.RippleDrawable(
-                    android.content.res.ColorStateList.valueOf(Color.parseColor("#40FFFFFF")),
+                    android.content.res.ColorStateList.valueOf(Color.parseColor("#35FFFFFF")),
                     gd, null
             );
         }
@@ -4259,16 +4445,16 @@ public class MainActivity extends AppCompatActivity {
 
     private GradientDrawable createInputDrawable() {
         GradientDrawable gd = new GradientDrawable();
-        gd.setColor(Color.parseColor("#0B0F17"));
-        gd.setCornerRadius(dp(14));
-        gd.setStroke(dp(1.2f), Color.parseColor("#22314C"));
+        gd.setColor(Color.parseColor("#0B0C10"));
+        gd.setCornerRadius(dp(12));
+        gd.setStroke(dp(1), Color.parseColor("#1A1C26"));
         return gd;
     }
 
     private GradientDrawable createBadgeDrawable(String hexBg, String hexStroke) {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(Color.parseColor(hexBg));
-        gd.setCornerRadius(dp(30));
+        gd.setCornerRadius(dp(20));
         if (hexStroke != null) {
             gd.setStroke(dp(1), Color.parseColor(hexStroke));
         }
@@ -4278,10 +4464,10 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout createCard() {
         LinearLayout l = new LinearLayout(this);
         l.setOrientation(LinearLayout.VERTICAL);
-        l.setPadding(dp(18), dp(16), dp(18), dp(16));
+        l.setPadding(dp(16), dp(14), dp(16), dp(14));
         l.setBackground(createCardDrawable());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, 0, dp(14));
+        lp.setMargins(0, 0, 0, dp(12));
         l.setLayoutParams(lp);
         return l;
     }
@@ -4290,11 +4476,11 @@ public class MainActivity extends AppCompatActivity {
         Button b = new Button(this);
         b.setText(text);
         b.setTextColor(Color.WHITE);
-        b.setTextSize(12.5f);
+        b.setTextSize(12f);
         b.setTypeface(null, Typeface.BOLD);
-        b.setBackground(createButtonDrawable(colorHex, 14f));
-        b.setPadding(dp(16), dp(12), dp(16), dp(12));
-        b.setMinHeight(dp(44));
+        b.setBackground(createButtonDrawable(colorHex, 12f));
+        b.setPadding(dp(14), dp(10), dp(14), dp(10));
+        b.setMinHeight(dp(40));
         b.setStateListAnimator(null);
         return b;
     }
@@ -4303,11 +4489,11 @@ public class MainActivity extends AppCompatActivity {
         Button b = new Button(this);
         b.setText(text);
         b.setTextColor(Color.WHITE);
-        b.setTextSize(13f);
+        b.setTextSize(12.5f);
         b.setTypeface(null, Typeface.BOLD);
-        b.setBackground(createGradientButtonDrawable(startColor, endColor, 14f));
-        b.setPadding(dp(18), dp(13), dp(18), dp(13));
-        b.setMinHeight(dp(48));
+        b.setBackground(createGradientButtonDrawable(startColor, endColor, 12f));
+        b.setPadding(dp(16), dp(11), dp(16), dp(11));
+        b.setMinHeight(dp(44));
         b.setStateListAnimator(null);
         return b;
     }
@@ -4318,9 +4504,9 @@ public class MainActivity extends AppCompatActivity {
         edt.setHintTextColor(Color.parseColor("#64748B"));
         edt.setTextColor(Color.WHITE);
         edt.setBackground(createInputDrawable());
-        edt.setPadding(dp(14), dp(12), dp(14), dp(12));
-        edt.setTextSize(13.5f);
-        edt.setMinHeight(dp(46));
+        edt.setPadding(dp(12), dp(10), dp(12), dp(10));
+        edt.setTextSize(13f);
+        edt.setMinHeight(dp(42));
         return edt;
     }
 }

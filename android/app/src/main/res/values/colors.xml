@@ -3,28 +3,29 @@
     <color name="colorPrimary">#FF6B00</color>
     <color name="colorPrimaryVariant">#FFA100</color>
     <color name="colorOnPrimary">#FFFFFF</color>
-    <color name="colorSecondary">#00D2FF</color>
-    <color name="colorSecondaryVariant">#0072FF</color>
+    <color name="colorSecondary">#10B981</color>
+    <color name="colorSecondaryVariant">#059669</color>
     <color name="colorOnSecondary">#FFFFFF</color>
     
-    <!-- OLED Dark Glass Theme Palette -->
-    <color name="bgCanvas">#0B0F17</color>
-    <color name="backgroundColor">#0B0F17</color>
-    <color name="cardSurface">#131B2A</color>
-    <color name="surfaceColor">#131B2A</color>
-    <color name="cardSurfaceActive">#1A253A</color>
-    <color name="cardBorder">#1F2E47</color>
-    <color name="cardBorderGlow">#38BDF8</color>
+    <!-- True OLED Pitch Black & Dark Charcoal Palette -->
+    <color name="bgCanvas">#08090C</color>
+    <color name="backgroundColor">#08090C</color>
+    <color name="cardSurface">#12131A</color>
+    <color name="surfaceColor">#12131A</color>
+    <color name="cardSurfaceInner">#171922</color>
+    <color name="cardBorder">#1E202E</color>
+    <color name="cardBorderGlow">#2A2E42</color>
     
     <!-- Gradients & Accents -->
     <color name="accentOrangeStart">#FF6B00</color>
     <color name="accentOrangeEnd">#FFA100</color>
-    <color name="accentCyanStart">#00D2FF</color>
-    <color name="accentCyanEnd">#0072FF</color>
+    <color name="accentCyanStart">#0284C7</color>
+    <color name="accentCyanEnd">#00D2FF</color>
     <color name="accentPurpleStart">#8B5CF6</color>
     <color name="accentPurpleEnd">#6366F1</color>
     <color name="accentEmeraldStart">#10B981</color>
     <color name="accentEmeraldEnd">#059669</color>
+    <color name="accentGold">#F59E0B</color>
     
     <!-- Status Colors -->
     <color name="statusSuccess">#10B981</color>
@@ -35,14 +36,14 @@
     <color name="statusDangerBg">#450A0A</color>
     
     <!-- Typography -->
-    <color name="textPrimary">#F8FAFC</color>
-    <color name="textColorPrimary">#F8FAFC</color>
+    <color name="textPrimary">#FFFFFF</color>
+    <color name="textColorPrimary">#FFFFFF</color>
     <color name="textSecondary">#94A3B8</color>
     <color name="textColorSecondary">#94A3B8</color>
     <color name="textMuted">#64748B</color>
     
-    <!-- Floating Bottom Nav & Overlays -->
-    <color name="floatingBottomBg">#111827</color>
-    <color name="floatingBottomBorder">#1F2E47</color>
-    <color name="ic_launcher_background">#0B0F17</color>
+    <!-- Bottom Nav & Overlays -->
+    <color name="floatingBottomBg">#0C0D13</color>
+    <color name="floatingBottomBorder">#1A1C26</color>
+    <color name="ic_launcher_background">#08090C</color>
 </resources>
