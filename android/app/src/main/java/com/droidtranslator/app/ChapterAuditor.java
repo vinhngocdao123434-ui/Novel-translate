@@ -6,6 +6,9 @@ import java.util.Map;
 
 /**
  * Bộ kiểm định chất lượng chương & Tự động vá lỗi ngoại tuyến (Offline Auto-Healer)
+ * Phân định ranh giới rõ ràng:
+ * - Lỗi Thực Sự Nặng (Critical): Từ chối dịch, kẹt đĩa, mất đoạn >60%, copy nguyên văn tiếng Trung >60 chữ Hán -> Bắt buộc Dịch lại.
+ * - Lỗi Nhẹ (Mild): Sót vài từ lai, tên riêng, Hán tự rải rác <= 60 chữ -> Chấp nhận bản dịch, để Bộ Quét Làm Mượt Final xử lý sau.
  */
 public class ChapterAuditor {
 
@@ -33,6 +36,11 @@ public class ChapterAuditor {
 
         public String getPrimaryIssue() {
             if (issues != null && !issues.isEmpty()) {
+                for (AuditIssue issue : issues) {
+                    if ("critical".equalsIgnoreCase(issue.severity)) {
+                        return issue.message;
+                    }
+                }
                 return issues.get(0).message;
             }
             return "Chất lượng bản dịch không đạt chuẩn";
@@ -77,7 +85,7 @@ public class ChapterAuditor {
         res.cleanedText = cleaned;
         int score = 100;
 
-        // 1. Kiểm tra AI Refusal (Từ chối dịch)
+        // 1. Kiểm tra AI Refusal (Từ chối dịch) -> CRITICAL
         String lower = cleaned.toLowerCase();
         if (lower.contains("tôi không thể") || lower.contains("i cannot") || lower.contains("safety guidelines") 
                 || lower.contains("content policy") || lower.contains("chính sách nội dung") || lower.contains("không thể hỗ trợ yêu cầu này")) {
@@ -86,14 +94,14 @@ public class ChapterAuditor {
             score -= 90;
         }
 
-        // 2. Kiểm tra lặp từ vô tận (Degeneration Loop)
+        // 2. Kiểm tra lặp từ vô tận (Degeneration Loop) -> CRITICAL
         if (detectRepetitionLoop(cleaned)) {
             res.hasCriticalError = true;
             res.issues.add(new AuditIssue("repetition_loop", "critical", "Phát hiện AI bị kẹt đĩa (lặp câu vô tận)"));
             score -= 60;
         }
 
-        // 3. Kiểm tra độ dài cắt cụt / mất chữ nghiêm trọng
+        // 3. Kiểm tra độ dài cắt cụt / mất chữ nghiêm trọng -> CRITICAL
         if (rawSource != null && rawSource.length() > 200) {
             double ratio = (double) cleaned.length() / (double) rawSource.length();
             if (ratio < 0.40) {
@@ -103,17 +111,23 @@ public class ChapterAuditor {
             }
         }
 
-        // 4. Kiểm tra lọt quá nhiều chữ Hán thô (nếu ngôn ngữ đích là Tiếng Việt)
+        // 4. Kiểm tra chữ Hán:
+        // - Nếu > 60 chữ Hán: AI copy nguyên xi cả đoạn văn bản tiếng Trung mà không dịch -> CRITICAL
+        // - Nếu từ 1 - 60 chữ Hán: Lỗi nhẹ rải rác (Từ lai, tên riêng, đồ vật) -> MILD (Chấp nhận bản dịch, Bộ Quét Final sẽ xử lý tự động)
         if (targetLanguage != null && targetLanguage.contains("Việt") && antiHanziStrict) {
-            if (rawHanzi > 8) {
+            if (rawHanzi > 60) {
                 res.hasCriticalError = true;
-                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch sót quá nhiều chữ Hán thô (" + rawHanzi + " chữ)"));
-                score -= 40;
+                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch bị lỗi copy nguyên văn tiếng Trung (" + rawHanzi + " chữ Hán)"));
+                score -= 50;
+            } else if (rawHanzi > 0) {
+                res.hasMildError = true;
+                res.issues.add(new AuditIssue("mild_hanzi", "mild", "Sót " + rawHanzi + " chữ Hán/từ lai (Bộ Quét Final sẽ làm mượt tự động)"));
+                score -= Math.min(15, rawHanzi);
             }
         }
 
         res.score = Math.max(0, Math.min(100, score));
-        res.isValid = !res.hasCriticalError && res.score >= 60;
+        res.isValid = !res.hasCriticalError && res.score >= 50;
         return res;
     }
 
@@ -123,46 +137,83 @@ public class ChapterAuditor {
 
         // Dỡ bỏ codeblock và thẻ rò rỉ
         if (cleaned.contains("===TRANSLATION===") || cleaned.contains("===NEW_GLOSSARY===")) {
-            cleaned = cleaned.replaceAll("(?i)[#*]*[ \t]*===+[ \t]*TRANSLATION[ \t]*===+[#*]*", "");
-            cleaned = cleaned.replaceAll("(?is)[#*]*[ \t]*===+[ \t]*NEW_GLOSSARY[ \t]*===+[#*]*.*$", "");
-            if (healedActions != null) healedActions.add("Dỡ bỏ thẻ phân tách hệ thống");
+            int transIdx = cleaned.indexOf("===TRANSLATION===");
+            if (transIdx != -1) {
+                int glossIdx = cleaned.indexOf("===NEW_GLOSSARY===", transIdx);
+                if (glossIdx != -1) {
+                    cleaned = cleaned.substring(transIdx + 17, glossIdx);
+                } else {
+                    cleaned = cleaned.substring(transIdx + 17);
+                }
+                if (healedActions != null) healedActions.add("Bóc tách thẻ cấu trúc ===TRANSLATION===");
+            }
         }
 
+        // Tẩy codeblock markdown thừa
         if (cleaned.startsWith("```")) {
-            int firstNl = cleaned.indexOf("\n");
+            int firstNl = cleaned.indexOf('\n');
             if (firstNl != -1) cleaned = cleaned.substring(firstNl + 1);
-            if (cleaned.endsWith("```")) cleaned = cleaned.substring(0, cleaned.length() - 3);
-            if (healedActions != null) healedActions.add("Tháo bỏ vỏ bọc Markdown codeblock");
+            if (cleaned.endsWith("```")) {
+                cleaned = cleaned.substring(0, cleaned.length() - 3);
+            }
+            if (healedActions != null) healedActions.add("Tẩy codeblock markdown");
         }
 
-        // Sửa lỗi Telex kẹt phím
-        String beforeTelex = cleaned;
-        cleaned = cleaned.replaceAll("(?i)([A-Za-zÀ-ỹ]+)ngk", "$1ng")
-                         .replaceAll("(?i)([A-Za-zÀ-ỹ]+)awk", "$1ă")
-                         .replaceAll("(?i)([A-Za-zÀ-ỹ]+)owk", "$1ơ")
-                         .replaceAll("(?i)([A-Za-zÀ-ỹ]+)uwk", "$1ư");
-        if (!cleaned.equals(beforeTelex) && healedActions != null) {
-            healedActions.add("Sửa lỗi kẹt phím bộ gõ Telex");
+        // Lọc thẻ HTML/XML rò rỉ
+        String stripped = cleaned.replaceAll("<[^>]*>", "");
+        if (!stripped.equals(cleaned)) {
+            cleaned = stripped;
+            if (healedActions != null) healedActions.add("Xóa thẻ XML/HTML rò rỉ");
         }
 
-        // Nén dòng trống
-        cleaned = cleaned.replaceAll("[\r\n]{4,}", "\n\n\n");
+        // Phiên âm tức thì dựa trên SinoVietnameseDictionary cho các chữ Hán đơn lẻ
+        StringBuilder sb = new StringBuilder();
+        boolean substituted = false;
+        for (int i = 0; i < cleaned.length(); i++) {
+            char c = cleaned.charAt(i);
+            Character.UnicodeBlock block = Character.UnicodeBlock.of(c);
+            if (block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+                    || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS) {
+                String sino = SinoVietnameseDictionary.lookup(String.valueOf(c));
+                if (sino != null && !sino.isEmpty()) {
+                    sb.append(sino);
+                    substituted = true;
+                } else {
+                    sb.append(c);
+                }
+            } else {
+                sb.append(c);
+            }
+        }
 
-        // Phiên âm Hán-Việt cứu hộ nếu còn sót
-        cleaned = SinoVietnameseDictionary.transliterateLeftoverHanzi(cleaned);
+        if (substituted) {
+            cleaned = sb.toString();
+            if (healedActions != null) healedActions.add("Phiên âm Hán-Việt tự động");
+        }
 
         return cleaned.trim();
     }
 
-    public static boolean detectRepetitionLoop(String text) {
-        if (text == null || text.length() < 150) return false;
-        String[] sentences = text.split("[.!?\r\n]+");
-        for (int i = 0; i < sentences.length - 3; i++) {
-            String s = sentences[i].trim();
-            if (s.length() > 8 && s.equals(sentences[i + 1].trim()) && s.equals(sentences[i + 2].trim()) && s.equals(sentences[i + 3].trim())) {
-                return true;
+    private static boolean detectRepetitionLoop(String text) {
+        if (text == null || text.length() < 100) return false;
+        String[] lines = text.split("\n");
+        int maxRepeat = 0;
+        String lastLine = "";
+        int repeatCount = 0;
+
+        for (String l : lines) {
+            String trimmed = l.trim();
+            if (trimmed.length() < 10) continue;
+            if (trimmed.equals(lastLine)) {
+                repeatCount++;
+                if (repeatCount > maxRepeat) maxRepeat = repeatCount;
+            } else {
+                lastLine = trimmed;
+                repeatCount = 1;
             }
         }
-        return false;
+
+        return maxRepeat >= 4;
     }
 }
