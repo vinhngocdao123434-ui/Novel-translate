@@ -124,6 +124,9 @@ public class MainActivity extends AppCompatActivity {
     private Button btnStartRange;
     private Button btnPauseResume;
     private Button btnCancelTrans;
+    private Button btnFillGaps;
+    private Button btnFillGapsTab3;
+    private boolean isGapFillingMode = false;
     private EditText edtRawText;
     private EditText edtChunkSize;
     private TextView tvGlossaryHeader;
@@ -947,6 +950,14 @@ public class MainActivity extends AppCompatActivity {
         btnRow.addView(btnCancelTrans, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         cardProgress.addView(btnRow);
+
+        View spGap = new View(this);
+        cardProgress.addView(spGap, new LinearLayout.LayoutParams(1, 10));
+
+        btnFillGaps = createButton("⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)", "#059669");
+        btnFillGaps.setOnClickListener(v -> startFillGapsTranslation());
+        cardProgress.addView(btnFillGaps);
+
         content.addView(cardProgress);
 
         // 3. Nạp văn bản truyện + Chọn file từ bộ nhớ + Tách chương tùy ý ký tự
@@ -1644,6 +1655,7 @@ public class MainActivity extends AppCompatActivity {
         rangeFromChap = Math.max(1, Math.min(rangeFromChap, rawChapters.size()));
         rangeToChap = Math.max(rangeFromChap, Math.min(rangeToChap, rawChapters.size()));
 
+        isGapFillingMode = false;
         currentChapterIdx = rangeFromChap - 1;
         isTranslating = true;
         isPaused = false;
@@ -1659,6 +1671,65 @@ public class MainActivity extends AppCompatActivity {
         }
 
         appendLog("▶ Bắt đầu dịch Range: Chương " + rangeFromChap + " ➔ " + rangeToChap + "...");
+        startTranslationLoop();
+    }
+
+    private void startFillGapsTranslation() {
+        if (rawChapters.isEmpty()) {
+            Toast.makeText(this, "Vui lòng nạp và tách chương trước!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            rangeFromChap = Integer.parseInt(edtFromChap.getText().toString().trim());
+            rangeToChap = Integer.parseInt(edtToChap.getText().toString().trim());
+        } catch (Exception e) {
+            rangeFromChap = 1;
+            rangeToChap = rawChapters.size();
+        }
+
+        rangeFromChap = Math.max(1, Math.min(rangeFromChap, rawChapters.size()));
+        rangeToChap = Math.max(rangeFromChap, Math.min(rangeToChap, rawChapters.size()));
+
+        // Quét danh sách các chương còn thiếu trong khoảng
+        List<Integer> missingIndices = new ArrayList<>();
+        for (int i = rangeFromChap - 1; i < rangeToChap && i < rawChapters.size(); i++) {
+            if (!translatedChapters.containsKey(i) || translatedChapters.get(i) == null || translatedChapters.get(i).trim().isEmpty()) {
+                missingIndices.add(i);
+            }
+        }
+
+        if (missingIndices.isEmpty()) {
+            Toast.makeText(this, "🎉 Toàn bộ chương từ " + rangeFromChap + " đến " + rangeToChap + " đều đã có bản dịch! Không có chương nào bị sót.", Toast.LENGTH_LONG).show();
+            appendLog("🎉 Đã kiểm tra khoảng Chương " + rangeFromChap + " ➔ " + rangeToChap + ": Đã hoàn thành 100%, không có chương nào bị sót!");
+            return;
+        }
+
+        isGapFillingMode = true;
+        currentChapterIdx = rangeFromChap - 1;
+        isTranslating = true;
+        isPaused = false;
+        btnPauseResume.setText("Tạm dừng");
+
+        // Bật Foreground Service
+        Intent serviceIntent = new Intent(this, TranslationForegroundService.class);
+        serviceIntent.putExtra("INFO", "Đang dịch bù " + missingIndices.size() + " chương thiếu (né chương đã dịch)");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+
+        StringBuilder sbMiss = new StringBuilder();
+        int previewCount = Math.min(missingIndices.size(), 8);
+        for (int m = 0; m < previewCount; m++) {
+            sbMiss.append(missingIndices.get(m) + 1).append(m < previewCount - 1 ? ", " : "");
+        }
+        if (missingIndices.size() > 8) sbMiss.append("...");
+
+        appendLog("⚡ [DỊCH BÙ THÔNG MINH] Phát hiện " + missingIndices.size() + " chương chưa dịch (Chương " + sbMiss.toString() + "). Tự động né 100% các chương đã có bản dịch!");
+        Toast.makeText(this, "Đang dịch bù " + missingIndices.size() + " chương còn thiếu!", Toast.LENGTH_SHORT).show();
+
         startTranslationLoop();
     }
 
@@ -1678,6 +1749,7 @@ public class MainActivity extends AppCompatActivity {
     private void cancelTranslation() {
         isTranslating = false;
         isPaused = false;
+        isGapFillingMode = false;
         btnPauseResume.setText("Tạm dừng");
         stopService(new Intent(this, TranslationForegroundService.class));
         appendLog("⏹ Đã hủy tiến trình dịch.");
@@ -1693,6 +1765,14 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 final int chapIndex = currentChapterIdx;
+
+                // NẾU ĐANG Ở CHẾ ĐỘ DỊCH BÙ VÀ CHƯƠNG NÀY ĐÃ CÓ BẢN DỊCH:
+                if (isGapFillingMode && translatedChapters.containsKey(chapIndex) && translatedChapters.get(chapIndex) != null && !translatedChapters.get(chapIndex).trim().isEmpty()) {
+                    mainHandler.post(() -> appendLog("⏭️ [NÉ ĐÃ DỊCH] Chương " + (chapIndex + 1) + " đã có bản dịch hoàn chỉnh, tự động lướt qua!"));
+                    currentChapterIdx++;
+                    continue;
+                }
+
                 appendLog("⚡ Đang gửi Chương " + (chapIndex + 1) + " đến " + currentModel + "...");
 
                 try {
@@ -1910,6 +1990,16 @@ public class MainActivity extends AppCompatActivity {
         btnExportTab3.setOnClickListener(v -> exportFullNovelData());
         content.addView(btnExportTab3);
 
+        View spGap3 = new View(this);
+        content.addView(spGap3, new LinearLayout.LayoutParams(1, 10));
+
+        btnFillGapsTab3 = createButton("⚡ Dịch Bù Toàn Bộ Chương Còn Thiếu (Né Đã Dịch)", "#0D9488");
+        btnFillGapsTab3.setOnClickListener(v -> {
+            switchTab(1);
+            startFillGapsTranslation();
+        });
+        content.addView(btnFillGapsTab3);
+
         View spExp = new View(this);
         content.addView(spExp, new LinearLayout.LayoutParams(1, 14));
 
@@ -2003,7 +2093,24 @@ public class MainActivity extends AppCompatActivity {
             tvStatus.setTypeface(null, Typeface.BOLD);
             item.addView(tvStatus);
 
-            item.setOnClickListener(v -> openFullScreenReader(idx));
+            item.setOnClickListener(v -> {
+                if (isDone) {
+                    openFullScreenReader(idx);
+                } else {
+                    AlertDialog.Builder d = new AlertDialog.Builder(MainActivity.this);
+                    d.setTitle("Chương " + (idx + 1) + " (Chưa có bản dịch)");
+                    d.setMessage("Chương này đang ở trạng thái 'Chờ'.\n\nBạn có muốn dịch ngay chương này không?");
+                    d.setPositiveButton("⚡ Dịch ngay chương này", (dialog, which) -> {
+                        edtFromChap.setText(String.valueOf(idx + 1));
+                        edtToChap.setText(String.valueOf(idx + 1));
+                        switchTab(1);
+                        startRangeTranslation();
+                    });
+                    d.setNeutralButton("Đọc bản gốc", (dialog, which) -> openFullScreenReader(idx));
+                    d.setNegativeButton("Đóng", null);
+                    d.show();
+                }
+            });
             llChapterList.addView(item);
         }
     }

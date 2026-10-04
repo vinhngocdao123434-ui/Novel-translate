@@ -347,6 +347,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   // Translation runtime state
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isGapFillingMode, setIsGapFillingMode] = useState<boolean>(false);
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number>(0);
   const [liveStreamText, setLiveStreamText] = useState<string>('');
   const [statusText, setStatusText] = useState<string>('● Sẵn sàng');
@@ -920,6 +921,12 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       const targetEnd = Math.min(toChapInput || project.chapters.length, project.chapters.length);
       
       if (currentChapterIndex < targetEnd) {
+        // NẾU Ở CHẾ ĐỘ DỊCH BÙ VÀ CHƯƠNG NÀY ĐÃ CÓ BẢN DỊCH -> LƯỚT QUA NGAY
+        if (isGapFillingMode && project.translatedChapters[currentChapterIndex]) {
+          setCurrentChapterIndex(prev => prev + 1);
+          return;
+        }
+
         setStatusText(`⚡ Đang dịch chương ${currentChapterIndex + 1}/${targetEnd}...`);
         
         const rawContent = project.chapters[currentChapterIndex];
@@ -1124,6 +1131,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             setCurrentChapterIndex(prev => prev + 1);
           } else {
             setIsTranslating(false);
+            setIsGapFillingMode(false);
             setStatusText('🎉 Đã hoàn thành khoảng chương yêu cầu!');
             addLog(`🎉 Hoàn tất dịch từ Chương ${fromChapInput} đến ${targetEnd}!`);
           }
@@ -1131,7 +1139,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       }
     }
     return () => clearTimeout(timer);
-  }, [isTranslating, isPaused, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput]);
+  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput]);
 
   // Export Full Novel (.txt)
   const handleExportFullNovel = () => {
@@ -1759,6 +1767,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                         return;
                       }
                       setCurrentChapterIndex(Math.max(0, fromChapInput - 1));
+                      setIsGapFillingMode(false);
                       setIsTranslating(true);
                       setIsPaused(false);
                       addLog(`▶ Bắt đầu dịch Range từ Chương ${fromChapInput} đến ${toChapInput}...`);
@@ -1795,6 +1804,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     onClick={() => {
                       setIsTranslating(false);
                       setIsPaused(false);
+                      setIsGapFillingMode(false);
                       setStatusText('● Đã hủy tiến trình');
                       addLog('⏹ Đã hủy tiến trình dịch');
                     }}
@@ -1804,6 +1814,37 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <span>Hủy</span>
                   </button>
                 </div>
+
+                {/* NÚT DỊCH BÙ CHƯƠNG SÓT (NÉ CHƯƠNG ĐÃ DỊCH) */}
+                <button
+                  disabled={isTranslating}
+                  onClick={() => {
+                    if (!project || project.chapters.length === 0) {
+                      alert('Vui lòng nạp và tách chương truyện trước!');
+                      return;
+                    }
+                    const start = Math.max(0, fromChapInput - 1);
+                    const end = Math.min(toChapInput || project.chapters.length, project.chapters.length);
+                    const missing = [];
+                    for (let i = start; i < end; i++) {
+                      if (!project.translatedChapters[i]) missing.push(i + 1);
+                    }
+                    if (missing.length === 0) {
+                      addLog(`🎉 Toàn bộ chương từ ${fromChapInput} đến ${toChapInput} đều đã có bản dịch! Không có chương nào bị sót.`);
+                      alert(`Toàn bộ chương từ ${fromChapInput} đến ${toChapInput} đều đã có bản dịch!`);
+                      return;
+                    }
+                    setIsGapFillingMode(true);
+                    setCurrentChapterIndex(start);
+                    setIsTranslating(true);
+                    setIsPaused(false);
+                    addLog(`⚡ [DỊCH BÙ THÔNG MINH] Phát hiện ${missing.length} chương chưa dịch (${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '...' : ''}). Tự động né 100% các chương đã có bản dịch!`);
+                  }}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)</span>
+                </button>
 
                 {/* Rolling Context Banner */}
                 {lastAttachedSnippet && (
@@ -2074,6 +2115,35 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Xuất Toàn Văn (.txt) Tất Cả Các Chương Đã Dịch</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (!project || project.chapters.length === 0) {
+                      alert('Chưa có chương nào!');
+                      return;
+                    }
+                    const missing = [];
+                    for (let i = 0; i < project.chapters.length; i++) {
+                      if (!project.translatedChapters[i]) missing.push(i + 1);
+                    }
+                    if (missing.length === 0) {
+                      alert('🎉 Toàn bộ chương đều đã được dịch đầy đủ 100%!');
+                      return;
+                    }
+                    setIsGapFillingMode(true);
+                    setFromChapInput(1);
+                    setToChapInput(project.chapters.length);
+                    setCurrentChapterIndex(0);
+                    setIsTranslating(true);
+                    setIsPaused(false);
+                    setActiveBottomTab('translate');
+                    addLog(`⚡ [DỊCH BÙ TOÀN BỘ] Phát hiện ${missing.length} chương chưa dịch. Đang tự động dịch bù và né 100% các chương đã xong!`);
+                  }}
+                  className="w-full py-2 bg-teal-700 hover:bg-teal-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>⚡ Dịch Bù Toàn Bộ Chương Còn Thiếu (Né Đã Dịch)</span>
                 </button>
 
                 {/* Chapter Pagination Bar to Prevent Scroll Lag */}
