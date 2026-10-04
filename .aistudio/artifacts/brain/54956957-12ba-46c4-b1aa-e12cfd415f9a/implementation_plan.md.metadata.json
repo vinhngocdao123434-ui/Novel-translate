@@ -1,6 +1,6 @@
 {
-  "summary":  "Cập nhật kế hoạch: Thêm lại model 3.5 Flash Lite vào Tab Key & Prompt (giữ nguyên toàn bộ model hiện tại), đại tu Tab Cài Đặt với nút gạt Switch xanh ngọc, bộ tăng giảm số [ - ] [ + ] và pop-up hướng dẫn (?) siêu dễ hiểu.",
-  "updatedAt":  "2026-10-04T16:14:47.491624553Z",
+  "summary":  "Kế hoạch khắc phục triệt để lỗi mất dữ liệu khi dịch lại/thoát app (chuyển sang Atomic File Storage), sửa lỗi crash khi xuất file (chuẩn Scoped Storage & Share Sheet), và hỗ trợ toàn diện 5 định dạng Nhập/Xuất (TXT, EPUB, HTML, MOBI, AZW3).",
+  "updatedAt":  "2026-10-04T16:39:03.667087652Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

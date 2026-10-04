@@ -1,67 +1,59 @@
-# Kế Hoạch Đại Tu Tab Cài Đặt & Bổ Sung Model 3.5 Flash Lite
+# Kế Hoạch Sửa Lỗi Lưu Trữ Vĩnh Cửu, Chống Crash & Hỗ Trợ 5 Định Dạng Nhập/Xuất (TXT, EPUB, HTML, MOBI, AZW3)
 
-Nâng cấp trải nghiệm toàn diện cho ứng dụng DroidTranslator: Thêm lại model **3.5 Flash Lite** vào danh mục Model của Tab Key & Prompt, đại tu **Tab Cài Đặt** với giao diện nút gạt Switch xanh ngọc hiện đại, bộ tăng giảm số `[-] [+]` chống vỡ chữ và hệ thống popup hướng dẫn `(?)` siêu dễ hiểu cho người mới.
+Giải quyết triệt để 2 lỗi nghiêm trọng (mất dữ liệu khi dịch lại/thoát app và crash khi xuất file) cùng tính năng nâng cấp mở rộng 5 định dạng Ebook cho cả chiều Nhập và Xuất.
 
 ---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Toàn bộ yêu cầu bổ sung đã được ghi nhận:
-> 1. **Tab 1 - Key & Prompt**: Thêm lại model `gemini-3.5-flash-lite` (3.5 Flash Lite) và giữ trọn vẹn toàn bộ 4 model hiện có (3.6 Flash, 2.5 Flash, 2.5 Flash Lite, 2.5 Pro).
-> 2. **Tab 4 - Cài Đặt**:
->    - Chuyển toàn bộ các tính năng Bật/Tắt sang **Nút gạt Switch xanh ngọc (`#10B981`)** nằm ở góc phải mỗi hàng.
->    - Thay thế 12 nút vuông bị ngắt chữ (`≥ 4 LẦ N`) bằng **Bộ tăng giảm số nhanh `[ - ]` Số `[ + ]`**.
->    - Bổ sung nút tròn **`(?)`** ở tất cả các mục cấu hình.
->    - Toàn bộ nội dung popup **`(?)`** được viết lại theo phong cách tiếng Việt đời thường, cực kỳ ngắn gọn, giải thích rõ công dụng và đưa ra lời khuyên nên BẬT hay TẮT.
+> **1. Nguyên nhân cốt lõi gây mất dữ liệu và phương án sửa triệt để:**
+> - *Nguyên nhân:* Hiện tại app đang lưu toàn bộ các chương truyện và từ điển vào `SharedPreferences` dưới dạng chuỗi JSON khổng lồ. Khi truyện đạt vài chục chương hoặc dịch lại làm tăng kích thước vượt quá giới hạn bộ đệm XML của Android (~1.5MB), hệ điều hành sẽ âm thầm hủy bỏ lệnh ghi (`TransactionTooLargeException` / file truncation). Khi mở lại app, file cấu hình bị rỗng nên app tưởng dự án mới tinh và mất trắng!
+> - *Khắc phục:* Chuyển đổi toàn bộ cơ chế lưu trữ dự án sang **Hệ thống tệp tin chuyên biệt (Atomic File Storage)** tại `context.getFilesDir()/projects/<project_id>.json`. Mỗi chương dịch xong được ghi tức thì ra tệp độc lập, có sao lưu dự phòng `.bak`, đảm bảo **BẢO TOÀN DỮ LIỆU VĨNH CỬU 100%**, không bao giờ bị mất dù máy tắt nguồn đột ngột hay khởi động lại.
+>
+> **2. Nguyên nhân Crash khi xuất file và phương án sửa triệt để:**
+> - *Nguyên nhân:* App đang gọi trực tiếp `Environment.getExternalStoragePublicDirectory()` mà không qua Scoped Storage API của Android 10+ (Android 11, 12, 13, 14, 15, 16), gây ra lỗi `SecurityException` làm app văng ngay lập tức.
+> - *Khắc phục:* Áp dụng chuẩn **Scoped Storage & MediaStore Downloads / FileProvider / Share Sheet Chooser**. Khi xuất file, app tạo tệp an toàn và mở hộp thoại chọn ứng dụng (Lưu vào Download, Mở bằng Moon+ Reader, Kindle, Gửi qua Zalo, Drive...) **KHÔNG BAO GIỜ CRASH**.
+>
+> **3. Hỗ trợ đầy đủ 5 định dạng (1 TXT + 4 Ebook: EPUB, HTML, MOBI, AZW3) cho cả NHẬP và XUẤT:**
+> - Nhập: Tự động nhận diện và bóc tách nội dung từ `.txt`, `.epub`, `.html`, `.mobi`, `.azw3`.
+> - Xuất: Hộp thoại lựa chọn định dạng chuyên nghiệp với 5 lựa chọn (TXT, EPUB có mục lục chuẩn, HTML trang đọc offline sang trọng, MOBI, AZW3 chuẩn Kindle).
 
 ---
 
-### 1. Danh Sách Model Tại Tab Key & Prompt (Đầy Đủ 5 Model)
+### 1. Kiến Trúc Lưu Trữ Dữ Liệu Mới (Chống Mất Dữ Liệu Vĩnh Cửu)
 
-1. **3.6 Flash** (`gemini-3.6-flash`): *Model Siêu Cấp 2026* — Chuyên gia xử lý Hán Việt & Làm mượt toàn văn tuyệt đối.
-2. **2.5 Flash** (`gemini-2.5-flash`): *Mặc định - Siêu tốc* — Cân bằng tốc độ và độ mượt văn phong.
-3. **2.5 Flash Lite** (`gemini-2.5-flash-lite`): *Tiết kiệm Quota* — Rất nhanh, ít tốn RPM/TPM.
-4. **3.5 Flash Lite** (`gemini-3.5-flash-lite`): *Thế hệ mới Siêu nhẹ* — Tốc độ phản hồi tức thì, tối ưu chi phí & hạn ngạch.
-5. **2.5 Pro** (`gemini-2.5-pro`): *Chuyên sâu* — Dành cho chương văn học phức tạp cần lập luận sâu.
+```
+/data/data/com.droidtranslator.app/files/
+  ├── config_global.json         (Key Pool, Thẻ Prompt, Cài đặt chung)
+  └── projects/
+      ├── Dai_Quan_Gia_Ma_Hoang.json       (Dữ liệu dự án)
+      ├── Dai_Quan_Gia_Ma_Hoang.json.bak   (File dự phòng chống ngắt nguồn)
+      └── ...
+```
+- **Tự động lưu (Auto-Flush)**: Ngay khi 1 chương dịch xong $\rightarrow$ Ghi đĩa ngay.
+- **Lifecycle Guard**: Ghi đĩa trong `onPause()`, `onStop()`, `onDestroy()`.
 
 ---
 
-### 2. Chi Tiết Thay Đổi Giao Diện Tab Cài Đặt
+### 2. Chi Tiết 5 Định Dạng Nhập / Xuất
 
-| Vị trí | Hiện trạng cũ | Nâng cấp mới (Pixel-Perfect) |
+| Định dạng | Nhập (Import) | Xuất (Export) |
 | :--- | :--- | :--- |
-| **Độ dài chữ Hán & Tần suất lặp** | 6 nút vuông ép ngang gây vỡ chữ thành 3 dòng (`≥ 4 LẦ N`) + nút LƯU xanh to | Hộp chọn số tinh tế: `[ - ]` `  2 ký tự  ` `[ + ]` và `[ - ]` `  ≥ 4 lần  ` `[ + ]` |
-| **Chống lọt chữ Hán 2 lớp** | Nút dài to đùng bấm đổi chữ | Hàng ngang: Tiêu đề + Phụ đề + **Nút gạt Switch xanh ngọc** bên phải |
-| **Tự động sửa lỗi / Dịch bù** | Nút dài to đùng màu xám/xanh | Hàng ngang: Tiêu đề + Phụ đề + **Nút gạt Switch xanh ngọc** bên phải |
-| **Xung đột nghĩa từ điển** | Nút to đùng chữ in hoa dài dòng | Khối lựa chọn 2 tùy chọn rõ ràng kèm nút `(?)` giải thích |
-| **Nút `(?)` Hướng dẫn** | Thiếu ở nhiều mục, nội dung dài dòng khó hiểu | Có mặt ở tất cả các mục, nội dung dân dã, chỉ rõ nên bật hay tắt |
+| **📄 TXT (Plain Text)** | Hỗ trợ UTF-8, UTF-16, GBK, GB2312 (tự nhận diện bảng mã) | File văn bản phân cách chương rõ ràng |
+| **📚 EPUB (Standard Ebook)** | Giải nén ZIP, phân tích `content.opf`, `toc.ncx` | Đóng gói EPUB chuẩn có TOC mục lục, bìa, CSS căn lề đẹp |
+| **🌐 HTML (Offline Reader)** | Bóc tách thẻ `<p>`, `<br>`, `<h1>-<h6>` | Đóng gói file HTML5 có Menu mục lục bên trái, giao diện Đen/Sáng |
+| **📱 MOBI (Kindle Legacy)** | Trích xuất stream PalmDOC HTML | Đóng gói PalmDOC text/header tương thích máy Kindle cũ |
+| **⚡ AZW3 (Kindle KF8)** | Trích xuất KF8 container | Đóng gói KF8 chuẩn hiển thị mục lục và typography trên Kindle |
 
 ---
 
-### 3. Nội Dung Các Popup Hướng Dẫn `(?)` Siêu Dễ Hiểu
-
-1. **Độ dài chữ Hán tối thiểu `(?)`**:
-   - *Tác dụng:* Chọn từ có bao nhiêu chữ thì máy mới lưu vào danh sách nhớ.
-   - *Khuyên dùng:* Nên để **2 hoặc 3**. Để 1 sẽ bị lưu nhiều chữ rác (như "tôi", "nó").
-2. **Tần suất lặp lại tối thiểu `(?)`**:
-   - *Tác dụng:* Từ đó phải xuất hiện bao nhiêu lần trong truyện thì máy mới tính là từ quan trọng (tên nhân vật, chiêu thức).
-   - *Khuyên dùng:* Nên để **2 đến 4 lần**.
-3. **Bộ lọc chống chữ Hán sót `(?)`**:
-   - *Tác dụng:* Tự động quét và dịch nốt các chữ tiếng Trung còn sót lại trong bản dịch.
-   - *Khuyên dùng:* **NÊN BẬT** để đọc truyện không bao giờ bị vướng chữ Tàu.
-4. **Tự động dịch lại khi lỗi nặng `(?)`**:
-   - *Tác dụng:* Nếu mạng yếu hoặc dịch thiếu đoạn, app sẽ tự đổi chìa khóa (Key) khác để dịch bù ngay lập tức.
-   - *Khuyên dùng:* **NÊN BẬT** để không phải bấm dịch lại bằng tay.
-5. **Xử lý xung đột nghĩa từ điển `(?)`**:
-   - *Tác dụng:* Khi một từ tiếng Trung ở chương sau có nghĩa khác với chương trước thì ưu tiên cái nào.
-   - *Khuyên dùng:* Nên chọn **Giữ nghĩa cũ** để tên nhân vật xuyên suốt không bị đổi giữa chừng.
-
----
-
-### 4. Kế Hoạch Thực Hiện
-1. Cập nhật mảng model trong `MainActivity.java` và Web Preview để thêm `gemini-3.5-flash-lite`.
-2. Tạo component / helper `createSwitchRow()` và `createStepperRow()` trong `MainActivity.java` và Web Preview.
-3. Viết lại hàm `showSettingsHelpDialog()` với bộ từ điển giải thích mới siêu dễ hiểu.
-4. Đại tu toàn bộ hàm `createTabSettingsView()` và `refreshSettingsUI()`.
-5. Đồng bộ dữ liệu sang `src/native-project-data.ts`, kiểm tra cú pháp và build applet.
+### 3. Kế Hoạch Triển Khai
+1. **Tạo `ProjectStorageManager.java`**: Xây dựng module lưu trữ Atomic File Storage chuyên biệt cho Android.
+2. **Tạo `EbookFormatEngine.java`**: Xử lý giải mã và đóng gói 5 định dạng (TXT, EPUB, HTML, MOBI, AZW3).
+3. **Cập nhật `MainActivity.java`**:
+   - Thay thế toàn bộ code lưu trữ cũ sang `ProjectStorageManager`.
+   - Viết lại hàm xuất file với hộp thoại Modal chọn 5 định dạng + Share Sheet an toàn tuyệt đối.
+   - Thêm bộ lọc file đa định dạng (`.txt`, `.epub`, `.html`, `.htm`, `.mobi`, `.azw3`) khi chọn file truyện gốc.
+4. **Cập nhật Web Preview (`AndroidPhoneSimulator.tsx` / `ebook-parser.ts`)**: Đồng bộ 100% tính năng nhập/xuất 5 định dạng.
+5. **Kiểm thử và xác minh cú pháp**: Chạy `verify-java-final.mjs` và build applet.

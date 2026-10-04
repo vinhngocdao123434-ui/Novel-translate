@@ -21,18 +21,24 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
+import com.droidtranslator.app.engine.EbookFormatEngine;
 import com.droidtranslator.app.engine.HanziSweeperEngine;
 import com.droidtranslator.app.engine.RootController;
 import com.droidtranslator.app.model.ApiKeyItem;
 import com.droidtranslator.app.model.PromptCardItem;
 import com.droidtranslator.app.service.TranslationForegroundService;
+import com.droidtranslator.app.storage.ProjectStorageManager;
 import com.google.android.material.tabs.TabLayout;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import android.content.SharedPreferences;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.*;
@@ -747,6 +753,7 @@ public class MainActivity extends AppCompatActivity {
     private GeminiEngine engine;
     private Handler mainHandler;
     private final Gson gson = new Gson();
+    private ProjectStorageManager storageManager;
 
     // Tab 1: Key & Prompt UI
     private LinearLayout llKeyList;
@@ -806,6 +813,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mainHandler = new Handler(Looper.getMainLooper());
+        storageManager = new ProjectStorageManager(this);
 
         // Kích hoạt bảo vệ Root nếu có
         if (RootController.isRootAvailable()) {
@@ -837,29 +845,43 @@ public class MainActivity extends AppCompatActivity {
 
     private void saveAllState() {
         try {
-            SharedPreferences sp = getSharedPreferences("droid_prefs", Context.MODE_PRIVATE);
-            SharedPreferences.Editor editor = sp.edit();
-            editor.putString("current_project_name", currentProjectName);
-            editor.putString("current_model", currentModel);
-            editor.putInt("delay_sec", delaySec);
-            editor.putString("project_list", gson.toJson(projectList));
-            editor.putString("api_keys", gson.toJson(apiKeys));
-            editor.putString("prompt_cards", gson.toJson(promptCards));
+            if (storageManager == null) storageManager = new ProjectStorageManager(this);
 
-            // Lưu cấu hình Cài Đặt Chuyên Sâu
-            editor.putInt("min_term_length", minTermLength);
-            editor.putInt("min_frequency", minFrequency);
-            editor.putString("conflict_policy", conflictPolicy);
-            editor.putBoolean("anti_hanzi_strict", antiHanziStrict);
-            editor.putBoolean("auto_heal_online", autoHealOnlineEnabled);
-            editor.putString("target_language", targetLanguage);
-            editor.putString("polish_model", polishModel);
-            editor.putInt("cooldown_seconds", cooldownSeconds);
-            editor.putString("rotation_strategy", rotationStrategy);
-            editor.putInt("context_snippet_len", contextSnippetLength);
+            ProjectStorageManager.GlobalConfigHolder conf = new ProjectStorageManager.GlobalConfigHolder();
+            conf.currentProjectName = currentProjectName;
+            conf.projectList.clear();
+            conf.projectList.addAll(projectList);
+            conf.currentModel = currentModel;
+            conf.polishModel = polishModel;
+            conf.minTermLength = minTermLength;
+            conf.minFrequency = minFrequency;
+            conf.conflictPolicy = conflictPolicy;
+            conf.antiHanziStrict = antiHanziStrict;
+            conf.autoHealOnlineEnabled = autoHealOnlineEnabled;
+            conf.targetLanguage = targetLanguage;
+            conf.delaySec = delaySec;
+            conf.readerFontSize = readerFontSize;
+            conf.readerTheme = readerTheme;
 
-            editor.apply();
+            conf.apiKeys = new JsonArray();
+            for (ApiKeyItem k : apiKeys) {
+                JsonObject kObj = new JsonObject();
+                kObj.addProperty("key", k.key);
+                kObj.addProperty("state", k.state);
+                conf.apiKeys.add(kObj);
+            }
 
+            conf.promptCards = new JsonArray();
+            for (PromptCardItem p : promptCards) {
+                JsonObject pObj = new JsonObject();
+                pObj.addProperty("id", p.id);
+                pObj.addProperty("title", p.title);
+                pObj.addProperty("content", p.content);
+                pObj.addProperty("active", p.active);
+                conf.promptCards.add(pObj);
+            }
+
+            storageManager.saveGlobalConfig(conf);
             saveCurrentProjectData();
         } catch (Exception e) {
             e.printStackTrace();
@@ -868,36 +890,17 @@ public class MainActivity extends AppCompatActivity {
 
     private void saveCurrentProjectData() {
         try {
+            if (storageManager == null) storageManager = new ProjectStorageManager(this);
             if (currentProjectName == null || currentProjectName.trim().isEmpty()) return;
-            java.io.File projectDir = new java.io.File(getFilesDir(), "projects");
-            if (!projectDir.exists()) projectDir.mkdirs();
 
-            java.io.File pFile = new java.io.File(projectDir, currentProjectName + ".json");
-            JsonObject obj = new JsonObject();
-            obj.addProperty("projectName", currentProjectName);
-            obj.addProperty("currentChapterIdx", currentChapterIdx);
-            obj.addProperty("loadedRawContent", loadedRawContent != null ? loadedRawContent : "");
+            ProjectStorageManager.ProjectDataHolder proj = new ProjectStorageManager.ProjectDataHolder();
+            proj.name = currentProjectName;
+            proj.rawChapters = new ArrayList<>(rawChapters);
+            proj.translatedChapters = new HashMap<>(translatedChapters);
+            proj.masterGlossary = new LinkedHashMap<>(masterGlossary);
+            proj.lastModified = System.currentTimeMillis();
 
-            JsonArray rawArr = new JsonArray();
-            for (String r : rawChapters) rawArr.add(r);
-            obj.add("rawChapters", rawArr);
-
-            JsonObject transObj = new JsonObject();
-            for (Map.Entry<Integer, String> entry : translatedChapters.entrySet()) {
-                transObj.addProperty(String.valueOf(entry.getKey()), entry.getValue());
-            }
-            obj.add("translatedChapters", transObj);
-
-            JsonObject glossObj = new JsonObject();
-            for (Map.Entry<String, String> entry : masterGlossary.entrySet()) {
-                glossObj.addProperty(entry.getKey(), entry.getValue());
-            }
-            obj.add("masterGlossary", glossObj);
-
-            java.io.FileOutputStream fos = new java.io.FileOutputStream(pFile);
-            fos.write(obj.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            fos.flush();
-            fos.close();
+            storageManager.saveProject(proj);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -911,35 +914,14 @@ public class MainActivity extends AppCompatActivity {
             loadedRawContent = "";
             currentChapterIdx = 0;
 
-            java.io.File pFile = new java.io.File(new java.io.File(getFilesDir(), "projects"), name + ".json");
-            if (pFile.exists()) {
-                java.io.FileInputStream fis = new java.io.FileInputStream(pFile);
-                byte[] data = new byte[(int) pFile.length()];
-                fis.read(data);
-                fis.close();
-                String jsonStr = new String(data, java.nio.charset.StandardCharsets.UTF_8);
-                JsonObject obj = gson.fromJson(jsonStr, JsonObject.class);
-                if (obj != null) {
-                    if (obj.has("currentChapterIdx")) currentChapterIdx = obj.get("currentChapterIdx").getAsInt();
-                    if (obj.has("loadedRawContent")) loadedRawContent = obj.get("loadedRawContent").getAsString();
+            if (storageManager == null) storageManager = new ProjectStorageManager(this);
+            if (name == null || name.trim().isEmpty()) return;
 
-                    if (obj.has("rawChapters")) {
-                        JsonArray arr = obj.getAsJsonArray("rawChapters");
-                        for (int i = 0; i < arr.size(); i++) rawChapters.add(arr.get(i).getAsString());
-                    }
-                    if (obj.has("translatedChapters")) {
-                        JsonObject tObj = obj.getAsJsonObject("translatedChapters");
-                        for (String k : tObj.keySet()) {
-                            translatedChapters.put(Integer.parseInt(k), tObj.get(k).getAsString());
-                        }
-                    }
-                    if (obj.has("masterGlossary")) {
-                        JsonObject gObj = obj.getAsJsonObject("masterGlossary");
-                        for (String k : gObj.keySet()) {
-                            masterGlossary.put(k, gObj.get(k).getAsString());
-                        }
-                    }
-                }
+            ProjectStorageManager.ProjectDataHolder proj = storageManager.loadProject(name);
+            if (proj != null) {
+                if (proj.rawChapters != null) rawChapters.addAll(proj.rawChapters);
+                if (proj.translatedChapters != null) translatedChapters.putAll(proj.translatedChapters);
+                if (proj.masterGlossary != null) masterGlossary.putAll(proj.masterGlossary);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -947,54 +929,51 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadAllState() {
-        SharedPreferences sp = getSharedPreferences("droid_prefs", Context.MODE_PRIVATE);
-        boolean hasSaved = sp.contains("current_project_name");
+        if (storageManager == null) storageManager = new ProjectStorageManager(this);
 
-        if (hasSaved) {
-            currentProjectName = sp.getString("current_project_name", "Dai_Quan_Gia_Ma_Hoang");
-            currentModel = sp.getString("current_model", "gemini-2.5-flash");
-            delaySec = sp.getInt("delay_sec", 2);
+        ProjectStorageManager.GlobalConfigHolder conf = storageManager.loadGlobalConfig();
 
-            String pListJson = sp.getString("project_list", null);
-            if (pListJson != null) {
-                java.lang.reflect.Type listType = new com.google.gson.reflect.TypeToken<ArrayList<String>>(){}.getType();
-                List<String> list = gson.fromJson(pListJson, listType);
-                if (list != null && !list.isEmpty()) {
-                    projectList.clear();
-                    projectList.addAll(list);
+        if (conf != null) {
+            currentProjectName = conf.currentProjectName;
+            currentModel = conf.currentModel;
+            polishModel = conf.polishModel;
+            minTermLength = conf.minTermLength;
+            minFrequency = conf.minFrequency;
+            conflictPolicy = conf.conflictPolicy;
+            antiHanziStrict = conf.antiHanziStrict;
+            autoHealOnlineEnabled = conf.autoHealOnlineEnabled;
+            targetLanguage = conf.targetLanguage;
+            delaySec = conf.delaySec;
+            readerFontSize = conf.readerFontSize;
+            readerTheme = conf.readerTheme;
+
+            if (conf.projectList != null && !conf.projectList.isEmpty()) {
+                projectList.clear();
+                projectList.addAll(conf.projectList);
+            }
+
+            if (conf.apiKeys != null && conf.apiKeys.size() > 0) {
+                apiKeys.clear();
+                for (JsonElement el : conf.apiKeys) {
+                    JsonObject ko = el.getAsJsonObject();
+                    ApiKeyItem ki = new ApiKeyItem(ko.get("key").getAsString());
+                    if (ko.has("state")) ki.state = ko.get("state").getAsString();
+                    apiKeys.add(ki);
                 }
             }
 
-            String keysJson = sp.getString("api_keys", null);
-            if (keysJson != null) {
-                java.lang.reflect.Type keyType = new com.google.gson.reflect.TypeToken<ArrayList<ApiKeyItem>>(){}.getType();
-                List<ApiKeyItem> kList = gson.fromJson(keysJson, keyType);
-                if (kList != null && !kList.isEmpty()) {
-                    apiKeys.clear();
-                    apiKeys.addAll(kList);
+            if (conf.promptCards != null && conf.promptCards.size() > 0) {
+                promptCards.clear();
+                for (JsonElement el : conf.promptCards) {
+                    JsonObject po = el.getAsJsonObject();
+                    promptCards.add(new PromptCardItem(
+                            po.get("id").getAsLong(),
+                            po.get("title").getAsString(),
+                            po.get("content").getAsString(),
+                            po.get("active").getAsBoolean()
+                    ));
                 }
             }
-
-            String promptsJson = sp.getString("prompt_cards", null);
-            if (promptsJson != null) {
-                java.lang.reflect.Type pType = new com.google.gson.reflect.TypeToken<ArrayList<PromptCardItem>>(){}.getType();
-                List<PromptCardItem> pList = gson.fromJson(promptsJson, pType);
-                if (pList != null && !pList.isEmpty()) {
-                    promptCards.clear();
-                    promptCards.addAll(pList);
-                }
-            }
-
-            minTermLength = sp.getInt("min_term_length", 2);
-            minFrequency = sp.getInt("min_frequency", 2);
-            conflictPolicy = sp.getString("conflict_policy", "keep-old");
-            antiHanziStrict = sp.getBoolean("anti_hanzi_strict", true);
-            autoHealOnlineEnabled = sp.getBoolean("auto_heal_online", true);
-            targetLanguage = sp.getString("target_language", "Tiếng Việt");
-            polishModel = sp.getString("polish_model", "gemini-3.6-flash");
-            cooldownSeconds = sp.getInt("cooldown_seconds", 60);
-            rotationStrategy = sp.getString("rotation_strategy", "round-robin");
-            contextSnippetLength = sp.getInt("context_snippet_len", 350);
 
             loadCurrentProjectData(currentProjectName);
         } else {
@@ -1004,58 +983,47 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initSampleData() {
+        projectList.clear();
         projectList.add("Dai_Quan_Gia_Ma_Hoang");
         projectList.add("Pham_Nhan_Tu_Tien");
 
+        apiKeys.clear();
         apiKeys.add(new ApiKeyItem("AIzaSyDemoSampleKeyNumberOneXYZ12345"));
         apiKeys.add(new ApiKeyItem("AIzaSyDemoSampleKeyNumberTwoABC67890"));
 
+        masterGlossary.clear();
         masterGlossary.put("林辰", "Lâm Thần");
         masterGlossary.put("青云宗", "Thanh Vân Tông");
         masterGlossary.put("赵霸天", "Triệu Bá Thiên");
         masterGlossary.put("黑风寨", "Hắc Phong Trại");
 
+        promptCards.clear();
         promptCards.add(new PromptCardItem(1, "Tiên Hiệp (Chuẩn mực)", "Dịch sang tiếng Việt tiểu thuyết tiên hiệp trôi chảy, đúng ngữ pháp. Động từ dịch nghĩa tự nhiên, không thô Hán-Việt. Xưng hô: hắn, nàng, ta, ngươi. Tên riêng giữ âm Hán-Việt.", true));
         promptCards.add(new PromptCardItem(2, "Đô Thị (Mượt mà)", "Dịch văn phong hiện đại đời thường mượt mà. Giữ nguyên tên nhân vật Hán-Việt.", false));
         promptCards.add(new PromptCardItem(3, "Huyền Huyễn / Sử Thi", "Dịch tiểu thuyết kỳ ảo, giữ nguyên thuật ngữ ma pháp, văn phong hào hùng.", false));
 
         String nl = String.valueOf((char) 10);
+        rawChapters.clear();
         rawChapters.add("第一章 少年与剑" + nl + "在偏僻的青石村中，有一位身负残破木剑的少年，名为林辰。" + nl + "林辰背着一把长剑，走在深邃的巷子里...");
         rawChapters.add("第二章 青云仙宗" + nl + "青云宗山门耸立在云海之巅，气势磅礴。" + nl + "数以千计的年轻才俊汇聚在巨大的演武广场上...");
 
+        translatedChapters.clear();
         translatedChapters.put(0, "Chương 1: Thiếu Niên Và Kiếm" + nl + nl + "Tại thôn Thanh Thạch hẻo lánh, có một thiếu niên mang trên lưng thanh mộc kiếm tàn tạ, tên gọi Lâm Thần..." + nl);
 
         saveCurrentProjectData();
 
-        // Khởi tạo sẵn tệp cho dự án mẫu số 2 để chuyển đổi dự án mượt mà
+        // Khởi tạo sẵn tệp cho dự án mẫu số 2
         try {
-            java.io.File projectDir = new java.io.File(getFilesDir(), "projects");
-            if (!projectDir.exists()) projectDir.mkdirs();
-            java.io.File pFile2 = new java.io.File(projectDir, "Pham_Nhan_Tu_Tien.json");
-            JsonObject obj2 = new JsonObject();
-            obj2.addProperty("projectName", "Pham_Nhan_Tu_Tien");
-            obj2.addProperty("currentChapterIdx", 0);
-            obj2.addProperty("loadedRawContent", "");
-
-            JsonArray rawArr2 = new JsonArray();
-            rawArr2.add("第一章 山边小村" + nl + "二愣子睁大双眼，看着茅草屋顶，心中一片茫然。他本名韩立，因皮肤黝黑，村里人都唤他二愣子。" + nl + "韩立从床榻上爬起，走出屋外，清晨的山风夹杂着泥土的气息扑面而来。");
-            rawArr2.add("第二章 七玄门试炼" + nl + "彩霞山七玄门，坐落于群山环抱之中，宛若仙境。" + nl + "数十名少年在岳堂主的带领下，站在险峻的落日峰前。");
-            obj2.add("rawChapters", rawArr2);
-
-            JsonObject transObj2 = new JsonObject();
-            obj2.add("translatedChapters", transObj2);
-
-            JsonObject glossObj2 = new JsonObject();
-            glossObj2.addProperty("韩立", "Hàn Lập");
-            glossObj2.addProperty("二愣子", "Nhị Lăng Tử");
-            glossObj2.addProperty("七玄门", "Thất Huyền Môn");
-            glossObj2.addProperty("彩霞山", "Thải Hà Sơn");
-            obj2.add("masterGlossary", glossObj2);
-
-            java.io.FileOutputStream fos2 = new java.io.FileOutputStream(pFile2);
-            fos2.write(obj2.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            fos2.flush();
-            fos2.close();
+            if (storageManager == null) storageManager = new ProjectStorageManager(this);
+            ProjectStorageManager.ProjectDataHolder proj2 = new ProjectStorageManager.ProjectDataHolder();
+            proj2.name = "Pham_Nhan_Tu_Tien";
+            proj2.rawChapters.add("第一章 山边小村" + nl + "二愣子睁大双眼，看着茅草屋顶，心中一片茫然。他本名韩立，因皮肤黝黑，村里人都唤他二愣子。" + nl + "韩立从床榻上爬起，走出屋外，清晨的山风夹杂着泥土的气息扑面而来。");
+            proj2.rawChapters.add("第二章 七玄门试炼" + nl + "彩霞山七玄门，坐落于群山环抱之中，宛若仙境。" + nl + "数十名少年在岳堂主的带领下，站在险峻的落日峰前。");
+            proj2.masterGlossary.put("韩立", "Hàn Lập");
+            proj2.masterGlossary.put("二愣子", "Nhị Lăng Tử");
+            proj2.masterGlossary.put("七玄门", "Thất Huyền Môn");
+            proj2.masterGlossary.put("彩霞山", "Thải Hà Sơn");
+            storageManager.saveProject(proj2);
         } catch (Exception ignored) {}
     }
 
@@ -2499,7 +2467,14 @@ public class MainActivity extends AppCompatActivity {
     private void openFilePicker() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("*/*");
-        String[] mimeTypes = {"text/plain", "application/epub+zip", "application/x-mobipocket-ebook", "application/octet-stream"};
+        String[] mimeTypes = {
+                "text/plain",
+                "text/html",
+                "application/epub+zip",
+                "application/x-mobipocket-ebook",
+                "application/vnd.amazon.ebook",
+                "application/octet-stream"
+        };
         intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
         try {
             startActivityForResult(intent, REQUEST_PICK_FILE);
@@ -2524,8 +2499,8 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == REQUEST_PICK_FILE && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
             if (uri != null) {
-                appendLog("⏳ Đang nạp và giải mã tệp Ebook từ bộ nhớ...");
-                Toast.makeText(this, "Đang đọc tệp Ebook...", Toast.LENGTH_SHORT).show();
+                appendLog("⏳ Đang nạp và giải mã tệp Ebook đa định dạng (TXT/EPUB/HTML/MOBI/AZW3)...");
+                Toast.makeText(this, "Đang đọc và xử lý tệp...", Toast.LENGTH_SHORT).show();
                 new Thread(() -> {
                     try {
                         InputStream is = getContentResolver().openInputStream(uri);
@@ -2539,55 +2514,14 @@ public class MainActivity extends AppCompatActivity {
                             }
                         } catch (Exception ignored) {}
 
-                        String lowerName = fileName.toLowerCase();
-                        StringBuilder sb = new StringBuilder();
-                        String nl = String.valueOf((char) 10);
+                        EbookFormatEngine.ParsedBook parsed = EbookFormatEngine.parseInputStream(is, fileName);
+                        if (is != null) is.close();
 
-                        if (lowerName.endsWith(".epub")) {
-                            // Native Java EPUB ZIP parser
-                            java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(is);
-                            java.util.zip.ZipEntry entry;
-                            while ((entry = zis.getNextEntry()) != null) {
-                                String en = entry.getName().toLowerCase();
-                                if ((en.endsWith(".xhtml") || en.endsWith(".html") || en.endsWith(".htm")) && !en.contains("toc")) {
-                                    BufferedReader br = new BufferedReader(new InputStreamReader(zis, java.nio.charset.StandardCharsets.UTF_8));
-                                    String l;
-                                    StringBuilder htmlSb = new StringBuilder();
-                                    while ((l = br.readLine()) != null) {
-                                        htmlSb.append(l).append(nl);
-                                    }
-                                    // Làm sạch thẻ HTML
-                                    String plain = htmlSb.toString()
-                                            .replaceAll("(?i)<br[ \t\n\r]*/?>", nl)
-                                            .replaceAll("(?i)</p>", nl + nl)
-                                            .replaceAll("(?i)</div>", nl)
-                                            .replaceAll("<[^>]+>", " ")
-                                            .replaceAll("&nbsp;", " ")
-                                            .replaceAll("&quot;", String.valueOf((char) 34))
-                                            .replaceAll("&apos;", "'")
-                                            .replaceAll("&lt;", "<")
-                                            .replaceAll("&gt;", ">")
-                                            .replaceAll("&amp;", "&")
-                                            .trim();
-                                    if (plain.length() > 50) {
-                                        sb.append(plain).append(nl).append(nl);
-                                    }
-                                }
-                                zis.closeEntry();
-                            }
-                            zis.close();
-                        } else {
-                            // TXT hoặc MOBI/AZW3 stream
-                            BufferedReader reader = new BufferedReader(new InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8));
-                            String line;
-                            while ((line = reader.readLine()) != null) {
-                                sb.append(line).append(nl);
-                            }
-                            reader.close();
-                        }
-
-                        final String fullText = sb.toString();
+                        final String fullText = parsed.fullText != null ? parsed.fullText : "";
                         final String finalFileName = fileName;
+                        final String bookTitle = parsed.title;
+
+                        String nl = String.valueOf((char) 10);
                         mainHandler.post(() -> {
                             loadedRawContent = fullText;
                             if (fullText.length() > 6000) {
@@ -2597,13 +2531,12 @@ public class MainActivity extends AppCompatActivity {
                             }
                             splitRawTextFromContent(fullText, false);
                             appendLog("📚 Đã nạp thành công file Ebook [" + finalFileName + "] (" + rawChapters.size() + " chương)!");
-                            Toast.makeText(MainActivity.this, "Đã nạp file Ebook và tách " + rawChapters.size() + " chương thành công!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Đã nạp file Ebook [" + finalFileName + "] và tách " + rawChapters.size() + " chương thành công!", Toast.LENGTH_SHORT).show();
                         });
                     } catch (Exception e) {
                         mainHandler.post(() -> {
                             appendLog("❌ Lỗi đọc tệp Ebook: " + e.getMessage());
                             Toast.makeText(MainActivity.this, "Lỗi đọc tệp: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        });
                     }
                 }).start();
             }
@@ -3428,10 +3361,10 @@ public class MainActivity extends AppCompatActivity {
         tvDesc.setPadding(0, dp(6), 0, dp(12));
         cardToolbar.addView(tvDesc);
 
-        Button btnExportTab3 = createGradientButton("📥 XUẤT TOÀN VĂN TÁC PHẨM (.TXT) VÀO DOWNLOAD", Color.parseColor("#059669"), Color.parseColor("#10B981"));
+        Button btnExportTab3 = createGradientButton("📥 XUẤT TÁC PHẨM (TXT, EPUB, HTML, MOBI, AZW3)", Color.parseColor("#059669"), Color.parseColor("#10B981"));
         btnExportTab3.setOnClickListener(v -> {
             triggerHaptic();
-            exportFullNovelData();
+            showExportFormatDialog();
         });
         cardToolbar.addView(btnExportTab3);
 
@@ -4393,57 +4326,223 @@ public class MainActivity extends AppCompatActivity {
         return row;
     }
 
-    private void exportFullNovelData() {
+    private void showExportFormatDialog() {
         if (translatedChapters.isEmpty()) {
             Toast.makeText(this, "Chưa có chương nào được dịch để xuất!", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String nl = String.valueOf((char) 10);
-        StringBuilder sb = new StringBuilder();
-        sb.append("=== TOÀN VĂN TÁC PHẨM: ").append(currentProjectName).append(" ===").append(nl);
-        sb.append("Biên dịch bởi: DroidTranslator God-Mode").append(nl);
-        sb.append("Mô hình: ").append(currentModel).append(nl);
-        sb.append("Tổng số chương đã dịch: ").append(translatedChapters.size()).append(nl).append(nl);
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(createExportDialogView(dialog));
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.show();
+    }
 
-        List<Integer> keys = new ArrayList<>(translatedChapters.keySet());
-        Collections.sort(keys);
-        for (Integer idx : keys) {
-            sb.append("============================================================").append(nl);
-            sb.append(translatedChapters.get(idx)).append(nl).append(nl);
+    private View createExportDialogView(final Dialog dialog) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(20), dp(20), dp(20), dp(20));
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#0F111A"));
+        bg.setCornerRadius(dp(24));
+        bg.setStroke(dp(1.5f), Color.parseColor("#1E2235"));
+        root.setBackground(bg);
+
+        // Header
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("📦 Xuất Bản Dịch Ebook");
+        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextSize(17f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        root.addView(tvTitle);
+
+        TextView tvSub = new TextView(this);
+        tvSub.setText("Chọn định dạng đóng gói tác phẩm [" + currentProjectName + "] (" + translatedChapters.size() + " chương đã dịch):");
+        tvSub.setTextColor(Color.parseColor("#94A3B8"));
+        tvSub.setTextSize(12f);
+        tvSub.setPadding(0, dp(4), 0, dp(14));
+        root.addView(tvSub);
+
+        // Danh sách 5 định dạng Ebook
+        EbookFormatEngine.EbookFormat[] formats = EbookFormatEngine.EbookFormat.values();
+        for (EbookFormatEngine.EbookFormat fmt : formats) {
+            LinearLayout optCard = new LinearLayout(this);
+            optCard.setOrientation(LinearLayout.HORIZONTAL);
+            optCard.setGravity(Gravity.CENTER_VERTICAL);
+            optCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+
+            GradientDrawable optBg = new GradientDrawable();
+            optBg.setColor(Color.parseColor("#161826"));
+            optBg.setCornerRadius(dp(14));
+            optBg.setStroke(dp(1), Color.parseColor("#22263D"));
+            optCard.setBackground(optBg);
+
+            LinearLayout.LayoutParams oclp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            oclp.setMargins(0, 0, 0, dp(8));
+            optCard.setLayoutParams(oclp);
+
+            TextView tvIcon = new TextView(this);
+            tvIcon.setText(fmt.icon);
+            tvIcon.setTextSize(20f);
+            tvIcon.setPadding(0, 0, dp(12), 0);
+            optCard.addView(tvIcon);
+
+            LinearLayout txtCol = new LinearLayout(this);
+            txtCol.setOrientation(LinearLayout.VERTICAL);
+
+            TextView tvFmtTitle = new TextView(this);
+            tvFmtTitle.setText(fmt.label);
+            tvFmtTitle.setTextColor(Color.WHITE);
+            tvFmtTitle.setTextSize(13.5f);
+            tvFmtTitle.setTypeface(null, Typeface.BOLD);
+            txtCol.addView(tvFmtTitle);
+
+            TextView tvFmtDesc = new TextView(this);
+            String desc = "Đóng gói toàn văn chuẩn hóa";
+            if (fmt == EbookFormatEngine.EbookFormat.TXT) desc = "Văn bản thuần .txt • Tương thích 100% mọi thiết bị";
+            else if (fmt == EbookFormatEngine.EbookFormat.EPUB) desc = "Sách điện tử chuẩn Quốc tế • Có mục lục phân chương";
+            else if (fmt == EbookFormatEngine.EbookFormat.HTML) desc = "Trang web đọc Offline • Giao diện Dark AMOLED cực đẹp";
+            else if (fmt == EbookFormatEngine.EbookFormat.MOBI) desc = "Sách Kindle Classic • Tối ưu máy đọc sách Amazon";
+            else if (fmt == EbookFormatEngine.EbookFormat.AZW3) desc = "Sách Kindle KF8 • Chuẩn hiển thị cao cấp cho Kindle";
+            tvFmtDesc.setText(desc);
+            tvFmtDesc.setTextColor(Color.parseColor("#64748B"));
+            tvFmtDesc.setTextSize(11f);
+            txtCol.addView(tvFmtDesc);
+
+            optCard.addView(txtCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+            TextView tvArrow = new TextView(this);
+            tvArrow.setText("➔");
+            tvArrow.setTextColor(Color.parseColor("#38BDF8"));
+            tvArrow.setTextSize(16f);
+            optCard.addView(tvArrow);
+
+            optCard.setOnClickListener(v -> {
+                triggerHaptic();
+                dialog.dismiss();
+                exportNovelToFormat(fmt);
+            });
+
+            root.addView(optCard);
         }
 
-        String fullText = sb.toString();
-        try {
-            java.io.File downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
-            if (!downloadDir.exists()) downloadDir.mkdirs();
-            java.io.File outFile = new java.io.File(downloadDir, currentProjectName + "_FULL_TRANSLATED.txt");
-            java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
-            fos.write(fullText.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            fos.flush();
-            fos.close();
+        // Nút Hủy
+        Button btnCancel = createButton("Đóng", "#1A1C28");
+        btnCancel.setTextColor(Color.parseColor("#94A3B8"));
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.setMargins(0, dp(4), 0, 0);
+        root.addView(btnCancel, clp);
 
-            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (cm != null) {
-                cm.setPrimaryClip(ClipData.newPlainText("Full Novel", fullText));
-            }
+        return root;
+    }
 
-            appendLog("📁 Đã lưu file tổng tại: " + outFile.getAbsolutePath());
-            Toast.makeText(this, "✅ Đã lưu file thành công tại thư mục Download!" + nl + "Tên file: " + outFile.getName(), Toast.LENGTH_LONG).show();
-
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("text/plain");
-            shareIntent.putExtra(Intent.EXTRA_SUBJECT, currentProjectName + " - Bản Dịch Hoàn Chỉnh");
-            shareIntent.putExtra(Intent.EXTRA_TEXT, fullText.length() > 50000 ? fullText.substring(0, 50000) + nl + nl + "... [Đã lưu toàn bộ file tại thư mục Download]" : fullText);
-            startActivity(Intent.createChooser(shareIntent, "Chia sẻ hoặc Mở File Toàn Văn"));
-        } catch (Exception e) {
-            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (cm != null) {
-                cm.setPrimaryClip(ClipData.newPlainText("Full Novel", fullText));
-            }
-            appendLog("📋 Đã sao chép toàn bộ " + translatedChapters.size() + " chương vào Clipboard.");
-            Toast.makeText(this, "Đã sao chép toàn văn " + translatedChapters.size() + " chương vào Clipboard!", Toast.LENGTH_LONG).show();
+    private void exportNovelToFormat(final EbookFormatEngine.EbookFormat format) {
+        if (translatedChapters.isEmpty()) {
+            Toast.makeText(this, "Chưa có chương nào được dịch để xuất!", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        appendLog("📦 Đang đóng gói tác phẩm sang định dạng " + format.name() + " (" + format.label + ")...");
+        Toast.makeText(this, "Đang đóng gói " + format.name() + "...", Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            try {
+                byte[] data = EbookFormatEngine.exportBook(format, currentProjectName, translatedChapters);
+                String safeName = currentProjectName.replaceAll("[^a-zA-Z0-9._-]", "_");
+                String fileName = safeName + "_TRANSLATED." + format.ext;
+
+                // 1. Lưu vào bộ nhớ Cache ứng dụng (an toàn cho FileProvider chia sẻ sang app khác)
+                File exportDir = new File(getCacheDir(), "exports");
+                if (!exportDir.exists()) exportDir.mkdirs();
+                File cacheFile = new File(exportDir, fileName);
+                try (FileOutputStream fos = new FileOutputStream(cacheFile)) {
+                    fos.write(data);
+                    fos.flush();
+                }
+
+                // 2. Lưu vào thư mục Download công khai qua MediaStore (Android 10+) hoặc direct file
+                boolean savedToDownload = false;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    try {
+                        android.content.ContentValues cv = new android.content.ContentValues();
+                        cv.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, fileName);
+                        cv.put(android.provider.MediaStore.Downloads.MIME_TYPE, format.mimeType);
+                        cv.put(android.provider.MediaStore.Downloads.IS_PENDING, 1);
+                        Uri collection = android.provider.MediaStore.Downloads.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY);
+                        Uri itemUri = getContentResolver().insert(collection, cv);
+                        if (itemUri != null) {
+                            try (java.io.OutputStream os = getContentResolver().openOutputStream(itemUri)) {
+                                if (os != null) {
+                                    os.write(data);
+                                    os.flush();
+                                }
+                            }
+                            cv.clear();
+                            cv.put(android.provider.MediaStore.Downloads.IS_PENDING, 0);
+                            getContentResolver().update(itemUri, cv, null, null);
+                            savedToDownload = true;
+                        }
+                    } catch (Exception exStore) {
+                        Log.w("Export", "MediaStore write failed: " + exStore.getMessage());
+                    }
+                } else {
+                    try {
+                        File dlDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
+                        if (!dlDir.exists()) dlDir.mkdirs();
+                        File dlFile = new File(dlDir, fileName);
+                        try (FileOutputStream fos = new FileOutputStream(dlFile)) {
+                            fos.write(data);
+                            fos.flush();
+                        }
+                        savedToDownload = true;
+                    } catch (Exception ignored) {}
+                }
+
+                // Sao chép bản dịch dạng Text vào Clipboard nếu là TXT
+                if (format == EbookFormatEngine.EbookFormat.TXT) {
+                    try {
+                        String fullText = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+                        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (cm != null && fullText.length() < 200000) {
+                            cm.setPrimaryClip(ClipData.newPlainText("Full Novel", fullText));
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                final boolean finalSaved = savedToDownload;
+                final String finalFileName = fileName;
+
+                mainHandler.post(() -> {
+                    appendLog("✅ [XUẤT THÀNH CÔNG] Đã tạo file: " + finalFileName + " (" + (data.length / 1024) + " KB)");
+                    Toast.makeText(MainActivity.this, "✅ Đã đóng gói " + format.name() + " thành công!", Toast.LENGTH_LONG).show();
+
+                    // Mở Android Share Sheet / File Chooser để người dùng lưu hoặc mở bằng ReadEra/Kindle/Drive
+                    try {
+                        Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", cacheFile);
+                        Intent intent = new Intent(Intent.ACTION_SEND);
+                        intent.setType(format.mimeType);
+                        intent.putExtra(Intent.EXTRA_STREAM, uri);
+                        intent.putExtra(Intent.EXTRA_SUBJECT, currentProjectName + " - Bản Dịch Hoàn Chỉnh (" + format.name() + ")");
+                        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(intent, "Lưu hoặc Mở file " + format.name()));
+                    } catch (Exception exShare) {
+                        Log.e("Export", "Share sheet error: " + exShare.getMessage());
+                    }
+                });
+
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    appendLog("❌ Lỗi xuất file " + format.name() + ": " + e.getMessage());
+                    Toast.makeText(MainActivity.this, "Lỗi xuất file: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
     }
 
     private TextView createStatusRow(String name, String status) {

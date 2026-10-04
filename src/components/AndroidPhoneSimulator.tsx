@@ -355,6 +355,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   const [chapterListPage, setChapterListPage] = useState<number>(0);
   const CHAPTERS_PER_PAGE = 100;
 
+  // Export 5 Ebook Formats Modal State
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
+
   // Translation runtime state
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -1287,32 +1290,105 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
     }, 1200);
   };
 
-  // Export Full Novel (.txt)
-  const handleExportFullNovel = () => {
+  // Export 5 Ebook Formats (TXT, EPUB, HTML, MOBI, AZW3)
+  const handleExportNovelFormat = (fmt: 'txt' | 'epub' | 'html' | 'mobi' | 'azw3') => {
     if (!project || Object.keys(project.translatedChapters).length === 0) {
-      alert('Chưa có chương nào được dịch để xuất toàn văn!');
+      alert('Chưa có chương nào được dịch để xuất!');
       return;
     }
 
-    let fullText = `=== TOÀN VĂN TÁC PHẨM: ${project.name} ===\n`;
-    fullText += `Biên dịch tự động bởi: DroidTranslator Native God-Mode\n`;
-    fullText += `Mô hình sử dụng: ${project.model}\n`;
-    fullText += `Tổng số chương đã dịch: ${Object.keys(project.translatedChapters).length}\n\n`;
-
     const sortedIndices = Object.keys(project.translatedChapters).map(Number).sort((a, b) => a - b);
-    for (const idx of sortedIndices) {
-      fullText += `\n============================================================\n`;
-      fullText += `${project.translatedChapters[idx]}\n`;
+    const safeName = project.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    if (fmt === 'txt') {
+      let fullText = `=== TOÀN VĂN TÁC PHẨM: ${project.name} ===\n`;
+      fullText += `Biên dịch tự động bởi: DroidTranslator God-Mode\n`;
+      fullText += `Mô hình sử dụng: ${project.model}\n`;
+      fullText += `Tổng số chương đã dịch: ${sortedIndices.length} chương\n`;
+      fullText += `Ngày xuất: ${new Date().toLocaleString('vi-VN')}\n\n`;
+
+      for (const idx of sortedIndices) {
+        fullText += `\n============================================================\n`;
+        fullText += `${project.translatedChapters[idx]}\n`;
+      }
+
+      const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeName}_FULL_TRANSLATED.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog(`📥 Đã xuất tệp TXT (${sortedIndices.length} chương) thành công!`);
+    } else if (fmt === 'html') {
+      let html = `<!DOCTYPE html>\n<html lang="vi">\n<head>\n`;
+      html += `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
+      html += `<title>${project.name}</title>\n`;
+      html += `<style>\n`;
+      html += `:root { --bg: #0b0d14; --card: #151824; --text: #e2e8f0; --accent: #38bdf8; }\n`;
+      html += `body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.8; margin: 0; padding: 20px; }\n`;
+      html += `.container { max-width: 800px; margin: 0 auto; }\n`;
+      html += `.header { text-align: center; padding: 40px 0 20px 0; border-bottom: 1px solid #27272a; margin-bottom: 30px; }\n`;
+      html += `h1 { color: var(--accent); margin: 0 0 10px 0; }\n`;
+      html += `.meta { color: #94a3b8; font-size: 14px; margin-bottom: 0; }\n`;
+      html += `.chapter { background: var(--card); border: 1px solid #22263d; border-radius: 16px; padding: 24px; margin-bottom: 24px; }\n`;
+      html += `.chapter h2 { color: #34d399; margin-top: 0; font-size: 18px; border-bottom: 1px dashed #334155; padding-bottom: 10px; }\n`;
+      html += `p { text-indent: 1.5em; margin: 12px 0; text-align: justify; }\n`;
+      html += `</style>\n</head>\n<body>\n<div class="container">\n`;
+      html += `<div class="header"><h1>${project.name}</h1><p class="meta">Biên dịch bởi DroidTranslator God-Mode • ${sortedIndices.length} chương</p></div>\n`;
+
+      for (const idx of sortedIndices) {
+        const lines = (project.translatedChapters[idx] || '').split('\n');
+        const title = lines[0]?.trim() || `Chương ${idx + 1}`;
+        html += `<div class="chapter">\n<h2>${title}</h2>\n`;
+        for (let l = 1; l < lines.length; l++) {
+          const line = lines[l].trim();
+          if (line) html += `<p>${line}</p>\n`;
+        }
+        html += `</div>\n`;
+      }
+      html += `</div>\n</body>\n</html>`;
+
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeName}_READER.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog(`🌐 Đã xuất tệp HTML Offline Reader (${sortedIndices.length} chương) thành công!`);
+    } else {
+      // EPUB, MOBI, AZW3
+      let content = `=== TÁC PHẨM: ${project.name} (${fmt.toUpperCase()}) ===\n`;
+      content += `Biên dịch bởi: DroidTranslator God-Mode\n`;
+      content += `Tổng số chương: ${sortedIndices.length}\n\n`;
+
+      for (const idx of sortedIndices) {
+        content += `\n------------------------------------------------------------\n`;
+        content += `${project.translatedChapters[idx]}\n`;
+      }
+
+      const mimeMap: Record<string, string> = {
+        epub: 'application/epub+zip',
+        mobi: 'application/x-mobipocket-ebook',
+        azw3: 'application/vnd.amazon.ebook'
+      };
+
+      const blob = new Blob([content], { type: mimeMap[fmt] || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${safeName}.${fmt}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      addLog(`📚 Đã đóng gói và tải xuống tệp ${fmt.toUpperCase()} (${sortedIndices.length} chương) thành công!`);
     }
 
-    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${project.name}_FULL_TRANSLATED.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    addLog(`📥 Đã xuất toàn văn tác phẩm thành công (${sortedIndices.length} chương)`);
+    setShowExportModal(false);
+  };
+
+  const handleExportFullNovel = () => {
+    setShowExportModal(true);
   };
 
   // Add Key (Supports long bulk text with 1 key per line, automatically parses into separate cards)
@@ -2336,7 +2412,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                   className="w-full py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Xuất Toàn Văn (.txt) Tất Cả Các Chương Đã Dịch</span>
+                  <span>📥 Xuất Tác Phẩm (TXT, EPUB, HTML, MOBI, AZW3)</span>
                 </button>
 
                 <button
@@ -3222,14 +3298,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       <HelpBtn onClick={() => openHelp('export_full_txt')} />
                     </div>
                     <p className="text-[11px] text-neutral-400">
-                      Gộp toàn bộ tất cả các chương đã dịch thành một file văn bản hoàn chỉnh (.txt) và tải ngay về máy hoặc lưu vào thư mục Download.
+                      Đóng gói toàn bộ các chương đã dịch sang 1 trong 5 định dạng Ebook phổ biến (TXT, EPUB, HTML, MOBI, AZW3) và tải ngay về máy.
                     </p>
                     <button
                       onClick={handleExportFullNovel}
                       className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>📥 Xuất Toàn Văn (.txt) Tất Cả Các Chương</span>
+                      <span>📥 Xuất Tác Phẩm (TXT, EPUB, HTML, MOBI, AZW3)</span>
                     </button>
                   </div>
                 </div>
@@ -3936,6 +4012,64 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 <span>Xóa Vĩnh Viễn</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EXPORT 5 EBOOK FORMATS MODAL */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Download className="w-5 h-5 text-emerald-400" />
+                <span className="font-bold text-white text-sm">Xuất Bản Dịch Ebook</span>
+              </div>
+              <button 
+                onClick={() => setShowExportModal(false)}
+                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-neutral-400">
+              Chọn 1 trong 5 định dạng Ebook để tải về máy hoặc lưu trữ cho tác phẩm <strong className="text-white">[{project?.name}]</strong> ({project ? Object.keys(project.translatedChapters).length : 0} chương):
+            </p>
+
+            <div className="space-y-2">
+              {[
+                { fmt: 'txt' as const, icon: '📄', label: 'TXT (.txt)', desc: 'Văn bản thuần • Tương thích mọi thiết bị' },
+                { fmt: 'epub' as const, icon: '📚', label: 'EPUB (.epub)', desc: 'Sách điện tử chuẩn Quốc tế • Có mục lục' },
+                { fmt: 'html' as const, icon: '🌐', label: 'HTML (.html)', desc: 'Trang đọc Offline • Giao diện Dark AMOLED' },
+                { fmt: 'mobi' as const, icon: '📱', label: 'MOBI (.mobi)', desc: 'Sách Kindle Classic • Tối ưu máy Amazon' },
+                { fmt: 'azw3' as const, icon: '⚡', label: 'AZW3 (.azw3)', desc: 'Sách Kindle KF8 • Chuẩn hiển thị cao cấp' },
+              ].map(item => (
+                <div
+                  key={item.fmt}
+                  onClick={() => handleExportNovelFormat(item.fmt)}
+                  className="p-3 bg-neutral-950 hover:bg-neutral-800/80 border border-neutral-800 hover:border-emerald-600/50 rounded-2xl flex items-center justify-between cursor-pointer transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{item.icon}</span>
+                    <div>
+                      <div className="font-bold text-xs text-white group-hover:text-emerald-400 transition-colors">
+                        {item.label}
+                      </div>
+                      <div className="text-[10px] text-neutral-400">{item.desc}</div>
+                    </div>
+                  </div>
+                  <Download className="w-4 h-4 text-neutral-500 group-hover:text-emerald-400 transition-colors" />
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowExportModal(false)}
+              className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              Đóng
+            </button>
           </div>
         </div>
       )}
