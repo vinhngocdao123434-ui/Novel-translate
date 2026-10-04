@@ -138,27 +138,27 @@ public class MainActivity extends AppCompatActivity {
         ));
 
         helpMap.put("settings_glossary_learning", new HelpData(
-            "Tự Động Gom Từ Điển (AI Auto-Learning)",
-            "Bộ Lọc Từ Điển",
-            "Máy sẽ tự động phát hiện tên nhân vật mới trong truyện và lưu vào từ điển.",
-            "• Độ dài chữ Hán tối thiểu: Nên để 2 hoặc 3 ký tự (tránh lưu chữ rác 1 từ).\n• Tần suất lặp lại: Nên để 2 đến 4 lần (để chỉ lưu các nhân vật quan trọng).",
-            "Bật tính năng này giúp bạn không cần phải tự gõ từ điển bằng tay."
+            "Tự Động Lưu Tên Nhân Vật (Auto-Learning)",
+            "Tự Nhớ Tên Nhân Vật",
+            "Khi dịch, ứng dụng sẽ tự động phát hiện tên nhân vật, địa danh mới xuất hiện trong truyện và tự nhớ lại để dịch đúng cho các chương sau.",
+            "• Độ dài chữ Hán: Nên để 2 ký tự (để không lưu nhầm các từ thông thường như 'tôi', 'nó').\n• Tần suất lặp lại: Nên để 2 hoặc 3 lần (để nhớ được đầy đủ tên nhân vật chính và phụ trong chương).",
+            "Tính năng này giúp tên nhân vật xuyên suốt bộ truyện luôn nhất quán mà bạn không cần tự nhập bằng tay."
         ));
 
         helpMap.put("settings_min_term_length", new HelpData(
-            "Độ Dài Chữ Hán Tối Thiểu",
-            "Lọc Từ Điển",
-            "Quy định từ tiếng Trung phải có từ bao nhiêu chữ trở lên thì mới được lưu vào từ điển.",
-            "• KHUYÊN DÙNG: Đặt là 2 hoặc 3 ký tự.\n• TẠI SAO: Nếu đặt 1 ký tự, máy sẽ lưu cả những chữ thông thường như 'tôi', 'nó', 'đi' làm hỏng bản dịch.",
-            "Nên để mặc định là 2 ký tự."
+            "Độ Dài Tên Tối Thiểu",
+            "Số Chữ Tối Thiểu",
+            "Chỉ những tên có từ bao nhiêu chữ Hán trở lên mới được máy tự động lưu vào từ điển.",
+            "• ĐẶT 2 KÝ TỰ (KHUYÊN DÙNG): Để máy chỉ nhớ các tên từ 2 chữ trở lên (VD: Lâm Thần, Tiêu Viêm).\n• NẾU ĐẶT 1 KÝ TỰ: Máy sẽ nhớ nhầm cả các từ thông thường như 'tôi', 'nó', 'đi' làm hỏng bản dịch.",
+            "Luôn giữ ở mức 2 ký tự để bản dịch sạch sẽ và chuẩn xác nhất."
         ));
 
         helpMap.put("settings_min_frequency", new HelpData(
-            "Tần Suất Lặp Lại Tối Thiểu",
-            "Lọc Từ Điển",
-            "Từ tiếng Trung đó phải xuất hiện bao nhiêu lần trong chương thì mới được coi là tên nhân vật.",
-            "• KHUYÊN DÙNG: Đặt từ 2 đến 4 lần.\n• TẠI SAO: Tránh lưu những từ người qua đường chỉ xuất hiện 1 lần rồi biến mất.",
-            "Nên để mặc định là 2 hoặc 3 lần."
+            "Số Lần Xuất Hiện Trong Chương",
+            "Số Lần Lặp Lại",
+            "Tên nhân vật phải xuất hiện bao nhiêu lần trong 1 chương thì mới được máy tự nhớ.",
+            "• ĐẶT 2 HOẶC 3 LẦN (KHUYÊN DÙNG): Giúp máy nhớ trọn vẹn tên của cả nhân vật chính lẫn nhân vật phụ.\n• NẾU ĐẶT QUÁ CAO (VD: 5 lần): Tên nhân vật phụ xuất hiện ít lần sẽ không được nhớ, làm bản dịch không đồng nhất.",
+            "Nên để 2 hoặc 3 lần để máy nhớ đầy đủ tên nhân vật nhất."
         ));
 
         helpMap.put("settings_conflict_policy", new HelpData(
@@ -3905,14 +3905,14 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout rowS2Head = new LinearLayout(this);
         rowS2Head.setOrientation(LinearLayout.HORIZONTAL);
         rowS2Head.setGravity(Gravity.CENTER_VERTICAL);
-        rowS2Head.setPadding(0, dp(12), 0, 0);
+        rowS2Head.setPadding(0, dp(12), 0, dp(4));
 
         TextView tvGlossSettingsTitle = new TextView(this);
         tvGlossSettingsTitle.setText("2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)");
         tvGlossSettingsTitle.setTextColor(Color.WHITE);
         tvGlossSettingsTitle.setTextSize(14f);
         tvGlossSettingsTitle.setTypeface(null, Typeface.BOLD);
-        rowS2Head.addView(tvGlossSettingsTitle);
+        rowS2Head.addView(tvGlossSettingsTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
         rowS2Head.addView(createHelpButton("settings_glossary_learning"));
         content.addView(rowS2Head);
 
@@ -4290,12 +4290,13 @@ public class MainActivity extends AppCompatActivity {
         TextView tvT = new TextView(this);
         tvT.setText(title);
         tvT.setTextColor(Color.WHITE);
-        tvT.setTextSize(12.5f);
+        tvT.setTextSize(12f);
         tvT.setTypeface(null, Typeface.BOLD);
-        tRow.addView(tvT);
+        tRow.addView(tvT, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         if (helpKey != null) {
-            tRow.addView(createHelpButton(helpKey));
+            View helpBtn = createHelpButton(helpKey);
+            tRow.addView(helpBtn);
         }
         row.addView(tRow, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
