@@ -718,7 +718,20 @@ public class MainActivity extends AppCompatActivity {
     // Quản lý Đa Dự Án (Multi-Project)
     private String currentProjectName = "Dai_Quan_Gia_Ma_Hoang";
     private final List<String> projectList = new ArrayList<>();
-    private TextView tvCurrentProjectName;
+    private TextView tvHeaderProjectName;
+    private TextView tvTab2ProjectName;
+
+    private void updateProjectNameUI() {
+        if (tvHeaderProjectName != null) {
+            tvHeaderProjectName.setText(currentProjectName + " ▾");
+        }
+        if (tvTab2ProjectName != null) {
+            tvTab2ProjectName.setText("📖 Dự án: " + currentProjectName);
+        }
+        if (tvSettingsProjName != null) {
+            tvSettingsProjName.setText("📖 Dự án hiện tại: " + currentProjectName);
+        }
+    }
 
     // Trạng thái ứng dụng
     private final List<ApiKeyItem> apiKeys = new ArrayList<>();
@@ -738,7 +751,7 @@ public class MainActivity extends AppCompatActivity {
     private String rotationStrategy = "round-robin";
     private int contextSnippetLength = 350;
 
-    private String currentModel = "gemini-2.5-flash";
+    private String currentModel = "gemini-3.6-flash";
     private String polishModel = "gemini-3.6-flash";
     private boolean isTranslating = false;
     private boolean isPaused = false;
@@ -1227,12 +1240,12 @@ public class MainActivity extends AppCompatActivity {
         tvPrLabel.setTextSize(11.5f);
         projPill.addView(tvPrLabel);
 
-        tvCurrentProjectName = new TextView(this);
-        tvCurrentProjectName.setText(currentProjectName + " ▾");
-        tvCurrentProjectName.setTextColor(Color.parseColor("#38BDF8"));
-        tvCurrentProjectName.setTextSize(11.5f);
-        tvCurrentProjectName.setTypeface(null, Typeface.BOLD);
-        projPill.addView(tvCurrentProjectName);
+        tvHeaderProjectName = new TextView(this);
+        tvHeaderProjectName.setText(currentProjectName + " ▾");
+        tvHeaderProjectName.setTextColor(Color.parseColor("#38BDF8"));
+        tvHeaderProjectName.setTextSize(11.5f);
+        tvHeaderProjectName.setTypeface(null, Typeface.BOLD);
+        projPill.addView(tvHeaderProjectName);
 
         projPill.setOnClickListener(v -> {
             triggerHaptic();
@@ -2024,12 +2037,12 @@ public class MainActivity extends AppCompatActivity {
         rowProjHeader.setGravity(Gravity.CENTER_VERTICAL);
         rowProjHeader.setPadding(0, dp(12), 0, dp(10));
 
-        tvCurrentProjectName = new TextView(this);
-        tvCurrentProjectName.setText("📖 Dự án: " + currentProjectName);
-        tvCurrentProjectName.setTextColor(Color.parseColor("#38BDF8"));
-        tvCurrentProjectName.setTextSize(13f);
-        tvCurrentProjectName.setTypeface(null, Typeface.BOLD);
-        rowProjHeader.addView(tvCurrentProjectName, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        tvTab2ProjectName = new TextView(this);
+        tvTab2ProjectName.setText("📖 Dự án: " + currentProjectName);
+        tvTab2ProjectName.setTextColor(Color.parseColor("#38BDF8"));
+        tvTab2ProjectName.setTextSize(13f);
+        tvTab2ProjectName.setTypeface(null, Typeface.BOLD);
+        rowProjHeader.addView(tvTab2ProjectName, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
         Button btnSwitchProj = createButton("Đổi Truyện", "#1E293B");
         btnSwitchProj.setTextSize(11f);
@@ -2379,7 +2392,7 @@ public class MainActivity extends AppCompatActivity {
                     projectList.add(name);
                 }
                 currentProjectName = name;
-                tvCurrentProjectName.setText("📖 Dự án: " + currentProjectName);
+                updateProjectNameUI();
 
                 // Làm mới dữ liệu độc lập cho truyện mới
                 rawChapters.clear();
@@ -2415,7 +2428,7 @@ public class MainActivity extends AppCompatActivity {
             loadCurrentProjectData(chosen);
             saveAllState();
 
-            tvCurrentProjectName.setText("📖 Dự án: " + currentProjectName);
+            updateProjectNameUI();
             updateProgressUI();
             refreshGlossaryList();
             refreshChapterListView();
@@ -2443,7 +2456,7 @@ public class MainActivity extends AppCompatActivity {
             loadCurrentProjectData(nextProject);
             saveAllState();
 
-            tvCurrentProjectName.setText("📖 Dự án: " + currentProjectName);
+            updateProjectNameUI();
             updateProgressUI();
             refreshGlossaryList();
             refreshChapterListView();

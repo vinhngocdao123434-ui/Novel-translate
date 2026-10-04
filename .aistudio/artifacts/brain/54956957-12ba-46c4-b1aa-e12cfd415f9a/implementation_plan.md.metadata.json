@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch khắc phục triệt để lỗi mất dữ liệu khi dịch lại/thoát app (chuyển sang Atomic File Storage), sửa lỗi crash khi xuất file (chuẩn Scoped Storage & Share Sheet), và hỗ trợ toàn diện 5 định dạng Nhập/Xuất (TXT, EPUB, HTML, MOBI, AZW3).",
-  "updatedAt":  "2026-10-04T16:39:03.667087652Z",
+  "summary":  "Kế hoạch cập nhật: Sửa lỗi hiển thị tên dự án trên Header và xử lý lỗi HTTP 503 khi dùng Gemini 3.6 Flash bằng thuật toán Exponential Backoff & Key Rotation",
+  "updatedAt":  "2026-10-04T20:49:44.888662611Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

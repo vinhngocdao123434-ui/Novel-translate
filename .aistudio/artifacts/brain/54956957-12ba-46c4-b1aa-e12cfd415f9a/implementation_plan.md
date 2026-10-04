@@ -1,59 +1,51 @@
-# Kế Hoạch Sửa Lỗi Lưu Trữ Vĩnh Cửu, Chống Crash & Hỗ Trợ 5 Định Dạng Nhập/Xuất (TXT, EPUB, HTML, MOBI, AZW3)
+# Kế Hoạch Cập Nhật Code: Sửa Lỗi Hiển Thị Dự Án & Xử Lý HTTP 503 Gemini 3.6 Flash
 
-Giải quyết triệt để 2 lỗi nghiêm trọng (mất dữ liệu khi dịch lại/thoát app và crash khi xuất file) cùng tính năng nâng cấp mở rộng 5 định dạng Ebook cho cả chiều Nhập và Xuất.
+## 1. Phân Tích & Nguyên Nhân 2 Lỗi
 
----
+### Lỗi 1: Tên dự án trên Header không thay đổi khi đổi truyện (Duyệt theo ảnh chụp)
+- **Phát hiện:** Trong `MainActivity.java`, biến `tvCurrentProjectName` bị gán đè (re-assigned) 2 lần:
+  - Lần 1: Tại Header Tầng 3 (`tvCurrentProjectName = new TextView(this)`).
+  - Lần 2: Tại Tab 2 Card 1 (`tvCurrentProjectName = new TextView(this)`).
+- **Hậu quả:** Khi chọn đổi dự án, lệnh `tvCurrentProjectName.setText(...)` chỉ cập nhật TextView ở Tab 2, còn TextView ở Header Tầng 3 bị mất tham chiếu nên giữ nguyên tên truyện cũ (`Dai_Quan_Gia_Ma_Hoang ▾`).
 
-### User Review & Critical Decisions
-
-> [!IMPORTANT]
-> **1. Nguyên nhân cốt lõi gây mất dữ liệu và phương án sửa triệt để:**
-> - *Nguyên nhân:* Hiện tại app đang lưu toàn bộ các chương truyện và từ điển vào `SharedPreferences` dưới dạng chuỗi JSON khổng lồ. Khi truyện đạt vài chục chương hoặc dịch lại làm tăng kích thước vượt quá giới hạn bộ đệm XML của Android (~1.5MB), hệ điều hành sẽ âm thầm hủy bỏ lệnh ghi (`TransactionTooLargeException` / file truncation). Khi mở lại app, file cấu hình bị rỗng nên app tưởng dự án mới tinh và mất trắng!
-> - *Khắc phục:* Chuyển đổi toàn bộ cơ chế lưu trữ dự án sang **Hệ thống tệp tin chuyên biệt (Atomic File Storage)** tại `context.getFilesDir()/projects/<project_id>.json`. Mỗi chương dịch xong được ghi tức thì ra tệp độc lập, có sao lưu dự phòng `.bak`, đảm bảo **BẢO TOÀN DỮ LIỆU VĨNH CỬU 100%**, không bao giờ bị mất dù máy tắt nguồn đột ngột hay khởi động lại.
->
-> **2. Nguyên nhân Crash khi xuất file và phương án sửa triệt để:**
-> - *Nguyên nhân:* App đang gọi trực tiếp `Environment.getExternalStoragePublicDirectory()` mà không qua Scoped Storage API của Android 10+ (Android 11, 12, 13, 14, 15, 16), gây ra lỗi `SecurityException` làm app văng ngay lập tức.
-> - *Khắc phục:* Áp dụng chuẩn **Scoped Storage & MediaStore Downloads / FileProvider / Share Sheet Chooser**. Khi xuất file, app tạo tệp an toàn và mở hộp thoại chọn ứng dụng (Lưu vào Download, Mở bằng Moon+ Reader, Kindle, Gửi qua Zalo, Drive...) **KHÔNG BAO GIỜ CRASH**.
->
-> **3. Hỗ trợ đầy đủ 5 định dạng (1 TXT + 4 Ebook: EPUB, HTML, MOBI, AZW3) cho cả NHẬP và XUẤT:**
-> - Nhập: Tự động nhận diện và bóc tách nội dung từ `.txt`, `.epub`, `.html`, `.mobi`, `.azw3`.
-> - Xuất: Hộp thoại lựa chọn định dạng chuyên nghiệp với 5 lựa chọn (TXT, EPUB có mục lục chuẩn, HTML trang đọc offline sang trọng, MOBI, AZW3 chuẩn Kindle).
+### Lỗi 2: Xử lý lỗi HTTP 503 (Service Unavailable) khi dùng Gemini 3.6 Flash
+- **Phát hiện:** HTTP 503 xuất hiện khi mô hình `gemini-3.6-flash` quá tải tạm thời trên Google API. `GeminiEngine.java` hiện chưa tự động xoay Key và chưa lùi thời gian lặp (exponential backoff), dẫn đến gửi dồn dập và bị từ chối liên tục.
 
 ---
 
-### 1. Kiến Trúc Lưu Trữ Dữ Liệu Mới (Chống Mất Dữ Liệu Vĩnh Cửu)
+## 2. Giải Pháp Thực Hiện
 
-```
-/data/data/com.droidtranslator.app/files/
-  ├── config_global.json         (Key Pool, Thẻ Prompt, Cài đặt chung)
-  └── projects/
-      ├── Dai_Quan_Gia_Ma_Hoang.json       (Dữ liệu dự án)
-      ├── Dai_Quan_Gia_Ma_Hoang.json.bak   (File dự phòng chống ngắt nguồn)
-      └── ...
-```
-- **Tự động lưu (Auto-Flush)**: Ngay khi 1 chương dịch xong $\rightarrow$ Ghi đĩa ngay.
-- **Lifecycle Guard**: Ghi đĩa trong `onPause()`, `onStop()`, `onDestroy()`.
+### Bước 1: Sửa Triệt Để Lỗi Hiển Thị Tên Dự Án Trên Header (`MainActivity.java`)
+- Khai báo 2 biến riêng biệt:
+  - `tvHeaderProjectName` (cho Header Tầng 3).
+  - `tvTab2ProjectName` (cho Tab 2 Card 1).
+- Tạo phương thức tập trung `updateProjectNameUI()`:
+  ```java
+  private void updateProjectNameUI() {
+      if (tvHeaderProjectName != null) {
+          tvHeaderProjectName.setText(currentProjectName + " ▾");
+      }
+      if (tvTab2ProjectName != null) {
+          tvTab2ProjectName.setText("📖 Dự án: " + currentProjectName);
+      }
+  }
+  ```
+- Gọi `updateProjectNameUI()` bất cứ khi nào đổi dự án (`showSwitchProjectDialog`), tạo mới (`showNewProjectDialog`), xóa dự án (`deleteProject`), hoặc mở ứng dụng.
+
+### Bước 2: Nâng Cấp `GeminiEngine.java` với Thuật Toán Exponential Backoff & Key Rotation
+- **Xử lý HTTP 503 / 500 / 502 / 504 / 429:**
+  - Bóc tách nội dung lỗi `error.message` từ Google API để hiển thị log chi tiết.
+  - Tự động gán `COOLDOWN` (20 giây) cho Key bị lỗi để hệ thống lập tức chuyển sang Key tiếp theo trong Pool.
+  - Tính thời gian chờ lùi lũy thừa `(2 ^ attempts) * 1000ms + Jitter (0-500ms)` trước khi gửi request tiếp theo.
+- **Thêm `maxOutputTokens`:** Thêm `genConfig.addProperty("maxOutputTokens", 8192);` cho mô hình Gemini 3.6 Flash.
+
+### Bước 3: Kiểm Tra Biên Dịch & Xác Nhận 100% Không Lỗi
+- Chạy `verify-java-final.mjs` kiểm tra cú pháp 10 file Java.
+- Đồng bộ dữ liệu native qua `scripts/sync-native-project-data.mjs`.
+- Chạy `lint_applet` và `compile_applet`.
 
 ---
 
-### 2. Chi Tiết 5 Định Dạng Nhập / Xuất
-
-| Định dạng | Nhập (Import) | Xuất (Export) |
-| :--- | :--- | :--- |
-| **📄 TXT (Plain Text)** | Hỗ trợ UTF-8, UTF-16, GBK, GB2312 (tự nhận diện bảng mã) | File văn bản phân cách chương rõ ràng |
-| **📚 EPUB (Standard Ebook)** | Giải nén ZIP, phân tích `content.opf`, `toc.ncx` | Đóng gói EPUB chuẩn có TOC mục lục, bìa, CSS căn lề đẹp |
-| **🌐 HTML (Offline Reader)** | Bóc tách thẻ `<p>`, `<br>`, `<h1>-<h6>` | Đóng gói file HTML5 có Menu mục lục bên trái, giao diện Đen/Sáng |
-| **📱 MOBI (Kindle Legacy)** | Trích xuất stream PalmDOC HTML | Đóng gói PalmDOC text/header tương thích máy Kindle cũ |
-| **⚡ AZW3 (Kindle KF8)** | Trích xuất KF8 container | Đóng gói KF8 chuẩn hiển thị mục lục và typography trên Kindle |
-
----
-
-### 3. Kế Hoạch Triển Khai
-1. **Tạo `ProjectStorageManager.java`**: Xây dựng module lưu trữ Atomic File Storage chuyên biệt cho Android.
-2. **Tạo `EbookFormatEngine.java`**: Xử lý giải mã và đóng gói 5 định dạng (TXT, EPUB, HTML, MOBI, AZW3).
-3. **Cập nhật `MainActivity.java`**:
-   - Thay thế toàn bộ code lưu trữ cũ sang `ProjectStorageManager`.
-   - Viết lại hàm xuất file với hộp thoại Modal chọn 5 định dạng + Share Sheet an toàn tuyệt đối.
-   - Thêm bộ lọc file đa định dạng (`.txt`, `.epub`, `.html`, `.htm`, `.mobi`, `.azw3`) khi chọn file truyện gốc.
-4. **Cập nhật Web Preview (`AndroidPhoneSimulator.tsx` / `ebook-parser.ts`)**: Đồng bộ 100% tính năng nhập/xuất 5 định dạng.
-5. **Kiểm thử và xác minh cú pháp**: Chạy `verify-java-final.mjs` và build applet.
+## 3. Kết Quả Dự Kiến
+- Header Tầng 3 và Tab 2 luôn hiển thị đồng bộ 100% đúng tên dự án đang chọn ngay khi chuyển truyện.
+- Dịch thuật và Làm mượt Final qua mô hình **Gemini 3.6 Flash** hoạt động trơn tru, tự động vượt lỗi HTTP 503 bằng cơ chế xoay Key và lùi thời gian thông minh.

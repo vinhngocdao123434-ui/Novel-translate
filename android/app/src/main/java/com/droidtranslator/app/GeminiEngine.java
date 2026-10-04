@@ -48,8 +48,13 @@ public class GeminiEngine {
     }
 
     public boolean testKey(ApiKeyItem item) {
+        return testKey(item, "gemini-3.6-flash");
+    }
+
+    public boolean testKey(ApiKeyItem item, String modelName) {
         try {
-            String testUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + item.key;
+            String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+            String testUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + item.key;
             JsonObject pingObj = new JsonObject();
             JsonArray pingContents = new JsonArray();
             JsonObject pingPartObj = new JsonObject();
@@ -159,9 +164,10 @@ public class GeminiEngine {
                 JsonObject genConfig = new JsonObject();
                 // Nếu ở chế độ cứu hộ, dùng nhiệt độ thấp (0.15) để độ chính xác tuyệt đối, không hallucination
                 genConfig.addProperty("temperature", (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) ? 0.15 : 0.3);
+                genConfig.addProperty("maxOutputTokens", 8192);
                 root.add("generationConfig", genConfig);
 
-                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-2.5-flash";
+                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
                 String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
 
                 RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
@@ -187,12 +193,33 @@ public class GeminiEngine {
                         throw new Exception("Không nhận được nội dung từ Gemini.");
                     }
                 } else {
-                    if (response.code() == 429) {
-                        keyItem.state = "COOLDOWN";
-                        keyItem.cooldownUntil = System.currentTimeMillis() + 60000;
-                        if (logger != null) logger.onLog("⚠️ Key ..." + keyItem.key.substring(Math.max(0, keyItem.key.length() - 6)) + " bị rate limit (429). Đổi Key tiếp theo!");
+                    int statusCode = response.code();
+                    String errorDetail = response.message();
+                    try {
+                        JsonObject errObj = gson.fromJson(respBody, JsonObject.class);
+                        if (errObj != null && errObj.has("error")) {
+                            JsonObject errBody = errObj.getAsJsonObject("error");
+                            if (errBody.has("message")) {
+                                errorDetail = errBody.get("message").getAsString();
+                            }
+                        }
+                    } catch (Exception ignored) {}
+
+                    String keySuffix = keyItem.key.length() > 6 ? keyItem.key.substring(keyItem.key.length() - 6) : keyItem.key;
+
+                    if (statusCode == 429 || statusCode == 503 || statusCode == 500 || statusCode == 502 || statusCode == 504) {
+                        keyItem.state = "COOLDOWN (" + statusCode + ")";
+                        keyItem.cooldownUntil = System.currentTimeMillis() + 20000; // 20s cooldown
+
+                        long backoffMs = (long) (Math.pow(2, Math.min(attempts, 4)) * 1000 + (Math.random() * 500));
+                        if (logger != null) {
+                            logger.onLog("⚠️ [Lỗi HTTP " + statusCode + " - Server Quá Tải / Limit] Key ..." + keySuffix + ": " + errorDetail + ". Tự động xoay Key tiếp theo & chờ lùi " + String.format(Locale.US, "%.1f", backoffMs / 1000.0) + "s...");
+                        }
+                        Thread.sleep(backoffMs);
                     } else {
-                        if (logger != null) logger.onLog("⚠️ Lỗi HTTP " + response.code() + ": " + response.message());
+                        keyItem.state = "ERROR (" + statusCode + ")";
+                        if (logger != null) logger.onLog("⚠️ Lỗi HTTP " + statusCode + " (Key ..." + keySuffix + "): " + errorDetail);
+                        Thread.sleep(1500);
                     }
                 }
             } catch (Exception e) {
