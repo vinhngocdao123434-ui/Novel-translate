@@ -29,50 +29,91 @@ public class ChapterAuditor {
         public boolean hasMildError;
         public String cleanedText;
         public List<String> healedActions = new ArrayList<>();
+        public int hanziCount = 0;
+
+        public String getPrimaryIssue() {
+            if (issues != null && !issues.isEmpty()) {
+                return issues.get(0).message;
+            }
+            return "Chất lượng bản dịch không đạt chuẩn";
+        }
+    }
+
+    public static int countHanziCharacters(String text) {
+        if (text == null) return 0;
+        int count = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            Character.UnicodeBlock block = Character.UnicodeBlock.of(c);
+            if (block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+                    || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public static AuditResult auditChapter(String rawSource, String translatedText, Map<String, String> glossary) {
+        return auditChapter(rawSource, translatedText, glossary, "Tiếng Việt", true);
+    }
+
+    public static AuditResult auditChapter(String rawSource, String translatedText, Map<String, String> glossary, String targetLanguage, boolean antiHanziStrict) {
         AuditResult res = new AuditResult();
         if (translatedText == null || translatedText.trim().isEmpty()) {
             res.isValid = false;
             res.score = 0;
             res.hasCriticalError = true;
             res.cleanedText = "";
-            res.issues.add(new AuditIssue("empty_content", "critical", "Bản dịch trống rỗng."));
+            res.issues.add(new AuditIssue("empty_content", "critical", "Bản dịch trống rỗng"));
             return res;
         }
+
+        // Đo đếm Hán tự thô trước khi phiên âm
+        int rawHanzi = countHanziCharacters(translatedText);
+        res.hanziCount = rawHanzi;
 
         String cleaned = cleanChapterOffline(translatedText, glossary, res.healedActions);
         res.cleanedText = cleaned;
         int score = 100;
 
-        // 1. Kiểm tra AI Refusal
+        // 1. Kiểm tra AI Refusal (Từ chối dịch)
         String lower = cleaned.toLowerCase();
-        if (lower.contains("tôi không thể") || lower.contains("i cannot") || lower.contains("safety guidelines") || lower.contains("content policy")) {
+        if (lower.contains("tôi không thể") || lower.contains("i cannot") || lower.contains("safety guidelines") 
+                || lower.contains("content policy") || lower.contains("chính sách nội dung") || lower.contains("không thể hỗ trợ yêu cầu này")) {
             res.hasCriticalError = true;
-            res.issues.add(new AuditIssue("ai_refusal", "critical", "AI từ chối dịch do chính sách nội dung."));
+            res.issues.add(new AuditIssue("ai_refusal", "critical", "AI từ chối dịch do chính sách nội dung"));
             score -= 90;
         }
 
         // 2. Kiểm tra lặp từ vô tận (Degeneration Loop)
         if (detectRepetitionLoop(cleaned)) {
             res.hasCriticalError = true;
-            res.issues.add(new AuditIssue("repetition_loop", "critical", "Phát hiện suy thoái mô hình (Degeneration loop)."));
+            res.issues.add(new AuditIssue("repetition_loop", "critical", "Phát hiện AI bị kẹt đĩa (lặp câu vô tận)"));
             score -= 60;
         }
 
-        // 3. Kiểm tra độ dài cắt cụt
+        // 3. Kiểm tra độ dài cắt cụt / mất chữ nghiêm trọng
         if (rawSource != null && rawSource.length() > 200) {
             double ratio = (double) cleaned.length() / (double) rawSource.length();
-            if (ratio < 0.30) {
+            if (ratio < 0.40) {
                 res.hasCriticalError = true;
-                res.issues.add(new AuditIssue("length_too_short", "critical", "Nội dung quá ngắn so với bản gốc (< 30%)."));
+                res.issues.add(new AuditIssue("length_too_short", "critical", "Mất chữ nghiêm trọng (chỉ đạt " + (int)(ratio * 100) + "% độ dài bản gốc)"));
                 score -= 50;
             }
         }
 
+        // 4. Kiểm tra lọt quá nhiều chữ Hán thô (nếu ngôn ngữ đích là Tiếng Việt)
+        if (targetLanguage != null && targetLanguage.contains("Việt") && antiHanziStrict) {
+            if (rawHanzi > 8) {
+                res.hasCriticalError = true;
+                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch sót quá nhiều chữ Hán thô (" + rawHanzi + " chữ)"));
+                score -= 40;
+            }
+        }
+
         res.score = Math.max(0, Math.min(100, score));
-        res.isValid = !res.hasCriticalError && res.score >= 50;
+        res.isValid = !res.hasCriticalError && res.score >= 60;
         return res;
     }
 

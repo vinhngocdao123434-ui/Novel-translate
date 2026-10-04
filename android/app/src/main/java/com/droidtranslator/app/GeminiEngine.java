@@ -81,6 +81,10 @@ public class GeminiEngine {
     }
 
     public String[] translateChapter(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, int minTermLength, int minFrequency, LogCallback logger) throws Exception {
+        return translateChapter(chapterText, previousChapterSnippet, systemPrompt, glossary, modelName, targetLanguage, antiHanziStrict, minTermLength, minFrequency, null, logger);
+    }
+
+    public String[] translateChapter(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, int minTermLength, int minFrequency, String rescueInstruction, LogCallback logger) throws Exception {
         int maxRetries = Math.max(keys.size() * 2, 4);
         int attempts = 0;
 
@@ -130,6 +134,11 @@ public class GeminiEngine {
                     promptSb.append("[TARGET JAPANESE]: Translate fluently into natural Japanese, seamlessly incorporating Kanji, Hiragana, and Katakana.").append(nl).append(nl);
                 }
 
+                if (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) {
+                    promptSb.append("[CHỈ THỊ CỨU HỘ KHẨN CẤP / PHẢI SỬA BẢN DỊCH HỎNG LẦN TRƯỚC]:").append(nl);
+                    promptSb.append(rescueInstruction.trim()).append(nl).append(nl);
+                }
+
                 promptSb.append("[QUY TẮC ĐẦU RA BẮT BUỘC]:").append(nl);
                 promptSb.append("===TRANSLATION===").append(nl);
                 promptSb.append("(Toàn bộ bản dịch trôi chảy, bắt đầu ngay bằng tiêu đề chương, không thừa thãi dấu câu)").append(nl);
@@ -148,7 +157,8 @@ public class GeminiEngine {
                 root.add("contents", contents);
 
                 JsonObject genConfig = new JsonObject();
-                genConfig.addProperty("temperature", 0.3);
+                // Nếu ở chế độ cứu hộ, dùng nhiệt độ thấp (0.15) để độ chính xác tuyệt đối, không hallucination
+                genConfig.addProperty("temperature", (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) ? 0.15 : 0.3);
                 root.add("generationConfig", genConfig);
 
                 String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-2.5-flash";

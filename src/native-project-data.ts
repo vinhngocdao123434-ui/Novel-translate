@@ -616,50 +616,91 @@ public class ChapterAuditor {
         public boolean hasMildError;
         public String cleanedText;
         public List<String> healedActions = new ArrayList<>();
+        public int hanziCount = 0;
+
+        public String getPrimaryIssue() {
+            if (issues != null && !issues.isEmpty()) {
+                return issues.get(0).message;
+            }
+            return "Chất lượng bản dịch không đạt chuẩn";
+        }
+    }
+
+    public static int countHanziCharacters(String text) {
+        if (text == null) return 0;
+        int count = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            Character.UnicodeBlock block = Character.UnicodeBlock.of(c);
+            if (block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+                    || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public static AuditResult auditChapter(String rawSource, String translatedText, Map<String, String> glossary) {
+        return auditChapter(rawSource, translatedText, glossary, "Tiếng Việt", true);
+    }
+
+    public static AuditResult auditChapter(String rawSource, String translatedText, Map<String, String> glossary, String targetLanguage, boolean antiHanziStrict) {
         AuditResult res = new AuditResult();
         if (translatedText == null || translatedText.trim().isEmpty()) {
             res.isValid = false;
             res.score = 0;
             res.hasCriticalError = true;
             res.cleanedText = "";
-            res.issues.add(new AuditIssue("empty_content", "critical", "Bản dịch trống rỗng."));
+            res.issues.add(new AuditIssue("empty_content", "critical", "Bản dịch trống rỗng"));
             return res;
         }
+
+        // Đo đếm Hán tự thô trước khi phiên âm
+        int rawHanzi = countHanziCharacters(translatedText);
+        res.hanziCount = rawHanzi;
 
         String cleaned = cleanChapterOffline(translatedText, glossary, res.healedActions);
         res.cleanedText = cleaned;
         int score = 100;
 
-        // 1. Kiểm tra AI Refusal
+        // 1. Kiểm tra AI Refusal (Từ chối dịch)
         String lower = cleaned.toLowerCase();
-        if (lower.contains("tôi không thể") || lower.contains("i cannot") || lower.contains("safety guidelines") || lower.contains("content policy")) {
+        if (lower.contains("tôi không thể") || lower.contains("i cannot") || lower.contains("safety guidelines") 
+                || lower.contains("content policy") || lower.contains("chính sách nội dung") || lower.contains("không thể hỗ trợ yêu cầu này")) {
             res.hasCriticalError = true;
-            res.issues.add(new AuditIssue("ai_refusal", "critical", "AI từ chối dịch do chính sách nội dung."));
+            res.issues.add(new AuditIssue("ai_refusal", "critical", "AI từ chối dịch do chính sách nội dung"));
             score -= 90;
         }
 
         // 2. Kiểm tra lặp từ vô tận (Degeneration Loop)
         if (detectRepetitionLoop(cleaned)) {
             res.hasCriticalError = true;
-            res.issues.add(new AuditIssue("repetition_loop", "critical", "Phát hiện suy thoái mô hình (Degeneration loop)."));
+            res.issues.add(new AuditIssue("repetition_loop", "critical", "Phát hiện AI bị kẹt đĩa (lặp câu vô tận)"));
             score -= 60;
         }
 
-        // 3. Kiểm tra độ dài cắt cụt
+        // 3. Kiểm tra độ dài cắt cụt / mất chữ nghiêm trọng
         if (rawSource != null && rawSource.length() > 200) {
             double ratio = (double) cleaned.length() / (double) rawSource.length();
-            if (ratio < 0.30) {
+            if (ratio < 0.40) {
                 res.hasCriticalError = true;
-                res.issues.add(new AuditIssue("length_too_short", "critical", "Nội dung quá ngắn so với bản gốc (< 30%)."));
+                res.issues.add(new AuditIssue("length_too_short", "critical", "Mất chữ nghiêm trọng (chỉ đạt " + (int)(ratio * 100) + "% độ dài bản gốc)"));
                 score -= 50;
             }
         }
 
+        // 4. Kiểm tra lọt quá nhiều chữ Hán thô (nếu ngôn ngữ đích là Tiếng Việt)
+        if (targetLanguage != null && targetLanguage.contains("Việt") && antiHanziStrict) {
+            if (rawHanzi > 8) {
+                res.hasCriticalError = true;
+                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch sót quá nhiều chữ Hán thô (" + rawHanzi + " chữ)"));
+                score -= 40;
+            }
+        }
+
         res.score = Math.max(0, Math.min(100, score));
-        res.isValid = !res.hasCriticalError && res.score >= 50;
+        res.isValid = !res.hasCriticalError && res.score >= 60;
         return res;
     }
 
@@ -805,6 +846,10 @@ public class GeminiEngine {
     }
 
     public String[] translateChapter(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, int minTermLength, int minFrequency, LogCallback logger) throws Exception {
+        return translateChapter(chapterText, previousChapterSnippet, systemPrompt, glossary, modelName, targetLanguage, antiHanziStrict, minTermLength, minFrequency, null, logger);
+    }
+
+    public String[] translateChapter(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, int minTermLength, int minFrequency, String rescueInstruction, LogCallback logger) throws Exception {
         int maxRetries = Math.max(keys.size() * 2, 4);
         int attempts = 0;
 
@@ -854,6 +899,11 @@ public class GeminiEngine {
                     promptSb.append("[TARGET JAPANESE]: Translate fluently into natural Japanese, seamlessly incorporating Kanji, Hiragana, and Katakana.").append(nl).append(nl);
                 }
 
+                if (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) {
+                    promptSb.append("[CHỈ THỊ CỨU HỘ KHẨN CẤP / PHẢI SỬA BẢN DỊCH HỎNG LẦN TRƯỚC]:").append(nl);
+                    promptSb.append(rescueInstruction.trim()).append(nl).append(nl);
+                }
+
                 promptSb.append("[QUY TẮC ĐẦU RA BẮT BUỘC]:").append(nl);
                 promptSb.append("===TRANSLATION===").append(nl);
                 promptSb.append("(Toàn bộ bản dịch trôi chảy, bắt đầu ngay bằng tiêu đề chương, không thừa thãi dấu câu)").append(nl);
@@ -872,7 +922,8 @@ public class GeminiEngine {
                 root.add("contents", contents);
 
                 JsonObject genConfig = new JsonObject();
-                genConfig.addProperty("temperature", 0.3);
+                // Nếu ở chế độ cứu hộ, dùng nhiệt độ thấp (0.15) để độ chính xác tuyệt đối, không hallucination
+                genConfig.addProperty("temperature", (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) ? 0.15 : 0.3);
                 root.add("generationConfig", genConfig);
 
                 String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-2.5-flash";
@@ -1238,6 +1289,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnLangEn;
     private Button btnLangKo;
     private Button btnSettingsAntiHanzi;
+    private Button btnSettingsAutoHeal;
     private Button btnSettingsPolicy;
     private final List<Button> minTermButtons = new ArrayList<>();
     private final List<Button> minFreqButtons = new ArrayList<>();
@@ -1259,6 +1311,7 @@ public class MainActivity extends AppCompatActivity {
     private int minFrequency = 2;
     private String conflictPolicy = "keep-old";
     private boolean antiHanziStrict = true;
+    private boolean autoHealOnlineEnabled = true;
     private String targetLanguage = "Tiếng Việt";
     private int cooldownSeconds = 60;
     private String rotationStrategy = "round-robin";
@@ -1377,6 +1430,7 @@ public class MainActivity extends AppCompatActivity {
             editor.putInt("min_frequency", minFrequency);
             editor.putString("conflict_policy", conflictPolicy);
             editor.putBoolean("anti_hanzi_strict", antiHanziStrict);
+            editor.putBoolean("auto_heal_online", autoHealOnlineEnabled);
             editor.putString("target_language", targetLanguage);
             editor.putInt("cooldown_seconds", cooldownSeconds);
             editor.putString("rotation_strategy", rotationStrategy);
@@ -1513,6 +1567,7 @@ public class MainActivity extends AppCompatActivity {
             minFrequency = sp.getInt("min_frequency", 2);
             conflictPolicy = sp.getString("conflict_policy", "keep-old");
             antiHanziStrict = sp.getBoolean("anti_hanzi_strict", true);
+            autoHealOnlineEnabled = sp.getBoolean("auto_heal_online", true);
             targetLanguage = sp.getString("target_language", "Tiếng Việt");
             cooldownSeconds = sp.getInt("cooldown_seconds", 60);
             rotationStrategy = sp.getString("rotation_strategy", "round-robin");
@@ -2892,6 +2947,8 @@ public class MainActivity extends AppCompatActivity {
                     );
 
                     String translatedText = result[0];
+                    String newGlossaryRaw = (result.length > 1) ? result[1] : "";
+
                     // Lớp 2: Hậu kiểm Regex chống lọt chữ Hán cho bản dịch tiếng Việt
                     if (targetLanguage.contains("Việt") && antiHanziStrict) {
                         List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(masterGlossary.entrySet());
@@ -2901,15 +2958,88 @@ public class MainActivity extends AppCompatActivity {
                                 translatedText = translatedText.replace(gEntry.getKey(), gEntry.getValue());
                             }
                         }
-                        translatedText = GeminiEngine.cleanTranslatedText(translatedText);
+                    }
+
+                    // TẦNG KIỂM ĐỊNH NGOẠI TUYẾN (Offline Quality Audit)
+                    ChapterAuditor.AuditResult audit = ChapterAuditor.auditChapter(
+                            rawChapters.get(chapIndex),
+                            translatedText,
+                            masterGlossary,
+                            targetLanguage,
+                            antiHanziStrict
+                    );
+
+                    // TỰ ĐỘNG ĐẨY LÊN ONLINE DỊCH LẠI & GHI ĐÈ NẾU BẢN DỊCH BỊ LỖI NẶNG
+                    if (autoHealOnlineEnabled && !audit.isValid && audit.hasCriticalError) {
+                        final String primaryIssue = audit.getPrimaryIssue();
+                        mainHandler.post(() -> appendLog("⚠️ [PHÁT HIỆN LỖI NẶNG] Chương " + (chapIndex + 1) + ": " + primaryIssue + ". Đang đẩy lên AI dịch lại (Auto-Heal Online)..."));
+
+                        String rescuePrompt = "LỆNH CỨU HỘ ĐẶC BIỆT: Bản dịch trước bị lỗi nghiêm trọng [" + primaryIssue + "]. "
+                                + "YÊU CẦU DỊCH LẠI TOÀN BỘ: Dịch trọn vẹn chương sau sang " + targetLanguage + " đầy đủ 100%, tuyệt đối không tóm tắt, không bỏ sót câu chữ nào, không để sót chữ Hán thô trong câu văn, không lặp lại câu vô nghĩa.";
+
+                        try {
+                            String[] rescueResult = engine.translateChapter(
+                                    rawChapters.get(chapIndex),
+                                    prevSnippet,
+                                    activePrompt,
+                                    masterGlossary,
+                                    currentModel,
+                                    targetLanguage,
+                                    antiHanziStrict,
+                                    minTermLength,
+                                    minFrequency,
+                                    rescuePrompt,
+                                    msg -> mainHandler.post(() -> appendLog(msg))
+                            );
+
+                            String rescueTranslated = rescueResult[0];
+                            if (targetLanguage.contains("Việt") && antiHanziStrict) {
+                                List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(masterGlossary.entrySet());
+                                sortedEntries.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+                                for (Map.Entry<String, String> gEntry : sortedEntries) {
+                                    if (rescueTranslated.contains(gEntry.getKey())) {
+                                        rescueTranslated = rescueTranslated.replace(gEntry.getKey(), gEntry.getValue());
+                                    }
+                                }
+                            }
+
+                            ChapterAuditor.AuditResult rescueAudit = ChapterAuditor.auditChapter(
+                                    rawChapters.get(chapIndex),
+                                    rescueTranslated,
+                                    masterGlossary,
+                                    targetLanguage,
+                                    antiHanziStrict
+                            );
+
+                            if (rescueAudit.isValid || rescueAudit.score > audit.score) {
+                                translatedText = rescueAudit.cleanedText;
+                                if (rescueResult.length > 1 && rescueResult[1] != null && !rescueResult[1].trim().isEmpty()) {
+                                    newGlossaryRaw = rescueResult[1];
+                                }
+                                final int finalScore = rescueAudit.score;
+                                mainHandler.post(() -> appendLog("🎯 [CỨU HỘ THÀNH CÔNG] Chương " + (chapIndex + 1) + " đã được dịch lại chuẩn (Điểm: " + finalScore + "/100). Ghi đè vào bộ nhớ!"));
+                            } else {
+                                translatedText = audit.cleanedText;
+                                mainHandler.post(() -> appendLog("🛡️ [CỨU HỘ NGOẠI TUYẾN] Dùng bản vá sạch ngoại tuyến cho Chương " + (chapIndex + 1) + "."));
+                            }
+                        } catch (Exception exRescue) {
+                            translatedText = audit.cleanedText;
+                            mainHandler.post(() -> appendLog("🛡️ [LỖI MẠNG CỨU HỘ] Dùng bản vá sạch ngoại tuyến cho Chương " + (chapIndex + 1) + ": " + exRescue.getMessage()));
+                        }
+                    } else {
+                        translatedText = audit.cleanedText;
+                        if (!audit.healedActions.isEmpty()) {
+                            final String actions = String.join(", ", audit.healedActions);
+                            mainHandler.post(() -> appendLog("🧹 [TỰ VÁ OFFLINE] Chương " + (chapIndex + 1) + ": Đã " + actions));
+                        }
                     }
 
                     translatedChapters.put(chapIndex, translatedText);
 
                     // Bóc tách thuật ngữ mới tuân thủ minTermLength, minFrequency và conflictPolicy
                     List<GlossaryManager.GlossaryEntry> newlyAdded = new ArrayList<>();
-                    if (result.length > 1 && result[1] != null && !result[1].trim().isEmpty()) {
-                        newlyAdded = GlossaryManager.mergeNewEntries(masterGlossary, result[1], rawChapters.get(chapIndex), minTermLength, minFrequency, conflictPolicy);
+                    if (newGlossaryRaw != null && !newGlossaryRaw.trim().isEmpty()) {
+                        newlyAdded = GlossaryManager.mergeNewEntries(masterGlossary, newGlossaryRaw, rawChapters.get(chapIndex), minTermLength, minFrequency, conflictPolicy);
                     }
 
                     saveCurrentProjectData(); // Lưu bền vững vào ổ nhớ ngay lập tức sau mỗi chương!
@@ -3382,8 +3512,12 @@ public class MainActivity extends AppCompatActivity {
         updateMinFreqButtonStyles();
 
         if (btnSettingsAntiHanzi != null) {
-            btnSettingsAntiHanzi.setText("Bộ Lọc 2 Lớp Chống Chữ Hán: " + (antiHanziStrict ? "BẬT [Lớp 1 + Lớp 2]" : "TẮT"));
+            btnSettingsAntiHanzi.setText("Bộ Lọc 2 Lớp Chống Chữ Hán: " + (antiHanziStrict ? "🟢 BẬT [Lớp 1 + Lớp 2]" : "⚪ TẮT"));
             btnSettingsAntiHanzi.setBackground(createButtonDrawable(antiHanziStrict ? "#059669" : "#374151", 18f));
+        }
+        if (btnSettingsAutoHeal != null) {
+            btnSettingsAutoHeal.setText("Tự Động Dịch Lại Khi Lỗi Nặng: " + (autoHealOnlineEnabled ? "🟢 BẬT [Auto-Heal Online]" : "⚪ TẮT"));
+            btnSettingsAutoHeal.setBackground(createButtonDrawable(autoHealOnlineEnabled ? "#0D9488" : "#374151", 18f));
         }
         if (btnSettingsPolicy != null) {
             btnSettingsPolicy.setText("Xung Đột Nghĩa: " + ("keep-old".equals(conflictPolicy) ? "Giữ Cũ - Bỏ Mới (Bảo toàn)" : "Ghi Đè Bằng Nghĩa Mới"));
@@ -3396,6 +3530,11 @@ public class MainActivity extends AppCompatActivity {
         boolean isJa = targetLanguage.contains("Nhật") || targetLanguage.contains("日本語");
         boolean isEn = targetLanguage.equalsIgnoreCase("English");
         boolean isKo = targetLanguage.contains("Hàn") || targetLanguage.contains("한국어");
+
+        btnLangVi.setText((isVi ? "✓ " : "") + "Tiếng Việt");
+        btnLangJa.setText((isJa ? "✓ " : "") + "日本語");
+        btnLangEn.setText((isEn ? "✓ " : "") + "English");
+        btnLangKo.setText((isKo ? "✓ " : "") + "한국어");
 
         btnLangVi.setBackground(createButtonDrawable(isVi ? "#2563EB" : "#1E293B", 18f));
         btnLangJa.setBackground(createButtonDrawable(isJa ? "#2563EB" : "#1E293B", 18f));
@@ -3721,7 +3860,7 @@ public class MainActivity extends AppCompatActivity {
 
         cardTrans.addView(rowLangs);
 
-        btnSettingsAntiHanzi = createButton("Bộ Lọc 2 Lớp Chống Chữ Hán: " + (antiHanziStrict ? "BẬT [Lớp 1 + Lớp 2]" : "TẮT"), antiHanziStrict ? "#059669" : "#374151");
+        btnSettingsAntiHanzi = createButton("Bộ Lọc 2 Lớp Chống Chữ Hán: " + (antiHanziStrict ? "🟢 BẬT [Lớp 1 + Lớp 2]" : "⚪ TẮT"), antiHanziStrict ? "#059669" : "#374151");
         btnSettingsAntiHanzi.setOnClickListener(v -> {
             antiHanziStrict = !antiHanziStrict;
             saveAllState();
@@ -3729,6 +3868,18 @@ public class MainActivity extends AppCompatActivity {
             appendLog("⚙️ Bộ lọc chống lọt chữ Hán: " + (antiHanziStrict ? "BẬT" : "TẮT"));
         });
         cardTrans.addView(btnSettingsAntiHanzi);
+
+        View spBetween = new View(this);
+        cardTrans.addView(spBetween, new LinearLayout.LayoutParams(1, 10));
+
+        btnSettingsAutoHeal = createButton("Tự Động Dịch Lại Khi Lỗi Nặng: " + (autoHealOnlineEnabled ? "🟢 BẬT [Auto-Heal Online]" : "⚪ TẮT"), autoHealOnlineEnabled ? "#0D9488" : "#374151");
+        btnSettingsAutoHeal.setOnClickListener(v -> {
+            autoHealOnlineEnabled = !autoHealOnlineEnabled;
+            saveAllState();
+            refreshSettingsUI();
+            appendLog("⚙️ Cơ chế Tự Động Dịch Lại & Ghi Đè khi lỗi nặng: " + (autoHealOnlineEnabled ? "BẬT" : "TẮT"));
+        });
+        cardTrans.addView(btnSettingsAutoHeal);
 
         content.addView(cardTrans);
 
