@@ -12,36 +12,72 @@ export const NATIVE_PROJECT_FILES: ProjectFileEntry[] = [
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, '**' ]
+    tags:
+      - 'v*'
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    name: Build Debug APK
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-    - name: Setup Gradle 8.9
-      uses: gradle/actions/setup-gradle@v4
-      with:
-        gradle-version: '8.9'
+      - name: Setup Gradle 8.4
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.4'
+          build-root-directory: android
+          cache-disabled: true
 
-    - name: Build Debug APK
-      run: gradle assembleDebug --no-daemon
+      - name: Grant Execute Permission to Gradle Wrapper
+        run: chmod +x android/gradlew
 
-    - name: Upload DroidTranslator APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: DroidTranslator-APK
-        path: app/build/outputs/apk/debug/*.apk
+      - name: Build Debug APK with Gradle Wrapper
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Locate Generated APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: APK not found!"
+            exit 1
+          fi
+          echo "Found APK: $APK_PATH"
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidTranslator-Debug-APK
+          path: \${{ steps.find_apk.outputs.apk_path }}
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: \${{ steps.find_apk.outputs.apk_path }}
+          name: Release \${{ github.ref_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 `
   },
 
@@ -64,25 +100,12 @@ org.gradle.daemon=false
     path: 'build.gradle',
     language: 'groovy',
     description: 'Root build.gradle chuẩn hóa không dính plugin rườm rà',
-    content: `buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.5.2'
-    }
+    content: `plugins {
+    id 'com.android.application' version '8.3.2' apply false
 }
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
 }
 `
   },
