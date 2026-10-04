@@ -1,12 +1,14 @@
 package com.droidtranslator.app;
 
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -16,6 +18,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import com.droidtranslator.app.engine.HanziSweeperEngine;
@@ -36,63 +39,590 @@ import java.util.*;
 
 public class MainActivity extends AppCompatActivity {
 
-    private void showHowToUseDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("📖 CẨM NANG HƯỚNG DẪN TỪ A ĐẾN Z");
-        String nl = String.valueOf((char) 10);
-        
-        String message = 
-            "1. LẤY VÀ NẠP API KEY MIỄN PHÍ:" + nl +
-            "• Lấy tại: aistudio.google.com -> Bấm 'Get API key' -> Copy." + nl +
-            "• MẸO HAY: Mỗi tài khoản Google được 15 lượt/phút. Bạn NÊN DÙNG 2 - 5 TÀI KHOẢN GOOGLE để lấy 2 - 5 key nạp vào app. App sẽ tự động xoay tua từng key, giúp bạn dịch hàng ngàn chương liên tục không bao giờ bị nghẽn mạng!" + nl + nl +
-            "2. TẠO DỰ ÁN & NẠP FILE TRUYỆN:" + nl +
-            "• Bấm 'Dự Án' để tạo truyện mới." + nl +
-            "• Nạp file .txt hoặc .epub truyện tiếng Trung thô vào. App tự động chia chương chuẩn xác." + nl + nl +
-            "3. CHỌN KHOẢNG CHƯƠNG & CHỌN MODEL:" + nl +
-            "• Khuyên dùng cho truyện dài (>10MB): Gemini 2.5 Flash-Lite hoặc 3.5 Flash-Lite vì tốc độ siêu nhanh và không lo chạm hạn mức. Các lỗi nhỏ sẽ được hệ thống cứu hộ tự vá mượt đạt 9/10." + nl +
-            "• Gemini 2.5 Flash / 3.6 Flash: Dành cho dịch đoạn ngắn trau chuốt." + nl + nl +
-            "4. CÀI ĐẶT ẢNH HƯỞNG CHẤT LƯỢNG:" + nl +
-            "• Độ dài Glossary tối thiểu (2-4 ký tự): Lọc bỏ từ rác 1 chữ, chỉ lưu tên nhân vật." + nl +
-            "• Tần suất tối thiểu (2 lần): Chỉ lưu từ quan trọng." + nl +
-            "• Bật Chống Lọt Chữ Hán Nghiêm Ngặt & Tự Động Cứu Hộ Online để ép bản dịch 100% tiếng Việt." + nl + nl +
-            "5. XỬ LÝ KHI LỌT CHƯƠNG THIẾU:" + nl +
-            "• Bật 'Dịch bù chương thiếu' và bấm Dịch tiếp. App sẽ tự lướt qua chương đã có và chỉ dịch chương còn thiếu." + nl + nl +
-            "6. LÀM MƯỢT FINAL & XUẤT FILE:" + nl +
-            "• Bấm 'Làm Mượt Final' sau khi dịch xong toàn bộ." + nl +
-            "• Bấm 'Xuất Toàn Văn (.txt)' để nạp vào máy đọc sách hoặc app đọc truyện.";
+    private int dp(float dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
+    }
 
-        builder.setMessage(message);
-        builder.setPositiveButton("ĐÃ HIỂU", (d, w) -> d.dismiss());
-        builder.show();
+    private static class HelpData {
+        final String title;
+        final String category;
+        final String whatIsIt;
+        final String howToUse;
+        final String proTip;
+
+        HelpData(String title, String category, String whatIsIt, String howToUse, String proTip) {
+            this.title = title;
+            this.category = category;
+            this.whatIsIt = whatIsIt;
+            this.howToUse = howToUse;
+            this.proTip = proTip;
+        }
+    }
+
+    private final Map<String, HelpData> helpMap = new HashMap<>();
+
+    private void initHelpMap() {
+        if (!helpMap.isEmpty()) return;
+        helpMap.put("select_model", new HelpData(
+            "Lựa Chọn Model Dịch (Mô Hình AI)",
+            "Cấu Hình Động Cơ AI",
+            "Chọn bộ não AI của Google để thực hiện dịch thuật toàn văn tác phẩm.",
+            "• Gemini 2.5 Flash-Lite / 3.5 Flash-Lite: Khuyên dùng cho truyện dài (>10MB). Tốc độ siêu nhanh, hạn ngạch dồi dào không lo nghẽn mạng. Hệ thống tự động cứu hộ sẽ vá mượt bản dịch đạt 9/10 điểm.\n• Gemini 2.5 Flash / 3.6 Flash: Dành cho dịch đoạn ngắn cần độ trau chuốt tuyệt đối.",
+            "Bạn cũng có thể nhập mã Model ID tùy biến của Google vào ô bên cạnh rồi bấm 'Dùng Model Này'."
+        ));
+        helpMap.put("model_selection", helpMap.get("select_model"));
+
+        helpMap.put("key_pool", new HelpData(
+            "Multi-Key Gemini Pool (Kho Chìa Khóa API)",
+            "Quản Lý Khóa API",
+            "Nơi lưu trữ danh sách API Key Google Gemini của bạn. Ứng dụng sẽ tự động luân phiên đổi chìa khóa khi dịch để không bao giờ bị nghẽn mạng hay chạm Rate Limit 429.",
+            "• Dán API key (mỗi dòng 1 key, hỗ trợ dán hàng loạt) rồi bấm 'Thêm API Key Vào Pool'.\n• Bấm 'Test Tất Cả' để kiểm tra kết nối và hạn mức từng key.\n• Có thể xóa hoặc test riêng lẻ từng key trong danh sách.",
+            "NÊN DÙNG 2 - 5 TÀI KHOẢN GOOGLE để lấy 2 - 5 key nạp vào, giúp bạn dịch một mạch hàng nghìn chương liên tục!"
+        ));
+
+        helpMap.put("prompt_cards", new HelpData(
+            "Thẻ Phong Cách Dịch (Prompt Cards)",
+            "Văn Phong Dịch Thuật",
+            "Quyết định văn phong bản dịch (Tiên hiệp cổ trang, Đô thị hiện đại, Kiếm hiệp kiếm khí...).",
+            "• Nhấn vào thẻ phong cách để kích hoạt.\n• Bấm '+ Thêm Prompt' để tạo phong cách dịch theo sở thích của riêng bạn.\n• Chạm vào thẻ để xem hoặc chỉnh sửa nội dung prompt chi tiết.",
+            "Có thể tạo prompt riêng biệt cho từng thể loại truyện để câu từ mượt mà, đúng chuẩn nhất."
+        ));
+
+        helpMap.put("novel_raw_input", new HelpData(
+            "Mục 1: Nhập & Bóc Tách File Truyện Gốc",
+            "Nạp & Phân Tích File",
+            "Khu vực đưa truyện tiếng Trung thô vào và chia nhỏ thành từng chương để AI xử lý.",
+            "• Chọn File .txt / .epub: Bấm để nạp file truyện từ bộ nhớ điện thoại vào app.\n• Tách Tác Giả (Regex): Tự động nhận diện dòng tiêu đề chương (第一章, 第1章, Chương 1, Hồi thứ 1...) để cắt chuẩn y như sách in. Khuyên dùng cho 95% truyện mạng.\n• Tách Theo Ký Tự: Cắt đều đặn theo số ký tự (2000, 3000, 3500 ký tự). Dành cho truyện ngắn hoặc file thô bị mất dòng tiêu đề chương.\n• Đổi Truyện / Dự Án Mới: Quản lý nhiều bộ truyện độc lập mà không bị đè dữ liệu.",
+            "Độ dài tối ưu nhất cho AI dịch mượt là khoảng 3.000 - 3.500 ký tự mỗi chương."
+        ));
+
+        helpMap.put("range_progress", new HelpData(
+            "Mục 2: Tiến Độ Dịch Thuật & Điều Khiển",
+            "Tiến Trình Dịch",
+            "Trung tâm điều khiển toàn bộ quá trình dịch thuật của bộ truyện.",
+            "• Từ chương -> Đến chương: Nhập khoảng chương bạn muốn dịch (ví dụ: từ 1 đến 50).\n• Dịch Range: Khởi động quá trình dịch tự động tuần tự từng chương.\n• Tạm dừng / Tiếp tục: Dừng tạm thời khi có việc bận mà không làm mất chương đang dịch dở.\n• Hủy: Dừng hẳn tiến trình dịch an toàn.\n• ⚡ Dịch Bù Chương Sót: Tự động quét kiểm tra, phát hiện chương nào bị mất mạng/chưa dịch để dịch bù, và TỰ ĐỘNG BỎ QUA 100% các chương đã dịch xong.\n• ✨ Làm Mượt Bản Dịch Final: Khâu quét sạch toàn bộ chữ Hán và từ lai còn sót lại trong toàn tác phẩm sau khi bạn đã dịch xong.",
+            "Nếu truyện dài, hãy dịch theo từng đợt 50 - 100 chương để dễ kiểm soát và lưu trữ."
+        ));
+
+        helpMap.put("master_glossary", new HelpData(
+            "Mục 3: Kho Thuật Ngữ Master Glossary",
+            "Từ Điển Tác Phẩm",
+            "Bộ từ điển độc lập của tác phẩm, lưu giữ danh sách tên nhân vật, môn phái, chiêu thức, địa danh (VD: 林辰 = Lâm Thần).",
+            "• Đảm bảo nhân vật giữ đúng một tên gọi xuyên suốt từ chương đầu đến chương cuối.\n• Thêm nhanh: Nhập 'Từ gốc' và 'Nghĩa dịch' rồi bấm '+ Thêm Từ'.\n• Nạp / Xuất .txt: Nhập hoặc xuất file từ điển dạng txt (raw=vi) để sao lưu hoặc chia sẻ.\n• Danh sách hiển thị trực tiếp bên dưới với nút Xóa từng từ.",
+            "Nên kết hợp bật chức năng AI Auto-Learn ở Tab Cài đặt để AI tự động trích xuất nhân vật mới vào kho này."
+        ));
+
+        helpMap.put("chapter_auditor", new HelpData(
+            "Kho Chương Đã Dịch & Trình Đọc AMOLED",
+            "Đọc & Kiểm Tra Chất Lượng",
+            "Không gian quản lý các chương đã dịch xong kèm Trình đọc toàn màn hình AMOLED/Sepia chống mỏi mắt.",
+            "• Chạm vào bất kỳ chương nào trong danh sách để mở Trình Đọc Toàn Màn Hình.\n• Hỗ trợ 3 chế độ hiển thị: Bản Dịch, Song Ngữ (Đối Chiếu Trung-Việt) và Bản Gốc.\n• Đổi màu nền (AMOLED Đen Sâu, Sepia Dịu Mắt, Sáng) và cỡ chữ tùy ý.\n• Nút 'Dịch lại' trong từng chương giúp AI làm lại riêng chương đó nếu chưa ưng ý.\n• Phân trang 100 chương/trang chống giật lag khi truyện có hàng nghìn chương.",
+            "Chế độ Song Ngữ cực kỳ hữu ích để bạn đối chiếu câu chữ gốc khi gặp đoạn dịch khó hiểu."
+        ));
+
+        helpMap.put("settings_projects_manager", new HelpData(
+            "1. Quản Lý & Lưu Trữ Đa Dự Án Truyện",
+            "Quản Lý Tác Phẩm",
+            "Quản lý nhiều bộ truyện độc lập cùng lúc trên một thiết bị mà không bị lẫn lộn dữ liệu.",
+            "• Mỗi dự án lưu giữ riêng biệt: toàn bộ các chương thô, bản dịch đã hoàn thành và từ điển Master Glossary riêng của bộ đó.\n• Bấm 'Chuyển Dự Án' để tiếp tục dịch hoặc đọc một bộ truyện khác.\n• Bấm '+ Tạo Mới' để bắt đầu một bộ truyện mới.\n• Nút 'Xóa Vĩnh Viễn Dự Án': Chỉ xóa nội dung của bộ truyện đang chọn. Kho Key API và các Thẻ Prompt ở Tab 1 được bảo toàn vĩnh cửu 100%!",
+            "Bạn có thể lưu trữ hàng chục bộ truyện cùng lúc mà không lo mất dữ liệu."
+        ));
+
+        helpMap.put("settings_glossary_learning", new HelpData(
+            "2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)",
+            "Bộ Lọc & Quản Lý Từ Điển",
+            "Bộ quy chuẩn chất lượng để AI tự động lọc và thu thập tên nhân vật, chiêu thức, địa danh từ bản dịch vào Master Glossary.",
+            "• Độ dài chữ Hán tối thiểu: Khuyên để 2 đến 4 ký tự. Ngăn AI tự ý đưa các từ 1 chữ (hắn, nàng, đi, đến...) vào từ điển làm rác văn bản.\n• Tần suất tối thiểu: Đặt >= 2 lần để chỉ ghi nhớ các nhân vật/địa danh quan trọng xuất hiện lặp lại trong chương.\n• Chính sách xung đột (Conflict Policy): 'Giữ Cũ - Bỏ Mới' (Khuyên dùng) giúp cố định tên nhân vật ban đầu, tránh việc cùng một nhân vật bị đổi tên lộn xộn ở các chương sau.",
+            "Chính sách 'Giữ Cũ - Bỏ Mới' là chìa khóa vàng giúp toàn bộ 1000 chương truyện thống nhất tên gọi."
+        ));
+
+        helpMap.put("settings_translation_anti_hanzi", new HelpData(
+            "3. Cài Đặt Dịch Thuật & Chống Lọt Chữ Hán",
+            "Chất Lượng Bản Dịch & Đa Ngôn Ngữ",
+            "Kiểm soát ngôn ngữ dịch đầu ra và hệ thống phòng thủ chống sót chữ Hán 2 lớp (Dual-Layer Guard).",
+            "• Ngôn ngữ đích: Chọn Tiếng Việt, Tiếng Nhật, Tiếng Anh hoặc Tiếng Hàn.\n• Bộ lọc chống lọt chữ Hán 2 lớp:\n  - Lớp 1 (Ép khuôn Prompt): Cấm AI sinh chữ tượng hình Hán trong câu trả lời.\n  - Lớp 2 (Hậu kiểm Regex): Tự động quét regex [\\u4e00-\\u9fa5] để chuyển đổi triệt để sang âm Hán-Việt chuẩn, bản dịch sạch 100% tiếng Việt!\n• Tự Động Dịch Lại Khi Lỗi Nặng: Tự động gửi yêu cầu dịch lại nếu AI bị kẹt hoặc đứt mạng.",
+            "Nếu chọn ngôn ngữ đích là Tiếng Nhật, app sẽ tự động thả lỏng để AI sinh chữ Kanji tự nhiên."
+        ));
+
+        helpMap.put("settings_god_mode", new HelpData(
+            "4. Kiểm Soát 5 Lớp Chạy Ngầm (God-Mode)",
+            "Độ Bền Bỉ Hệ Thống Android",
+            "Kiến trúc dịch ngầm độc quyền giúp ứng dụng dịch liên tục hàng nghìn chương ngay cả khi tắt màn hình, khóa máy hoặc máy ít RAM.",
+            "• Lớp 1 (Foreground Service): Hiển thị tiến trình dịch liên tục trên thanh thông báo hệ thống.\n• Lớp 2 (CPU WakeLock): Giữ chip xử lý chạy ngầm, chống Deep Sleep khi tắt màn hình.\n• Lớp 3 (Bỏ qua tối ưu pin Doze Mode): Miễn nhiễm với cơ chế tự ngắt ứng dụng của Android.\n• Lớp 4 (WorkManager Watchdog): Tự động kiểm tra và hồi sinh tiến trình sau 15 giây nếu bị Android vô tình giải phóng RAM.\n• Lớp 5 (Root OOM Score -1000): Thiết lập độ ưu tiên tối thượng tương đương tiến trình nhân hệ thống (dành cho máy Root).",
+            "Bạn hoàn toàn có thể cắm sạc, khóa màn hình và đi ngủ, sáng dậy sẽ có hàng trăm chương truyện đã dịch xong!"
+        ));
+
+        helpMap.put("settings_api_rotation", new HelpData(
+            "5. Cấu Hình Model Làm Mượt Final & Độ Trễ",
+            "Động Cơ Xử Lý Nâng Cao",
+            "Cấu hình model phục vụ khâu rà soát văn phong cuối cùng và độ trễ an toàn giữa các chương.",
+            "• Model làm mượt Final: Khuyên dùng Gemini 3.6 Flash hoặc Gemini 2.5 Flash để rà soát lại ngữ pháp, khử sạch chữ Hán sót lại.\n• Độ trễ an toàn giữa các chương: Đặt từ 1 đến 3 giây để giãn cách các lượt gọi API, chống bị hệ thống Google đánh dấu nghi ngờ spam.",
+            "Sau khi dịch trọn bộ truyện, chạy Làm Mượt Final một lần sẽ nâng tầm toàn văn tác phẩm lên chất lượng xuất bản."
+        ));
+
+        helpMap.put("export_full_txt", new HelpData(
+            "Xuất Toàn Văn Tác Phẩm (.txt)",
+            "Xuất Dữ Liệu Hoàn Tất",
+            "Gộp toàn bộ tất cả các chương đã dịch thành một file văn bản hoàn chỉnh (.txt) duy nhất.",
+            "• Bấm nút '📥 Xuất Toàn Văn Tác Phẩm (.txt)' để lưu file vào thư mục Download của thiết bị.\n• File sau khi xuất có tiêu đề rõ ràng, phân cách từng chương chuẩn mực.\n• Sẵn sàng để copy vào máy đọc sách Kindle, Kobo hoặc mở bằng bất kỳ ứng dụng đọc sách nào trên điện thoại.",
+            "File xuất ra mã hóa UTF-8 chuẩn 100%, không bị lỗi font trên bất kỳ thiết bị nào."
+        ));
+    }
+
+    private View createStepCard(int stepNum, String title, String accentHex, String contentText, String proTip) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#121212"));
+        bg.setCornerRadius(dp(16));
+        bg.setStroke(dp(1.2f), Color.parseColor(accentHex));
+        card.setBackground(bg);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 0, 0, dp(12));
+        card.setLayoutParams(lp);
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvBadge = new TextView(this);
+        tvBadge.setText(String.valueOf(stepNum));
+        tvBadge.setTextColor(Color.parseColor(accentHex));
+        tvBadge.setTextSize(12);
+        tvBadge.setTypeface(null, Typeface.BOLD);
+        tvBadge.setGravity(Gravity.CENTER);
+        GradientDrawable badgeBg = new GradientDrawable();
+        badgeBg.setColor(Color.parseColor("#1F2937"));
+        badgeBg.setCornerRadius(dp(20));
+        badgeBg.setStroke(dp(1), Color.parseColor(accentHex));
+        tvBadge.setBackground(badgeBg);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(dp(22), dp(22));
+        blp.rightMargin = dp(8);
+        tvBadge.setLayoutParams(blp);
+        head.addView(tvBadge);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(Color.parseColor(accentHex));
+        tvTitle.setTextSize(13);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        head.addView(tvTitle);
+        card.addView(head);
+
+        TextView tvContent = new TextView(this);
+        tvContent.setText(contentText);
+        tvContent.setTextColor(Color.parseColor("#E5E7EB"));
+        tvContent.setTextSize(12);
+        tvContent.setLineSpacing(dp(2), 1.15f);
+        tvContent.setPadding(0, dp(8), 0, 0);
+        card.addView(tvContent);
+
+        if (proTip != null && !proTip.isEmpty()) {
+            LinearLayout tipBox = new LinearLayout(this);
+            tipBox.setOrientation(LinearLayout.VERTICAL);
+            GradientDrawable tipBg = new GradientDrawable();
+            tipBg.setColor(Color.parseColor("#271804"));
+            tipBg.setCornerRadius(dp(10));
+            tipBg.setStroke(dp(1), Color.parseColor("#B45309"));
+            tipBox.setBackground(tipBg);
+            tipBox.setPadding(dp(10), dp(8), dp(10), dp(8));
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            tlp.setMargins(0, dp(8), 0, 0);
+            tipBox.setLayoutParams(tlp);
+
+            TextView tvTip = new TextView(this);
+            tvTip.setText("💡 Mẹo Hay: " + proTip);
+            tvTip.setTextColor(Color.parseColor("#FDE68A"));
+            tvTip.setTextSize(11);
+            tvTip.setLineSpacing(dp(1), 1.1f);
+            tipBox.addView(tvTip);
+            card.addView(tipBox);
+        }
+
+        return card;
+    }
+
+    private void showHowToUseDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+
+        GradientDrawable rootBg = new GradientDrawable();
+        rootBg.setColor(Color.parseColor("#171717"));
+        rootBg.setCornerRadius(dp(24));
+        rootBg.setStroke(dp(1.5f), Color.parseColor("#3B82F6"));
+        root.setBackground(rootBg);
+        root.setPadding(dp(18), dp(18), dp(18), dp(18));
+
+        // HEADER
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, 0, 0, dp(14));
+
+        TextView tvIcon = new TextView(this);
+        tvIcon.setText("📖");
+        tvIcon.setTextSize(18);
+        tvIcon.setGravity(Gravity.CENTER);
+        GradientDrawable iconBg = new GradientDrawable();
+        iconBg.setColor(Color.parseColor("#1E3A8A"));
+        iconBg.setCornerRadius(dp(14));
+        iconBg.setStroke(dp(1), Color.parseColor("#3B82F6"));
+        tvIcon.setBackground(iconBg);
+        tvIcon.setPadding(dp(8), dp(6), dp(8), dp(6));
+        header.addView(tvIcon);
+
+        View sp1 = new View(this);
+        header.addView(sp1, new LinearLayout.LayoutParams(dp(10), 1));
+
+        LinearLayout colTitle = new LinearLayout(this);
+        colTitle.setOrientation(LinearLayout.VERTICAL);
+
+        TextView tvMainTitle = new TextView(this);
+        tvMainTitle.setText("Cẩm Nang Hướng Dẫn Toàn Diện");
+        tvMainTitle.setTextColor(Color.WHITE);
+        tvMainTitle.setTextSize(15);
+        tvMainTitle.setTypeface(null, Typeface.BOLD);
+        colTitle.addView(tvMainTitle);
+
+        TextView tvSubTitle = new TextView(this);
+        tvSubTitle.setText("Từ A đến Z cho người mới bắt đầu dịch");
+        tvSubTitle.setTextColor(Color.parseColor("#93C5FD"));
+        tvSubTitle.setTextSize(11);
+        colTitle.addView(tvSubTitle);
+
+        header.addView(colTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        TextView btnClose = new TextView(this);
+        btnClose.setText("✕");
+        btnClose.setTextColor(Color.parseColor("#9CA3AF"));
+        btnClose.setTextSize(14);
+        btnClose.setTypeface(null, Typeface.BOLD);
+        btnClose.setGravity(Gravity.CENTER);
+        GradientDrawable closeBg = new GradientDrawable();
+        closeBg.setColor(Color.parseColor("#27272A"));
+        closeBg.setCornerRadius(dp(20));
+        btnClose.setBackground(closeBg);
+        btnClose.setPadding(dp(10), dp(6), dp(10), dp(6));
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        header.addView(btnClose);
+
+        root.addView(header);
+
+        View div = new View(this);
+        div.setBackgroundColor(Color.parseColor("#27272A"));
+        root.addView(div, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+
+        LinearLayout listSteps = new LinearLayout(this);
+        listSteps.setOrientation(LinearLayout.VERTICAL);
+        listSteps.setPadding(0, dp(14), 0, 0);
+
+        // BƯỚC 1: Amber
+        listSteps.addView(createStepCard(
+            1, "Bước 1: Lấy API Key Miễn Phí & Nạp Nhiều Key", "#F59E0B",
+            "• Cách lấy key: Truy cập aistudio.google.com trên trình duyệt ➔ Đăng nhập Google ➔ Bấm 'Get API key' ➔ Tạo khóa và copy.\n• Nạp key: Dán vào ô nhập ở Thẻ 1 rồi bấm 'Thêm API Key Vào Pool'.",
+            "Mỗi tài khoản Google được miễn phí 15 lượt/phút. Bạn NÊN DÙNG 2 ĐẾN 5 TÀI KHOẢN GOOGLE để lấy 2 - 5 key khác nhau nạp vào app. App sẽ tự động xoay tua từng key, giúp bạn dịch hàng ngàn chương liên tục không bao giờ bị nghẽn mạng hay chạm hạn mức!"
+        ));
+
+        // BƯỚC 2: Blue
+        listSteps.addView(createStepCard(
+            2, "Bước 2: Tạo Dự Án & Nạp File Truyện Gốc", "#3B82F6",
+            "• Chuyển sang Thẻ 2 'Dịch & Từ điển' ➔ Bấm '+ Dự Án Mới' để đặt tên cho bộ truyện.\n• Bấm '📂 Chọn File .txt/.epub' để tải file truyện tiếng Trung vào.\n• Chọn chế độ 'Tách Tác Giả (Regex)' để app tự động cắt từng chương chuẩn xác theo tiêu đề.",
+            "Nên dùng chế độ Tách Tác Giả cho 95% truyện mạng để giữ nguyên vẹn tiêu đề chương của tác giả."
+        ));
+
+        // BƯỚC 3: Emerald
+        listSteps.addView(createStepCard(
+            3, "Bước 3: Chọn Khoảng Chương & Chọn Model Phù Hợp", "#10B981",
+            "• Điền khoảng chương cần dịch (ví dụ: Từ chương 1 đến chương 50).\n• KHUYÊN DÙNG CHO TRUYỆN DÀI (>10MB): Hãy chọn Gemini 2.5 Flash-Lite hoặc Gemini 3.5 Flash-Lite vì tốc độ siêu nhanh và hạn ngạch dồi dào. Các lỗi nhỏ sẽ được hệ thống cứu hộ tự vá mượt đạt 9/10 điểm!\n• Gemini 2.5 Flash / 3.6 Flash: Dành cho khi bạn dịch đoạn ngắn cần độ trau chuốt tuyệt đối.",
+            "Chọn Gemini Flash-Lite giúp bạn dịch một mạch cả bộ truyện mà không bao giờ bị nghẽn hạn ngạch."
+        ));
+
+        // BƯỚC 4: Purple
+        listSteps.addView(createStepCard(
+            4, "Bước 4: Thiết Lập Cài Đặt Ảnh Hưởng Chất Lượng", "#A855F7",
+            "• Độ dài Glossary tối thiểu (2-4 ký tự): Lọc bỏ từ rác 1 chữ, chỉ lưu tên nhân vật và địa danh quan trọng.\n• Bật Chống Lọt Chữ Hán Nghiêm Ngặt (2 Lớp): Ép AI chuyển 100% sang tiếng Việt chuẩn, quét sạch chữ tượng hình.\n• Bật Tự Động Cứu Hộ Online: Tự động gửi lệnh dịch lại ngay nếu AI bị kẹt mạng hoặc dừng câu.",
+            "Chính sách 'Giữ Cũ - Bỏ Mới' trong Tab Cài đặt giúp nhân vật không bao giờ bị đổi tên lộn xộn ở các chương sau."
+        ));
+
+        // BƯỚC 5: Cyan
+        listSteps.addView(createStepCard(
+            5, "Bước 5: Bắt Đầu Dịch & Xử Lý Khi Lọt Chương Thiếu", "#06B6D4",
+            "• Bấm nút '▶ Dịch Range'. Quá trình dịch diễn ra hoàn toàn tự động.\n• NẾU BỊ SÓT CHƯƠNG HOẶC DỪNG GIỮA CHỪNG: Bạn chỉ cần bấm '⚡ Dịch Bù Chương Sót (Gap-Filling)'. App sẽ tự động kiểm tra, lướt qua những chương đã có và chỉ tập trung dịch các chương còn thiếu!",
+            "Tính năng Gap-Filling giúp bạn không bao giờ phải lo lắng khi điện thoại mất mạng hay ứng dụng tạm ngắt."
+        ));
+
+        // BƯỚC 6: Rose
+        listSteps.addView(createStepCard(
+            6, "Bước 6: Làm Mượt Final & Xuất File Toàn Văn", "#F43F5E",
+            "• Sau khi dịch xong toàn bộ các chương, bấm '✨ Làm Mượt Bản Dịch Final' để rà soát ngữ pháp và quét sạch chữ Hán sót lại.\n• Bấm '📥 Xuất Toàn Văn Tác Phẩm (.txt)' để lưu vào thư mục Download của điện thoại, sẵn sàng nạp vào máy đọc sách Kindle, Kobo hoặc app đọc truyện.",
+            "File xuất ra định dạng UTF-8 chuẩn quốc tế, đọc mượt trên mọi thiết bị và ứng dụng."
+        ));
+
+        root.addView(listSteps);
+
+        // FOOTER BUTTON
+        Button btnStart = new Button(this);
+        btnStart.setText("ĐÃ HIỂU - SẴN SÀNG DỊCH THUẬT");
+        btnStart.setTextColor(Color.WHITE);
+        btnStart.setTextSize(13);
+        btnStart.setTypeface(null, Typeface.BOLD);
+        GradientDrawable btnBg = new GradientDrawable();
+        btnBg.setColor(Color.parseColor("#2563EB"));
+        btnBg.setCornerRadius(dp(16));
+        btnStart.setBackground(btnBg);
+        btnStart.setPadding(0, dp(14), 0, dp(14));
+        btnStart.setOnClickListener(v -> dialog.dismiss());
+        root.addView(btnStart);
+
+        scroll.addView(root);
+        dialog.setContentView(scroll);
+        if (dialog.getWindow() != null) {
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.94f);
+            int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.88f);
+            dialog.getWindow().setLayout(width, height);
+        }
+        dialog.show();
     }
 
     private void showHelpTooltipDialog(String title, String whatIsIt, String howToUse, String proTip) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("❓ " + title);
-        String nl = String.valueOf((char) 10);
-        StringBuilder sb = new StringBuilder();
-        sb.append("📌 DÙNG ĐỂ LÀM GÌ:").append(nl).append(whatIsIt).append(nl).append(nl);
-        sb.append("💡 CÁCH SỬ DỤNG:").append(nl).append(howToUse);
-        if (proTip != null && !proTip.isEmpty()) {
-            sb.append(nl).append(nl).append("✨ MẸO BỎ TÚI:").append(nl).append(proTip);
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         }
-        builder.setMessage(sb.toString());
-        builder.setPositiveButton("ĐÃ HIỂU", (d, w) -> d.dismiss());
-        builder.show();
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#18181B"));
+        bg.setCornerRadius(dp(22));
+        bg.setStroke(dp(1.5f), Color.parseColor("#3B82F6"));
+        card.setBackground(bg);
+        card.setPadding(dp(20), dp(20), dp(20), dp(20));
+
+        // HEADER ROW
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, 0, 0, dp(14));
+
+        TextView iconTv = new TextView(this);
+        iconTv.setText("❓");
+        iconTv.setTextSize(16);
+        iconTv.setGravity(Gravity.CENTER);
+        GradientDrawable iconBg = new GradientDrawable();
+        iconBg.setColor(Color.parseColor("#1E1B4B"));
+        iconBg.setCornerRadius(dp(12));
+        iconBg.setStroke(dp(1), Color.parseColor("#6366F1"));
+        iconTv.setBackground(iconBg);
+        iconTv.setPadding(dp(8), dp(6), dp(8), dp(6));
+        header.addView(iconTv);
+
+        View spaceH = new View(this);
+        header.addView(spaceH, new LinearLayout.LayoutParams(dp(10), 1));
+
+        LinearLayout titleCol = new LinearLayout(this);
+        titleCol.setOrientation(LinearLayout.VERTICAL);
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(Color.WHITE);
+        tvTitle.setTextSize(14);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        titleCol.addView(tvTitle);
+
+        header.addView(titleCol, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        TextView btnClose = new TextView(this);
+        btnClose.setText("✕");
+        btnClose.setTextColor(Color.parseColor("#9CA3AF"));
+        btnClose.setTextSize(14);
+        btnClose.setTypeface(null, Typeface.BOLD);
+        btnClose.setGravity(Gravity.CENTER);
+        GradientDrawable closeBg = new GradientDrawable();
+        closeBg.setColor(Color.parseColor("#27272A"));
+        closeBg.setCornerRadius(dp(20));
+        btnClose.setBackground(closeBg);
+        btnClose.setPadding(dp(10), dp(6), dp(10), dp(6));
+        btnClose.setOnClickListener(v -> dialog.dismiss());
+        header.addView(btnClose);
+
+        card.addView(header);
+
+        View div = new View(this);
+        div.setBackgroundColor(Color.parseColor("#27272A"));
+        card.addView(div, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+
+        // SECTION 1: DÙNG ĐỂ LÀM GÌ
+        LinearLayout sec1 = new LinearLayout(this);
+        sec1.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable s1Bg = new GradientDrawable();
+        s1Bg.setColor(Color.parseColor("#09090B"));
+        s1Bg.setCornerRadius(dp(14));
+        s1Bg.setStroke(dp(1), Color.parseColor("#27272A"));
+        sec1.setBackground(s1Bg);
+        sec1.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp1.setMargins(0, dp(14), 0, dp(10));
+        sec1.setLayoutParams(lp1);
+
+        TextView tvSec1Title = new TextView(this);
+        tvSec1Title.setText("📌 TÍNH NĂNG NÀY DÙNG ĐỂ LÀM GÌ?");
+        tvSec1Title.setTextColor(Color.parseColor("#60A5FA"));
+        tvSec1Title.setTextSize(12);
+        tvSec1Title.setTypeface(null, Typeface.BOLD);
+        sec1.addView(tvSec1Title);
+
+        TextView tvSec1Body = new TextView(this);
+        tvSec1Body.setText(whatIsIt);
+        tvSec1Body.setTextColor(Color.parseColor("#E4E4E7"));
+        tvSec1Body.setTextSize(12);
+        tvSec1Body.setLineSpacing(dp(2), 1.15f);
+        tvSec1Body.setPadding(0, dp(6), 0, 0);
+        sec1.addView(tvSec1Body);
+        card.addView(sec1);
+
+        // SECTION 2: CÁCH SỬ DỤNG TỐI ƯU
+        LinearLayout sec2 = new LinearLayout(this);
+        sec2.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable s2Bg = new GradientDrawable();
+        s2Bg.setColor(Color.parseColor("#09090B"));
+        s2Bg.setCornerRadius(dp(14));
+        s2Bg.setStroke(dp(1), Color.parseColor("#27272A"));
+        sec2.setBackground(s2Bg);
+        sec2.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp2.setMargins(0, 0, 0, dp(10));
+        sec2.setLayoutParams(lp2);
+
+        TextView tvSec2Title = new TextView(this);
+        tvSec2Title.setText("💡 CÁCH SỬ DỤNG TỐI ƯU:");
+        tvSec2Title.setTextColor(Color.parseColor("#34D399"));
+        tvSec2Title.setTextSize(12);
+        tvSec2Title.setTypeface(null, Typeface.BOLD);
+        sec2.addView(tvSec2Title);
+
+        TextView tvSec2Body = new TextView(this);
+        tvSec2Body.setText(howToUse);
+        tvSec2Body.setTextColor(Color.parseColor("#D4D4D8"));
+        tvSec2Body.setTextSize(12);
+        tvSec2Body.setLineSpacing(dp(2), 1.15f);
+        tvSec2Body.setPadding(0, dp(6), 0, 0);
+        sec2.addView(tvSec2Body);
+        card.addView(sec2);
+
+        // SECTION 3: MẸO NHỎ (nếu có)
+        if (proTip != null && !proTip.trim().isEmpty()) {
+            LinearLayout sec3 = new LinearLayout(this);
+            sec3.setOrientation(LinearLayout.VERTICAL);
+            GradientDrawable s3Bg = new GradientDrawable();
+            s3Bg.setColor(Color.parseColor("#271804"));
+            s3Bg.setCornerRadius(dp(14));
+            s3Bg.setStroke(dp(1), Color.parseColor("#D97706"));
+            sec3.setBackground(s3Bg);
+            sec3.setPadding(dp(14), dp(12), dp(14), dp(12));
+            LinearLayout.LayoutParams lp3 = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp3.setMargins(0, 0, 0, dp(12));
+            sec3.setLayoutParams(lp3);
+
+            TextView tvSec3Title = new TextView(this);
+            tvSec3Title.setText("✨ MẸO BỎ TÚI CỰC HAY:");
+            tvSec3Title.setTextColor(Color.parseColor("#FBBF24"));
+            tvSec3Title.setTextSize(12);
+            tvSec3Title.setTypeface(null, Typeface.BOLD);
+            sec3.addView(tvSec3Title);
+
+            TextView tvSec3Body = new TextView(this);
+            tvSec3Body.setText(proTip);
+            tvSec3Body.setTextColor(Color.parseColor("#FEF3C7"));
+            tvSec3Body.setTextSize(12);
+            tvSec3Body.setLineSpacing(dp(2), 1.15f);
+            tvSec3Body.setPadding(0, dp(6), 0, 0);
+            sec3.addView(tvSec3Body);
+            card.addView(sec3);
+        }
+
+        // FOOTER BUTTON: ĐÃ HIỂU
+        Button btnDismiss = new Button(this);
+        btnDismiss.setText("ĐÃ HIỂU");
+        btnDismiss.setTextColor(Color.WHITE);
+        btnDismiss.setTextSize(13);
+        btnDismiss.setTypeface(null, Typeface.BOLD);
+        GradientDrawable btnBg = new GradientDrawable();
+        btnBg.setColor(Color.parseColor("#2563EB"));
+        btnBg.setCornerRadius(dp(14));
+        btnDismiss.setBackground(btnBg);
+        btnDismiss.setPadding(0, dp(12), 0, dp(12));
+        btnDismiss.setOnClickListener(v -> dialog.dismiss());
+        card.addView(btnDismiss);
+
+        scroll.addView(card);
+        dialog.setContentView(scroll);
+        if (dialog.getWindow() != null) {
+            int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.92f);
+            dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.show();
+    }
+
+    private View createHelpButton(final String key) {
+        initHelpMap();
+        TextView tv = new TextView(this);
+        tv.setText("?");
+        tv.setTextColor(Color.parseColor("#60A5FA"));
+        tv.setTextSize(12);
+        tv.setTypeface(null, Typeface.BOLD);
+        tv.setGravity(Gravity.CENTER);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#0F172A"));
+        bg.setCornerRadius(dp(50));
+        bg.setStroke(dp(1.5f), Color.parseColor("#3B82F6"));
+        tv.setBackground(bg);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(26), dp(26));
+        lp.leftMargin = dp(8);
+        tv.setLayoutParams(lp);
+
+        tv.setOnClickListener(v -> {
+            HelpData item = helpMap.get(key);
+            if (item != null) {
+                showHelpTooltipDialog(item.title, item.whatIsIt, item.howToUse, item.proTip);
+            } else {
+                showHelpTooltipDialog("Hướng Dẫn", "Tính năng này giúp bạn quản lý và tối ưu quá trình dịch.", "Chạm vào các nút tương ứng để thao tác.", null);
+            }
+        });
+        return tv;
     }
 
     private View createHelpButton(final String title, final String whatIsIt, final String howToUse, final String proTip) {
         TextView tv = new TextView(this);
-        tv.setText(" ? ");
+        tv.setText("?");
         tv.setTextColor(Color.parseColor("#60A5FA"));
-        tv.setTextSize(11);
+        tv.setTextSize(12);
         tv.setTypeface(null, Typeface.BOLD);
+        tv.setGravity(Gravity.CENTER);
+
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.parseColor("#1E293B"));
-        bg.setCornerRadius(20);
-        bg.setStroke(1, Color.parseColor("#3B82F6"));
+        bg.setColor(Color.parseColor("#0F172A"));
+        bg.setCornerRadius(dp(50));
+        bg.setStroke(dp(1.5f), Color.parseColor("#3B82F6"));
         tv.setBackground(bg);
-        tv.setPadding(12, 4, 12, 4);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(26), dp(26));
+        lp.leftMargin = dp(8);
+        tv.setLayoutParams(lp);
+
         tv.setOnClickListener(v -> showHelpTooltipDialog(title, whatIsIt, howToUse, proTip));
         return tv;
     }
@@ -613,12 +1143,17 @@ public class MainActivity extends AppCompatActivity {
         content.setPadding(32, 24, 32, 32);
 
         // 1. CHỌN DÒNG MODEL GEMINI
+        LinearLayout rowMHead = new LinearLayout(this);
+        rowMHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowMHead.setGravity(Gravity.CENTER_VERTICAL);
         TextView tvModelHead = new TextView(this);
         tvModelHead.setText("1. Chọn Dòng Model Gemini:");
         tvModelHead.setTextColor(Color.WHITE);
         tvModelHead.setTextSize(15);
         tvModelHead.setTypeface(null, Typeface.BOLD);
-        content.addView(tvModelHead);
+        rowMHead.addView(tvModelHead);
+        rowMHead.addView(createHelpButton("select_model"));
+        content.addView(rowMHead);
 
         tvSelectedModel = new TextView(this);
         tvSelectedModel.setText("Model đang chọn: " + currentModel);
@@ -679,7 +1214,11 @@ public class MainActivity extends AppCompatActivity {
         tvKeyHead.setTextColor(Color.WHITE);
         tvKeyHead.setTextSize(15);
         tvKeyHead.setTypeface(null, Typeface.BOLD);
-        keyHeaderRow.addView(tvKeyHead, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        keyHeaderRow.addView(tvKeyHead);
+        keyHeaderRow.addView(createHelpButton("key_pool"));
+
+        View keySpacer = new View(this);
+        keyHeaderRow.addView(keySpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
 
         Button btnTestAll = createButton("Test Tất Cả", "#B45309");
         btnTestAll.setOnClickListener(v -> testAllKeys());
@@ -738,7 +1277,11 @@ public class MainActivity extends AppCompatActivity {
         tvPromptHead.setTextColor(Color.WHITE);
         tvPromptHead.setTextSize(15);
         tvPromptHead.setTypeface(null, Typeface.BOLD);
-        promptHeaderRow.addView(tvPromptHead, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        promptHeaderRow.addView(tvPromptHead);
+        promptHeaderRow.addView(createHelpButton("prompt_cards"));
+
+        View promptSpacer = new View(this);
+        promptHeaderRow.addView(promptSpacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
 
         Button btnAddPrompt = createButton("+ Thêm Prompt", "#2563EB");
         btnAddPrompt.setOnClickListener(v -> showPromptDialog(null));
@@ -931,16 +1474,37 @@ public class MainActivity extends AppCompatActivity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(32, 24, 32, 32);
 
-        // 1. Quản lý Dự Án Truyện (Multi-Project Switcher)
-        LinearLayout cardProj = createCard();
+        // =====================================================================
+        // MỤC 1: NHẬP & BÓC TÁCH FILE TRUYỆN GỐC (Card 1)
+        // =====================================================================
+        LinearLayout cardInput = createCard();
+
+        LinearLayout rowInputHeader = new LinearLayout(this);
+        rowInputHeader.setOrientation(LinearLayout.HORIZONTAL);
+        rowInputHeader.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvInputTitle = new TextView(this);
+        tvInputTitle.setText("1. Nhập & Bóc Tách File Truyện Gốc");
+        tvInputTitle.setTextColor(Color.WHITE);
+        tvInputTitle.setTextSize(15);
+        tvInputTitle.setTypeface(null, Typeface.BOLD);
+        rowInputHeader.addView(tvInputTitle);
+        rowInputHeader.addView(createHelpButton("novel_raw_input"));
+
+        View spInp = new View(this);
+        rowInputHeader.addView(spInp, new LinearLayout.LayoutParams(0, 1, 1.0f));
+        cardInput.addView(rowInputHeader);
+
+        // Quản lý Dự Án Truyện (Multi-Project Switcher)
         LinearLayout rowProjHeader = new LinearLayout(this);
         rowProjHeader.setOrientation(LinearLayout.HORIZONTAL);
         rowProjHeader.setGravity(Gravity.CENTER_VERTICAL);
+        rowProjHeader.setPadding(0, 12, 0, 8);
 
         tvCurrentProjectName = new TextView(this);
         tvCurrentProjectName.setText("📖 Dự án: " + currentProjectName);
         tvCurrentProjectName.setTextColor(Color.parseColor("#60A5FA"));
-        tvCurrentProjectName.setTextSize(14);
+        tvCurrentProjectName.setTextSize(13);
         tvCurrentProjectName.setTypeface(null, Typeface.BOLD);
         rowProjHeader.addView(tvCurrentProjectName, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
@@ -955,16 +1519,85 @@ public class MainActivity extends AppCompatActivity {
         btnNewProj.setOnClickListener(v -> showNewProjectDialog());
         rowProjHeader.addView(btnNewProj);
 
-        cardProj.addView(rowProjHeader);
-        content.addView(cardProj);
+        cardInput.addView(rowProjHeader);
 
-        // 2. Thẻ Tiến độ & Dịch theo Range (Từ chương -> Đến chương, 3 nút: Dịch / Tạm dừng / Hủy)
+        // Nạp văn bản truyện thô
+        edtRawText = new EditText(this);
+        edtRawText.setTextColor(Color.WHITE);
+        edtRawText.setBackgroundColor(Color.parseColor("#171717"));
+        edtRawText.setPadding(20, 16, 20, 16);
+        edtRawText.setHint("Dán truyện hoặc bấm Chọn File .txt...");
+        edtRawText.setHintTextColor(Color.parseColor("#666666"));
+        edtRawText.setLines(3);
+        cardInput.addView(edtRawText);
+
+        // Hàng nút: Chọn file từ bộ nhớ
+        LinearLayout fileRow = new LinearLayout(this);
+        fileRow.setOrientation(LinearLayout.HORIZONTAL);
+        fileRow.setPadding(0, 8, 0, 0);
+
+        Button btnPickFile = createButton("📂 Chọn File .txt / .epub Từ Bộ Nhớ", "#1E293B");
+        btnPickFile.setOnClickListener(v -> openFilePicker());
+        fileRow.addView(btnPickFile, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        cardInput.addView(fileRow);
+
+        // Hàng tách chương: Theo tác giả vs Theo số ký tự tùy chỉnh
+        LinearLayout splitOptRow = new LinearLayout(this);
+        splitOptRow.setOrientation(LinearLayout.HORIZONTAL);
+        splitOptRow.setPadding(0, 8, 0, 0);
+        splitOptRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button btnSplitAuthor = createButton("Tách Tác Giả (Regex)", "#047857");
+        btnSplitAuthor.setOnClickListener(v -> splitRawText(false));
+        splitOptRow.addView(btnSplitAuthor);
+
+        View ssp = new View(this);
+        splitOptRow.addView(ssp, new LinearLayout.LayoutParams(8, 1));
+
+        edtChunkSize = new EditText(this);
+        edtChunkSize.setText("3500");
+        edtChunkSize.setTextColor(Color.WHITE);
+        edtChunkSize.setBackgroundColor(Color.parseColor("#171717"));
+        edtChunkSize.setPadding(10, 8, 10, 8);
+        edtChunkSize.setHint("Ký tự");
+        splitOptRow.addView(edtChunkSize, new LinearLayout.LayoutParams(140, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        View ssp2 = new View(this);
+        splitOptRow.addView(ssp2, new LinearLayout.LayoutParams(8, 1));
+
+        Button btnSplitChars = createButton("Tách Theo Ký Tự", "#0369A1");
+        btnSplitChars.setOnClickListener(v -> splitRawText(true));
+        splitOptRow.addView(btnSplitChars, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        cardInput.addView(splitOptRow);
+        content.addView(cardInput);
+
+        // =====================================================================
+        // MỤC 2: TIẾN ĐỘ DỊCH THUẬT & ĐIỀU KHIỂN (Card 2)
+        // =====================================================================
         LinearLayout cardProgress = createCard();
+
+        LinearLayout rowProgHead = new LinearLayout(this);
+        rowProgHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowProgHead.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvProgTitle = new TextView(this);
+        tvProgTitle.setText("2. Tiến Độ Dịch Thuật & Điều Khiển");
+        tvProgTitle.setTextColor(Color.WHITE);
+        tvProgTitle.setTextSize(15);
+        tvProgTitle.setTypeface(null, Typeface.BOLD);
+        rowProgHead.addView(tvProgTitle);
+        rowProgHead.addView(createHelpButton("range_progress"));
+
+        View spProg = new View(this);
+        rowProgHead.addView(spProg, new LinearLayout.LayoutParams(0, 1, 1.0f));
+        cardProgress.addView(rowProgHead);
 
         tvProgressText = new TextView(this);
         tvProgressText.setTextColor(Color.parseColor("#93C5FD"));
-        tvProgressText.setTextSize(14);
+        tvProgressText.setTextSize(13);
         tvProgressText.setTypeface(null, Typeface.BOLD);
+        tvProgressText.setPadding(0, 8, 0, 4);
         tvProgressText.setText("Tiến độ: " + translatedChapters.size() + " / " + rawChapters.size() + " chương");
         cardProgress.addView(tvProgressText);
 
@@ -976,7 +1609,7 @@ public class MainActivity extends AppCompatActivity {
         // Range inputs: Từ chương -> Đến chương
         LinearLayout rangeRow = new LinearLayout(this);
         rangeRow.setOrientation(LinearLayout.HORIZONTAL);
-        rangeRow.setPadding(0, 16, 0, 8);
+        rangeRow.setPadding(0, 12, 0, 8);
         rangeRow.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView tvF = new TextView(this);
@@ -1049,73 +1682,30 @@ public class MainActivity extends AppCompatActivity {
 
         content.addView(cardProgress);
 
-        // 3. Nạp văn bản truyện + Chọn file từ bộ nhớ + Tách chương tùy ý ký tự
-        TextView tvInputTitle = new TextView(this);
-        tvInputTitle.setText("Nạp văn bản truyện thô:");
-        tvInputTitle.setTextColor(Color.WHITE);
-        tvInputTitle.setPadding(0, 16, 0, 8);
-        content.addView(tvInputTitle);
+        // =====================================================================
+        // MỤC 3: KHO THUẬT NGỮ MASTER GLOSSARY (Card 3)
+        // =====================================================================
+        LinearLayout cardGloss = createCard();
 
-        edtRawText = new EditText(this);
-        edtRawText.setTextColor(Color.WHITE);
-        edtRawText.setBackgroundColor(Color.parseColor("#171717"));
-        edtRawText.setPadding(20, 16, 20, 16);
-        edtRawText.setHint("Dán truyện hoặc bấm Chọn File .txt...");
-        edtRawText.setHintTextColor(Color.parseColor("#666666"));
-        edtRawText.setLines(3);
-        content.addView(edtRawText);
+        LinearLayout rowGlossHead = new LinearLayout(this);
+        rowGlossHead.setOrientation(LinearLayout.HORIZONTAL);
+        rowGlossHead.setGravity(Gravity.CENTER_VERTICAL);
 
-        // Hàng nút: Chọn file từ bộ nhớ
-        LinearLayout fileRow = new LinearLayout(this);
-        fileRow.setOrientation(LinearLayout.HORIZONTAL);
-        fileRow.setPadding(0, 8, 0, 0);
-
-        Button btnPickFile = createButton("📂 Chọn File .txt Từ Bộ Nhớ", "#1E293B");
-        btnPickFile.setOnClickListener(v -> openFilePicker());
-        fileRow.addView(btnPickFile, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-        content.addView(fileRow);
-
-        // Hàng tách chương: Theo tác giả vs Theo số ký tự tùy chỉnh
-        LinearLayout splitOptRow = new LinearLayout(this);
-        splitOptRow.setOrientation(LinearLayout.HORIZONTAL);
-        splitOptRow.setPadding(0, 8, 0, 8);
-        splitOptRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        Button btnSplitAuthor = createButton("Tách Tác Giả (Regex)", "#047857");
-        btnSplitAuthor.setOnClickListener(v -> splitRawText(false));
-        splitOptRow.addView(btnSplitAuthor);
-
-        View ssp = new View(this);
-        splitOptRow.addView(ssp, new LinearLayout.LayoutParams(8, 1));
-
-        edtChunkSize = new EditText(this);
-        edtChunkSize.setText("3500");
-        edtChunkSize.setTextColor(Color.WHITE);
-        edtChunkSize.setBackgroundColor(Color.parseColor("#171717"));
-        edtChunkSize.setPadding(10, 8, 10, 8);
-        edtChunkSize.setHint("Ký tự");
-        splitOptRow.addView(edtChunkSize, new LinearLayout.LayoutParams(140, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        View ssp2 = new View(this);
-        splitOptRow.addView(ssp2, new LinearLayout.LayoutParams(8, 1));
-
-        Button btnSplitChars = createButton("Tách Theo Ký Tự", "#0369A1");
-        btnSplitChars.setOnClickListener(v -> splitRawText(true));
-        splitOptRow.addView(btnSplitChars, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
-
-        content.addView(splitOptRow);
-
-        // 4. Master Glossary (Tự Động Bóc Tách & Nạp Tức Thì Sau Mỗi Chương)
         tvGlossaryHeader = new TextView(this);
-        tvGlossaryHeader.setText("Từ Điển Master Glossary (" + masterGlossary.size() + " từ):");
+        tvGlossaryHeader.setText("3. Kho Thuật Ngữ Master Glossary (" + masterGlossary.size() + " từ):");
         tvGlossaryHeader.setTextColor(Color.WHITE);
         tvGlossaryHeader.setTextSize(14);
         tvGlossaryHeader.setTypeface(null, Typeface.BOLD);
-        tvGlossaryHeader.setPadding(0, 20, 0, 8);
-        content.addView(tvGlossaryHeader);
+        rowGlossHead.addView(tvGlossaryHeader);
+        rowGlossHead.addView(createHelpButton("master_glossary"));
+
+        View spGloss = new View(this);
+        rowGlossHead.addView(spGloss, new LinearLayout.LayoutParams(0, 1, 1.0f));
+        cardGloss.addView(rowGlossHead);
 
         LinearLayout rowAddG = new LinearLayout(this);
         rowAddG.setOrientation(LinearLayout.HORIZONTAL);
+        rowAddG.setPadding(0, 10, 0, 0);
 
         edtGlossaryKey = createStyledEditText("Từ gốc (林辰)");
         rowAddG.addView(edtGlossaryKey, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
@@ -1126,7 +1716,7 @@ public class MainActivity extends AppCompatActivity {
         edtGlossaryVal = createStyledEditText("Nghĩa (Lâm Thần)");
         rowAddG.addView(edtGlossaryVal, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
-        content.addView(rowAddG);
+        cardGloss.addView(rowAddG);
 
         LinearLayout rowGButtons = new LinearLayout(this);
         rowGButtons.setOrientation(LinearLayout.HORIZONTAL);
@@ -1161,13 +1751,15 @@ public class MainActivity extends AppCompatActivity {
         btnExportG.setOnClickListener(v -> exportGlossaryData());
         rowGButtons.addView(btnExportG, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.8f));
 
-        content.addView(rowGButtons);
+        cardGloss.addView(rowGButtons);
 
         llGlossaryList = new LinearLayout(this);
         llGlossaryList.setOrientation(LinearLayout.VERTICAL);
-        llGlossaryList.setPadding(0, 8, 0, 16);
-        content.addView(llGlossaryList);
+        llGlossaryList.setPadding(0, 8, 0, 0);
+        cardGloss.addView(llGlossaryList);
         refreshGlossaryList();
+
+        content.addView(cardGloss);
 
         // 5. Live Console Logs
         TextView tvLogTitle = new TextView(this);
@@ -2192,12 +2784,18 @@ public class MainActivity extends AppCompatActivity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(32, 24, 32, 32);
 
+        LinearLayout rowTab3Head = new LinearLayout(this);
+        rowTab3Head.setOrientation(LinearLayout.HORIZONTAL);
+        rowTab3Head.setGravity(Gravity.CENTER_VERTICAL);
+
         tvChapterCountInfo = new TextView(this);
         tvChapterCountInfo.setTextColor(Color.parseColor("#60A5FA"));
         tvChapterCountInfo.setTextSize(14);
         tvChapterCountInfo.setTypeface(null, Typeface.BOLD);
-        tvChapterCountInfo.setText("Danh Sách Các Chương (Chạm để mở Trình Đọc Toàn Màn Hình):");
-        content.addView(tvChapterCountInfo);
+        tvChapterCountInfo.setText("Kho Chương Đã Dịch & Trình Đọc AMOLED:");
+        rowTab3Head.addView(tvChapterCountInfo, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        rowTab3Head.addView(createHelpButton("chapter_auditor"));
+        content.addView(rowTab3Head);
 
         TextView tvDesc = new TextView(this);
         tvDesc.setText("Phân trang 100 chương/trang chống khựng máy. Trạng thái đọc độc lập 100%, hỗ trợ AMOLED/Sepia.");
@@ -2677,12 +3275,17 @@ public class MainActivity extends AppCompatActivity {
         content.setPadding(32, 24, 32, 32);
 
         // 1. Quản Lý Dự Án & Xóa Dự Án
+        LinearLayout rowS1Head = new LinearLayout(this);
+        rowS1Head.setOrientation(LinearLayout.HORIZONTAL);
+        rowS1Head.setGravity(Gravity.CENTER_VERTICAL);
         TextView tvProjTitle = new TextView(this);
         tvProjTitle.setText("1. Quản Lý Dự Án Hiện Tại:");
         tvProjTitle.setTextColor(Color.WHITE);
         tvProjTitle.setTextSize(15);
         tvProjTitle.setTypeface(null, Typeface.BOLD);
-        content.addView(tvProjTitle);
+        rowS1Head.addView(tvProjTitle);
+        rowS1Head.addView(createHelpButton("settings_projects_manager"));
+        content.addView(rowS1Head);
 
         LinearLayout cardProj = createCard();
         tvSettingsProjName = new TextView(this);
@@ -2730,13 +3333,18 @@ public class MainActivity extends AppCompatActivity {
         content.addView(cardProj);
 
         // 2. Tinh Chỉnh Glossary AI Auto-Learning
+        LinearLayout rowS2Head = new LinearLayout(this);
+        rowS2Head.setOrientation(LinearLayout.HORIZONTAL);
+        rowS2Head.setGravity(Gravity.CENTER_VERTICAL);
+        rowS2Head.setPadding(0, 16, 0, 0);
         TextView tvGlossSettingsTitle = new TextView(this);
         tvGlossSettingsTitle.setText("2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning):");
         tvGlossSettingsTitle.setTextColor(Color.WHITE);
         tvGlossSettingsTitle.setTextSize(15);
         tvGlossSettingsTitle.setTypeface(null, Typeface.BOLD);
-        tvGlossSettingsTitle.setPadding(0, 16, 0, 0);
-        content.addView(tvGlossSettingsTitle);
+        rowS2Head.addView(tvGlossSettingsTitle);
+        rowS2Head.addView(createHelpButton("settings_glossary_learning"));
+        content.addView(rowS2Head);
 
         LinearLayout cardGloss = createCard();
         tvSettingsMinTerm = new TextView(this);
@@ -2903,13 +3511,18 @@ public class MainActivity extends AppCompatActivity {
         content.addView(cardGloss);
 
         // 3. Dịch Thuật & Chống Lọt Chữ Hán
+        LinearLayout rowS3Head = new LinearLayout(this);
+        rowS3Head.setOrientation(LinearLayout.HORIZONTAL);
+        rowS3Head.setGravity(Gravity.CENTER_VERTICAL);
+        rowS3Head.setPadding(0, 16, 0, 0);
         TextView tvTransTitle = new TextView(this);
         tvTransTitle.setText("3. Dịch Thuật & Chống Lọt Chữ Hán (2 Lớp):");
         tvTransTitle.setTextColor(Color.WHITE);
         tvTransTitle.setTextSize(15);
         tvTransTitle.setTypeface(null, Typeface.BOLD);
-        tvTransTitle.setPadding(0, 16, 0, 0);
-        content.addView(tvTransTitle);
+        rowS3Head.addView(tvTransTitle);
+        rowS3Head.addView(createHelpButton("settings_translation_anti_hanzi"));
+        content.addView(rowS3Head);
 
         LinearLayout cardTrans = createCard();
         tvSettingsTargetLang = new TextView(this);
@@ -2996,13 +3609,18 @@ public class MainActivity extends AppCompatActivity {
         content.addView(cardTrans);
 
         // 4. Trạng Thái 5 Tầng Chạy Ngầm (God-Mode)
+        LinearLayout rowS4Head = new LinearLayout(this);
+        rowS4Head.setOrientation(LinearLayout.HORIZONTAL);
+        rowS4Head.setGravity(Gravity.CENTER_VERTICAL);
+        rowS4Head.setPadding(0, 16, 0, 0);
         TextView tvTitle = new TextView(this);
         tvTitle.setText("4. Trạng Thái 5 Tầng Chạy Ngầm (God-Mode):");
         tvTitle.setTextColor(Color.WHITE);
         tvTitle.setTextSize(15);
         tvTitle.setTypeface(null, Typeface.BOLD);
-        tvTitle.setPadding(0, 16, 0, 0);
-        content.addView(tvTitle);
+        rowS4Head.addView(tvTitle);
+        rowS4Head.addView(createHelpButton("settings_god_mode"));
+        content.addView(rowS4Head);
 
         LinearLayout cardStatus = createCard();
         cardStatus.addView(createStatusRow("1. Foreground Service (DataSync)", "KÍCH HOẠT"));
@@ -3037,13 +3655,18 @@ public class MainActivity extends AppCompatActivity {
         content.addView(btnSaveDelay);
 
         // 5. Cấu hình Model Làm Mượt Bản Dịch Final (Global Polish Model)
+        LinearLayout rowS5Head = new LinearLayout(this);
+        rowS5Head.setOrientation(LinearLayout.HORIZONTAL);
+        rowS5Head.setGravity(Gravity.CENTER_VERTICAL);
+        rowS5Head.setPadding(0, 16, 0, 0);
         TextView tvPolishModelTitle = new TextView(this);
         tvPolishModelTitle.setText("5. Model Dùng Cho Khâu Làm Mượt Final:");
         tvPolishModelTitle.setTextColor(Color.WHITE);
         tvPolishModelTitle.setTextSize(15);
         tvPolishModelTitle.setTypeface(null, Typeface.BOLD);
-        tvPolishModelTitle.setPadding(0, 16, 0, 0);
-        content.addView(tvPolishModelTitle);
+        rowS5Head.addView(tvPolishModelTitle);
+        rowS5Head.addView(createHelpButton("settings_api_rotation"));
+        content.addView(rowS5Head);
 
         LinearLayout cardPolishModel = createCard();
         TextView tvCurPolishModel = new TextView(this);
@@ -3071,9 +3694,16 @@ public class MainActivity extends AppCompatActivity {
         content.addView(cardPolishModel);
 
         // Xuất toàn văn tác phẩm
+        LinearLayout rowExp = new LinearLayout(this);
+        rowExp.setOrientation(LinearLayout.HORIZONTAL);
+        rowExp.setGravity(Gravity.CENTER_VERTICAL);
+        rowExp.setPadding(0, 12, 0, 0);
+
         Button btnExport = createButton("📥 Xuất Toàn Văn Tác Phẩm (.txt)", "#059669");
         btnExport.setOnClickListener(v -> exportFullNovelData());
-        content.addView(btnExport);
+        rowExp.addView(btnExport, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+        rowExp.addView(createHelpButton("export_full_txt"));
+        content.addView(rowExp);
 
         tabSettingsView.addView(content);
     }
