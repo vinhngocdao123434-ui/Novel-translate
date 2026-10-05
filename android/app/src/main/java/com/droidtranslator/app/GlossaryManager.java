@@ -163,4 +163,46 @@ public class GlossaryManager {
         }
         return sb.toString();
     }
+
+    // =========================================================================
+    // PHÂN HỆ PATCH DICTIONARY (VIỆT - VIỆT) & LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG
+    // =========================================================================
+    public static class PatchEntry {
+        public String oldText;
+        public String newText;
+
+        public PatchEntry(String oldText, String newText) {
+            this.oldText = oldText;
+            this.newText = newText;
+        }
+    }
+
+    public static String applyPatches(String text, List<PatchEntry> patches) {
+        if (text == null || patches == null || patches.isEmpty()) return text;
+        String res = text;
+        for (PatchEntry p : patches) {
+            if (p.oldText != null && !p.oldText.isEmpty() && p.newText != null && !p.oldText.equals(p.newText)) {
+                res = res.replace(p.oldText, p.newText);
+            }
+        }
+        return res;
+    }
+
+    public static int syncPatchesToMasterGlossary(Map<String, String> masterGlossary, List<PatchEntry> patches) {
+        if (masterGlossary == null || patches == null || patches.isEmpty()) return 0;
+        int updated = 0;
+        for (PatchEntry p : patches) {
+            if (p.oldText == null || p.oldText.trim().isEmpty() || p.newText == null) continue;
+            String oldTrim = p.oldText.trim();
+            String newTrim = p.newText.trim();
+            for (Map.Entry<String, String> entry : masterGlossary.entrySet()) {
+                String val = entry.getValue();
+                if (val != null && (val.equals(oldTrim) || val.contains(oldTrim))) {
+                    entry.setValue(val.replace(oldTrim, newTrim));
+                    updated++;
+                }
+            }
+        }
+        return updated;
+    }
 }

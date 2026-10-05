@@ -40,6 +40,7 @@ public class ProjectStorageManager {
         public List<String> rawChapters = new ArrayList<>();
         public Map<Integer, String> translatedChapters = new HashMap<>();
         public Map<String, String> masterGlossary = new LinkedHashMap<>();
+        public Map<String, String> patchDictionary = new LinkedHashMap<>();
         public List<Integer> processedBatchStartIndices = new ArrayList<>();
         public long lastModified = System.currentTimeMillis();
     }
@@ -60,6 +61,8 @@ public class ProjectStorageManager {
         public String readerTheme = "amoled";
         public String translationPipelineMode = "BATCH_GLOSSARY";
         public int batchGlossarySize = 50;
+        public boolean rollingPolishEnabled = true;
+        public int rollingPolishBatchSize = 15;
         public JsonArray apiKeys = new JsonArray();
         public JsonArray promptCards = new JsonArray();
     }
@@ -168,6 +171,17 @@ public class ProjectStorageManager {
             }
             root.add("masterGlossary", glossObj);
 
+            // Lưu patchDictionary
+            JsonObject patchObj = new JsonObject();
+            if (proj.patchDictionary != null) {
+                for (Map.Entry<String, String> entry : proj.patchDictionary.entrySet()) {
+                    if (entry.getKey() != null && entry.getValue() != null) {
+                        patchObj.addProperty(entry.getKey(), entry.getValue());
+                    }
+                }
+            }
+            root.add("patchDictionary", patchObj);
+
             return writeAtomic(file, gson.toJson(root));
         } catch (Exception e) {
             Log.e(TAG, "Failed to save project: " + proj.name, e);
@@ -219,6 +233,13 @@ public class ProjectStorageManager {
                 JsonObject glossObj = root.getAsJsonObject("masterGlossary");
                 for (Map.Entry<String, JsonElement> entry : glossObj.entrySet()) {
                     proj.masterGlossary.put(entry.getKey(), entry.getValue().getAsString());
+                }
+            }
+
+            if (root.has("patchDictionary")) {
+                JsonObject patchObj = root.getAsJsonObject("patchDictionary");
+                for (Map.Entry<String, JsonElement> entry : patchObj.entrySet()) {
+                    proj.patchDictionary.put(entry.getKey(), entry.getValue().getAsString());
                 }
             }
             return proj;
@@ -282,6 +303,10 @@ public class ProjectStorageManager {
             root.addProperty("delaySec", config.delaySec);
             root.addProperty("readerFontSize", config.readerFontSize);
             root.addProperty("readerTheme", config.readerTheme);
+            root.addProperty("translationPipelineMode", config.translationPipelineMode);
+            root.addProperty("batchGlossarySize", config.batchGlossarySize);
+            root.addProperty("rollingPolishEnabled", config.rollingPolishEnabled);
+            root.addProperty("rollingPolishBatchSize", config.rollingPolishBatchSize);
 
             JsonArray projArr = new JsonArray();
             if (config.projectList != null) {
@@ -321,6 +346,10 @@ public class ProjectStorageManager {
             if (root.has("delaySec")) config.delaySec = root.get("delaySec").getAsInt();
             if (root.has("readerFontSize")) config.readerFontSize = root.get("readerFontSize").getAsInt();
             if (root.has("readerTheme")) config.readerTheme = root.get("readerTheme").getAsString();
+            if (root.has("translationPipelineMode")) config.translationPipelineMode = root.get("translationPipelineMode").getAsString();
+            if (root.has("batchGlossarySize")) config.batchGlossarySize = root.get("batchGlossarySize").getAsInt();
+            if (root.has("rollingPolishEnabled")) config.rollingPolishEnabled = root.get("rollingPolishEnabled").getAsBoolean();
+            if (root.has("rollingPolishBatchSize")) config.rollingPolishBatchSize = root.get("rollingPolishBatchSize").getAsInt();
 
             if (root.has("projectList")) {
                 JsonArray arr = root.getAsJsonArray("projectList");

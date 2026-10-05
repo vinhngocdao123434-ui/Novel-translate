@@ -22,6 +22,8 @@ export interface AdvancedSettings {
   // Pipeline Mode Settings
   translationPipelineMode: 'BATCH_GLOSSARY' | 'COMBINED'; // 'BATCH_GLOSSARY' (Bóc Lô 50 Chương -> Dịch Thuần Túy) | 'COMBINED' (Dịch & Bóc Đồng Thời)
   batchGlossarySize: number; // e.g. 50 chapters per batch
+  rollingPolishEnabled?: boolean; // Tự động làm mượt cuốn chiếu mỗi 15 chương
+  rollingPolishBatchSize?: number; // e.g. 15 chapters
 
   // Glossary AI Auto-Learning Settings
   minTermLength: number; // e.g. 2 chars (1 - 8)
@@ -62,6 +64,7 @@ export interface ProjectData {
   chapters: string[];
   translatedChapters: Record<number, string>;
   masterGlossary: Record<string, string>;
+  patchDictionary?: Record<string, string>;
   createdAt?: number;
   lastUpdated?: number;
 }

@@ -602,4 +602,133 @@ public class GeminiEngine {
 
         return new String[]{translation.trim(), newGlossary.trim()};
     }
+
+    public List<GlossaryManager.PatchEntry> extractRollingPatches(List<String> translatedChapters, String modelName, LogCallback logger) throws Exception {
+        int maxRetries = Math.max(keys.size() * 2, 4);
+        int attempts = 0;
+
+        while (attempts < maxRetries) {
+            attempts++;
+            ApiKeyItem keyItem = getNextAvailableKey();
+            if (keyItem == null) throw new Exception("Không có API Key nào trong kho lưu trữ!");
+
+            long now = System.currentTimeMillis();
+            if (keyItem.cooldownUntil > now) {
+                long waitSec = Math.max((keyItem.cooldownUntil - now) / 1000, 1);
+                if (logger != null) logger.onLog("⏳ Tất cả Key đang cooldown, chờ " + waitSec + "s...");
+                Thread.sleep(waitSec * 1000);
+            }
+
+            try {
+                keyItem.totalRequests++;
+                String nl = String.valueOf((char) 10);
+
+                StringBuilder systemInstructionSb = new StringBuilder();
+                systemInstructionSb.append("Bạn là chuyên gia biên tập và hiệu đính văn học cao cấp.").append(nl);
+                systemInstructionSb.append("Nhiệm vụ: Đọc kỹ các chương bản dịch bên dưới và trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:").append(nl);
+                systemInstructionSb.append("1. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').").append(nl);
+                systemInstructionSb.append("2. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng').").append(nl);
+                systemInstructionSb.append("3. Lỗi nhầm lẫn danh xưng hoặc tên nhân vật lặp lại (VD: 'Trưởng công tử' -> 'Trưởng công chúa').").append(nl);
+                systemInstructionSb.append("4. Các câu thô/sai ngữ pháp nghiêm trọng.").append(nl).append(nl);
+                systemInstructionSb.append("QUY TẮC ĐẦU RA BẮT BUỘC:").append(nl);
+                systemInstructionSb.append("- TUYỆT ĐỐI KHÔNG xuất lại toàn bộ nội dung các chương.").append(nl);
+                systemInstructionSb.append("- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' (từ/câu lỗi gốc chính xác có trong bài) và 'new' (từ/câu thay thế chuẩn mực):").append(nl);
+                systemInstructionSb.append("[{\"old\": \"chuỗi_lỗi_gốc\", \"new\": \"chuỗi_thay_thế_chuẩn\"}]").append(nl);
+                systemInstructionSb.append("Nếu không có lỗi nào, trả về: []");
+
+                StringBuilder promptSb = new StringBuilder();
+                promptSb.append("[NỘI DUNG CÁC CHƯƠNG BẢN DỊCH CẦN RÀ SOÁT LÀM MƯỢT]:").append(nl);
+                for (int i = 0; i < translatedChapters.size(); i++) {
+                    promptSb.append("--- CHƯƠNG ").append(i + 1).append(" ---").append(nl);
+                    promptSb.append(translatedChapters.get(i)).append(nl).append(nl);
+                }
+
+                JsonObject root = new JsonObject();
+                JsonObject sysInstObj = new JsonObject();
+                JsonArray sysParts = new JsonArray();
+                JsonObject sysPart = new JsonObject();
+                sysPart.addProperty("text", systemInstructionSb.toString());
+                sysParts.add(sysPart);
+                sysInstObj.add("parts", sysParts);
+                root.add("systemInstruction", sysInstObj);
+
+                JsonArray contents = new JsonArray();
+                JsonObject contentObj = new JsonObject();
+                JsonArray parts = new JsonArray();
+                JsonObject partObj = new JsonObject();
+                partObj.addProperty("text", promptSb.toString());
+                parts.add(partObj);
+                contentObj.add("parts", parts);
+                contents.add(contentObj);
+                root.add("contents", contents);
+
+                JsonObject genConfig = new JsonObject();
+                genConfig.addProperty("temperature", 0.15);
+                genConfig.addProperty("maxOutputTokens", 8192);
+                root.add("generationConfig", genConfig);
+
+                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
+
+                RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
+                Request request = new Request.Builder().url(url).post(requestBody).build();
+
+                Response response = client.newCall(request).execute();
+                String respBody = response.body() != null ? response.body().string() : "";
+
+                if (response.isSuccessful()) {
+                    keyItem.successRequests++;
+                    keyItem.state = "ACTIVE";
+
+                    List<GlossaryManager.PatchEntry> patches = new ArrayList<>();
+                    JsonObject respJson = gson.fromJson(respBody, JsonObject.class);
+                    JsonArray candidates = respJson.getAsJsonArray("candidates");
+
+                    if (candidates != null && candidates.size() > 0) {
+                        JsonObject firstCand = candidates.get(0).getAsJsonObject();
+                        JsonObject content = firstCand.getAsJsonObject("content");
+                        JsonArray outParts = content.getAsJsonArray("parts");
+                        String outText = outParts.get(0).getAsJsonObject().get("text").getAsString();
+
+                        if (outText != null && !outText.trim().isEmpty()) {
+                            String cleanJson = outText.trim();
+                            if (cleanJson.startsWith("```json")) cleanJson = cleanJson.substring(7);
+                            else if (cleanJson.startsWith("```")) cleanJson = cleanJson.substring(3);
+                            if (cleanJson.endsWith("```")) cleanJson = cleanJson.substring(0, cleanJson.length() - 3);
+                            cleanJson = cleanJson.trim();
+
+                            int firstBracket = cleanJson.indexOf('[');
+                            int lastBracket = cleanJson.lastIndexOf(']');
+                            if (firstBracket != -1 && lastBracket != -1 && lastBracket > firstBracket) {
+                                cleanJson = cleanJson.substring(firstBracket, lastBracket + 1);
+                                JsonArray arr = gson.fromJson(cleanJson, JsonArray.class);
+                                if (arr != null) {
+                                    for (int j = 0; j < arr.size(); j++) {
+                                        JsonObject item = arr.get(j).getAsJsonObject();
+                                        String oldStr = item.has("old") ? item.get("old").getAsString() : (item.has("original") ? item.get("original").getAsString() : null);
+                                        String newStr = item.has("new") ? item.get("new").getAsString() : (item.has("replacement") ? item.get("replacement").getAsString() : null);
+                                        if (oldStr != null && newStr != null && !oldStr.trim().isEmpty() && !oldStr.equals(newStr)) {
+                                            patches.add(new GlossaryManager.PatchEntry(oldStr.trim(), newStr.trim()));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return patches;
+                } else {
+                    int statusCode = response.code();
+                    if (statusCode == 429 || statusCode == 503) {
+                        keyItem.state = "COOLDOWN (" + statusCode + ")";
+                        keyItem.cooldownUntil = System.currentTimeMillis() + 60000;
+                    } else {
+                        keyItem.state = "ERROR (" + statusCode + ")";
+                    }
+                }
+            } catch (Exception e) {
+                keyItem.state = "FAIL";
+            }
+        }
+        throw new Exception("Trích xuất Patch làm mượt thất bại sau các lượt thử Key.");
+    }
 }

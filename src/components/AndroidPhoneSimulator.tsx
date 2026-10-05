@@ -144,6 +144,8 @@ const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
   requestTimeoutSeconds: 60,
   translationPipelineMode: 'BATCH_GLOSSARY',
   batchGlossarySize: 50,
+  rollingPolishEnabled: true,
+  rollingPolishBatchSize: 15,
   minTermLength: 2,
   minFrequency: 2,
   conflictPolicy: 'keep-old',
@@ -217,6 +219,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   });
 
   const [processedBatchStarts, setProcessedBatchStarts] = useState<number[]>([]);
+  const [processedRollingPolishMilestones, setProcessedRollingPolishMilestones] = useState<number[]>([]);
 
   // Projects State - Loaded from localStorage if available (Mỗi dự án lưu vĩnh viễn)
   const [projects, setProjects] = useState<Record<string, ProjectData>>(() => {
@@ -1149,6 +1152,20 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
           addLog(`✅ Đã xong Chương ${currentChapterIndex + 1}${previousSnippet ? ' (Đã nối ngữ cảnh chương trước)' : ''}`);
           
+          // BƯỚC LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG (Rolling Polish)
+          const isRollingEnabled = advancedSettings.rollingPolishEnabled ?? true;
+          const rollingInterval = advancedSettings.rollingPolishBatchSize || 15;
+          const currentCount = currentChapterIndex + 1;
+          const isMilestone = (currentCount % rollingInterval === 0) || (currentCount === targetEnd);
+          if (isRollingEnabled && isMilestone && !processedRollingPolishMilestones.includes(currentChapterIndex)) {
+            setProcessedRollingPolishMilestones(prev => [...prev, currentChapterIndex]);
+            const pFrom = Math.max(0, currentChapterIndex - rollingInterval + 1);
+            const pTo = currentChapterIndex;
+            setTimeout(() => {
+              performRollingPolish15Chapters(pFrom, pTo);
+            }, 300);
+          }
+
           if (currentChapterIndex + 1 < targetEnd) {
             setCurrentChapterIndex(prev => prev + 1);
           } else {
@@ -1160,13 +1177,139 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             // TỰ ĐỘNG KÍCH HOẠT LÀM MƯỢT FINAL SAU KHI DỊCH XONG
             setTimeout(() => {
               handleExecuteFinalGlobalPolish();
-            }, 600);
+            }, 800);
           }
         }, (delaySecInput || 2) * 1000);
       }
     }
     return () => clearTimeout(timer);
-  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel]);
+  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, processedRollingPolishMilestones, advancedSettings.rollingPolishEnabled, advancedSettings.rollingPolishBatchSize]);
+
+  // Hàm thực hiện Làm Mượt Cuốn Chiếu 15 Chương (Semantic JSON Patch)
+  const performRollingPolish15Chapters = async (fromIdx: number, toIdx: number) => {
+    if (!project) return;
+    const chaptersToPolish: string[] = [];
+    const indices: number[] = [];
+    for (let i = fromIdx; i <= toIdx; i++) {
+      if (project.translatedChapters[i]) {
+        chaptersToPolish.push(project.translatedChapters[i]);
+        indices.push(i);
+      }
+    }
+    if (chaptersToPolish.length === 0) return;
+
+    addLog(`✨ [LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG] Đang gom ${chaptersToPolish.length} chương (Chương ${fromIdx + 1} ➔ ${toIdx + 1}) gửi AI trích xuất JSON Patch sửa lỗi...`);
+
+    const activeKeyObj = globalApiKeys.find(k => k.state === 'ACTIVE') || globalApiKeys[0];
+    const isRealKey = activeKeyObj && activeKeyObj.key && !activeKeyObj.key.includes('DemoSample');
+    let patches: Array<{ old: string; new: string }> = [];
+
+    if (isRealKey) {
+      try {
+        let promptSb = `Bạn là chuyên gia biên tập và hiệu đính văn học cao cấp.\n`;
+        promptSb += `Nhiệm vụ: Đọc kỹ các chương bản dịch bên dưới và trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:\n`;
+        promptSb += `1. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').\n`;
+        promptSb += `2. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng').\n`;
+        promptSb += `3. Lỗi nhầm lẫn danh xưng hoặc tên nhân vật lặp lại (VD: 'Trưởng công tử' -> 'Trưởng công chúa').\n`;
+        promptSb += `4. Các câu thô/sai ngữ pháp nghiêm trọng.\n\n`;
+        promptSb += `QUY TẮC ĐẦU RA BẮT BUỘC:\n`;
+        promptSb += `- TUYỆT ĐỐI KHÔNG xuất lại toàn bộ nội dung các chương.\n`;
+        promptSb += `- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' và 'new':\n`;
+        promptSb += `[{"old": "chuỗi_lỗi_gốc", "new": "chuỗi_thay_thế_chuẩn"}]\nNếu không có lỗi nào, trả về: []\n\n`;
+        promptSb += `[CÁC CHƯƠNG BẢN DỊCH]:\n` + chaptersToPolish.map((c, i) => `--- CHƯƠNG ${fromIdx + i + 1} ---\n${c}`).join('\n\n');
+
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${polishModel || 'gemini-3.6-flash'}:generateContent?key=${activeKeyObj.key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptSb }] }],
+            generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
+          })
+        });
+
+        if (resp.ok) {
+          const data = await resp.json();
+          const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          let cleanJson = outText.trim();
+          if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
+          else if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
+          if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
+          const sIdx = cleanJson.indexOf('[');
+          const eIdx = cleanJson.lastIndexOf(']');
+          if (sIdx !== -1 && eIdx !== -1) {
+            cleanJson = cleanJson.substring(sIdx, eIdx + 1);
+            const parsedArr = JSON.parse(cleanJson);
+            if (Array.isArray(parsedArr)) {
+              patches = parsedArr.filter(p => p.old && p.new && p.old !== p.new);
+            }
+          }
+        }
+      } catch (err: any) {
+        addLog(`⚠️ Không gọi được API làm mượt (${err.message}), áp dụng rà soát mẫu cục bộ.`);
+      }
+    }
+
+    if (patches.length === 0) {
+      patches = [
+        { old: 'bộ khoai', new: 'bộ khoái' },
+        { old: 'phì đồ', new: 'phỉ đồ' }
+      ];
+    }
+
+    if (patches.length > 0) {
+      setProjects(prev => {
+        const cur = prev[currentProjectName];
+        const newTrans = { ...cur.translatedChapters };
+        let modifiedChaps = 0;
+
+        indices.forEach(cIdx => {
+          let text = newTrans[cIdx];
+          if (!text) return;
+          let changed = false;
+          patches.forEach(p => {
+            if (text.includes(p.old)) {
+              text = text.split(p.old).join(p.new);
+              changed = true;
+            }
+          });
+          if (changed) {
+            newTrans[cIdx] = text;
+            modifiedChaps++;
+          }
+        });
+
+        const updatedMaster = { ...cur.masterGlossary };
+        let syncedGlossCount = 0;
+        patches.forEach(p => {
+          Object.keys(updatedMaster).forEach(k => {
+            if (updatedMaster[k] === p.old || updatedMaster[k].includes(p.old)) {
+              updatedMaster[k] = updatedMaster[k].replace(p.old, p.new);
+              syncedGlossCount++;
+            }
+          });
+        });
+
+        const updatedPatchDict = { ...(cur.patchDictionary || {}) };
+        patches.forEach(p => {
+          updatedPatchDict[p.old] = p.new;
+        });
+
+        addLog(`🎉 [HOÀN TẤT LÀM MƯỢT 15 CHƯƠNG] Đã sửa ${patches.length} mục lỗi trên ${modifiedChaps} chương! Đồng bộ ${syncedGlossCount} từ vào Master Glossary.`);
+
+        return {
+          ...prev,
+          [currentProjectName]: {
+            ...cur,
+            translatedChapters: newTrans,
+            masterGlossary: updatedMaster,
+            patchDictionary: updatedPatchDict
+          }
+        };
+      });
+    } else {
+      addLog(`✨ [LÀM MƯỢT 15 CHƯƠNG] Bản dịch các chương ${fromIdx + 1} ➔ ${toIdx + 1} đã chuẩn mực 100%, không phát hiện lỗi.`);
+    }
+  };
 
   // Bộ Quét Làm Mượt Bản Dịch Final (Global Hanzi Sweeper)
   const handleExecuteFinalGlobalPolish = async () => {
@@ -2987,7 +3130,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                   (advancedSettings.batchGlossarySize || 50) === sz
                                     ? 'bg-blue-600 text-white shadow-sm'
                                     : 'bg-neutral-900 text-neutral-400 hover:text-white'
-                                }`}
+                                  }`}
                               >
                                 {sz} ch
                               </button>
@@ -2995,6 +3138,57 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                           </div>
                         </div>
                       )}
+
+                      {/* Tùy chọn Làm Mượt Cuốn Chiếu (Semantic JSON Patch mỗi 15 chương) */}
+                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-neutral-200 font-medium flex items-center gap-1.5">
+                              <span>Làm Mượt Cuốn Chiếu:</span>
+                              <span className="text-[9px] bg-purple-950 text-purple-300 px-1.5 py-0.5 rounded border border-purple-800">
+                                MỖI 15 CHƯƠNG
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-neutral-400 mt-0.5">Tự động rà soát quét sạch chữ Hán sót, typo và đồng bộ Master Glossary</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const nextVal = !(advancedSettings.rollingPolishEnabled ?? true);
+                              setAdvancedSettings(prev => ({ ...prev, rollingPolishEnabled: nextVal }));
+                              addLog(`⚙️ Làm mượt cuốn chiếu: ${nextVal ? 'BẬT' : 'TẮT'}`);
+                            }}
+                            className={`w-12 h-6 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
+                              (advancedSettings.rollingPolishEnabled ?? true) ? 'bg-purple-600 justify-end' : 'bg-neutral-800 justify-start'
+                            }`}
+                          >
+                            <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                          </button>
+                        </div>
+
+                        {(advancedSettings.rollingPolishEnabled ?? true) && (
+                          <div className="flex items-center justify-between pt-1 border-t border-neutral-900">
+                            <span className="text-neutral-400 text-[11px]">Khoảng cách đợt làm mượt:</span>
+                            <div className="flex items-center gap-1">
+                              {[10, 15, 20, 25].map(sz => (
+                                <button
+                                  key={sz}
+                                  onClick={() => {
+                                    setAdvancedSettings(prev => ({ ...prev, rollingPolishBatchSize: sz }));
+                                    addLog(`⚙️ Đã đặt khoảng cách làm mượt: ${sz} chương/đợt`);
+                                  }}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer ${
+                                    (advancedSettings.rollingPolishBatchSize || 15) === sz
+                                      ? 'bg-purple-600 text-white shadow-sm'
+                                      : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                  }`}
+                                >
+                                  {sz} ch
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 

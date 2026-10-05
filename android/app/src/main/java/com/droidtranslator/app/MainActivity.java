@@ -233,6 +233,14 @@ public class MainActivity extends AppCompatActivity {
             "• Khuyên dùng: 50 chương mỗi đợt.\n• Đọc trước 50 chương giúp AI nắm được toàn cảnh nhân vật chính/phụ và đặt tên nhất quán.",
             "Giữ ở mức 50 chương để có tốc độ và độ chính xác cao nhất."
         ));
+
+        helpMap.put("settings_rolling_polish", new HelpData(
+            "Làm Mượt Cuốn Chiếu (Semantic JSON Patch)",
+            "Làm Mượt & Soi Lỗi",
+            "Cứ mỗi 15 chương dịch xong, AI tự động quét rà soát toàn bộ văn bản để phát hiện lỗi typo Telex, chữ Hán sót, và sai lệch danh xưng.",
+            "• AI chỉ xuất mảng JSON quy đổi {old, new} để app tự động ghi đè sửa lỗi trong tích tắc.\n• Tự động đồng bộ các từ chuẩn vào Master Glossary cho đợt dịch tiếp theo.",
+            "BẬT tính năng này giúp truyện vừa dịch vừa tự động tinh luyện, không còn sót bất kỳ chữ Hán hay lỗi gõ nào."
+        ));
     }
 
     private View createStepCard(int stepNum, String title, String accentHex, String contentText, String proTip) {
@@ -843,6 +851,11 @@ public class MainActivity extends AppCompatActivity {
     private int batchGlossarySize = 50; // 20, 30, 50, 100
     private final Set<Integer> processedBatchGlossaryStartIndices = new HashSet<>();
 
+    private boolean rollingPolishEnabled = true;
+    private int rollingPolishBatchSize = 15; // 10, 15, 20, 25
+    private final Map<String, String> patchDictionary = new LinkedHashMap<>();
+    private final Set<Integer> processedRollingPolishMilestones = new HashSet<>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -898,6 +911,8 @@ public class MainActivity extends AppCompatActivity {
             conf.readerTheme = readerTheme;
             conf.translationPipelineMode = translationPipelineMode;
             conf.batchGlossarySize = batchGlossarySize;
+            conf.rollingPolishEnabled = rollingPolishEnabled;
+            conf.rollingPolishBatchSize = rollingPolishBatchSize;
 
             conf.apiKeys = new JsonArray();
             for (ApiKeyItem k : apiKeys) {
@@ -934,6 +949,7 @@ public class MainActivity extends AppCompatActivity {
             proj.rawChapters = new ArrayList<>(rawChapters);
             proj.translatedChapters = new HashMap<>(translatedChapters);
             proj.masterGlossary = new LinkedHashMap<>(masterGlossary);
+            proj.patchDictionary = new LinkedHashMap<>(patchDictionary);
             proj.processedBatchStartIndices = new ArrayList<>(processedBatchGlossaryStartIndices);
             proj.lastModified = System.currentTimeMillis();
 
@@ -948,7 +964,9 @@ public class MainActivity extends AppCompatActivity {
             rawChapters.clear();
             translatedChapters.clear();
             masterGlossary.clear();
+            patchDictionary.clear();
             processedBatchGlossaryStartIndices.clear();
+            processedRollingPolishMilestones.clear();
             loadedRawContent = "";
             currentChapterIdx = 0;
 
@@ -960,6 +978,7 @@ public class MainActivity extends AppCompatActivity {
                 if (proj.rawChapters != null) rawChapters.addAll(proj.rawChapters);
                 if (proj.translatedChapters != null) translatedChapters.putAll(proj.translatedChapters);
                 if (proj.masterGlossary != null) masterGlossary.putAll(proj.masterGlossary);
+                if (proj.patchDictionary != null) patchDictionary.putAll(proj.patchDictionary);
                 if (proj.processedBatchStartIndices != null) processedBatchGlossaryStartIndices.addAll(proj.processedBatchStartIndices);
             }
         } catch (Exception e) {
@@ -987,6 +1006,8 @@ public class MainActivity extends AppCompatActivity {
             readerTheme = conf.readerTheme;
             if (conf.translationPipelineMode != null) translationPipelineMode = conf.translationPipelineMode;
             if (conf.batchGlossarySize > 0) batchGlossarySize = conf.batchGlossarySize;
+            rollingPolishEnabled = conf.rollingPolishEnabled;
+            if (conf.rollingPolishBatchSize > 0) rollingPolishBatchSize = conf.rollingPolishBatchSize;
 
             if (conf.projectList != null && !conf.projectList.isEmpty()) {
                 projectList.clear();
@@ -3255,6 +3276,19 @@ public class MainActivity extends AppCompatActivity {
                     });
 
                     currentChapterIdx++;
+
+                    // BƯỚC LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG (Rolling Polish)
+                    if (rollingPolishEnabled) {
+                        int finishedCount = (chapIndex + 1);
+                        boolean isMilestone = (finishedCount % rollingPolishBatchSize == 0) || (chapIndex == rangeToChap - 1) || (chapIndex == rawChapters.size() - 1);
+                        if (isMilestone && !processedRollingPolishMilestones.contains(chapIndex)) {
+                            processedRollingPolishMilestones.add(chapIndex);
+                            int pFrom = Math.max(0, chapIndex - rollingPolishBatchSize + 1);
+                            int pTo = chapIndex;
+                            performRollingPolish(pFrom, pTo);
+                        }
+                    }
+
                     Thread.sleep(delaySec * 1000L);
                 } catch (Exception e) {
                     mainHandler.post(() -> appendLog("❌ Lỗi chương " + (chapIndex + 1) + ": " + e.getMessage()));
@@ -3278,6 +3312,65 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }).start();
+    }
+
+    private void performRollingPolish(int fromIndex, int toIndex) {
+        if (fromIndex > toIndex || fromIndex < 0 || toIndex >= rawChapters.size()) return;
+        List<String> chaptersToPolish = new ArrayList<>();
+        List<Integer> chapterIndices = new ArrayList<>();
+        for (int i = fromIndex; i <= toIndex; i++) {
+            if (translatedChapters.containsKey(i) && translatedChapters.get(i) != null) {
+                chaptersToPolish.add(translatedChapters.get(i));
+                chapterIndices.add(i);
+            }
+        }
+        if (chaptersToPolish.isEmpty()) return;
+
+        String targetPolishModel = (polishModel != null && !polishModel.isEmpty()) ? polishModel : "gemini-3.6-flash";
+        mainHandler.post(() -> appendLog("✨ [LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG] Đang gom " + chaptersToPolish.size() + " chương (Chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + ") gửi " + targetPolishModel + " để trích xuất JSON Patch..."));
+
+        try {
+            List<GlossaryManager.PatchEntry> patches = engine.extractRollingPatches(chaptersToPolish, targetPolishModel, msg -> mainHandler.post(() -> appendLog(msg)));
+            if (patches != null && !patches.isEmpty()) {
+                int chaptersModified = 0;
+
+                for (int cIdx : chapterIndices) {
+                    String orig = translatedChapters.get(cIdx);
+                    if (orig == null) continue;
+                    String patched = GlossaryManager.applyPatches(orig, patches);
+                    if (!orig.equals(patched)) {
+                        translatedChapters.put(cIdx, patched);
+                        chaptersModified++;
+                    }
+                }
+
+                // Lưu vào Patch Dictionary
+                for (GlossaryManager.PatchEntry p : patches) {
+                    patchDictionary.put(p.oldText, p.newText);
+                }
+
+                // Đồng bộ ngược lại Master Glossary (Hán -> Việt)
+                int syncedGlossary = GlossaryManager.syncPatchesToMasterGlossary(masterGlossary, patches);
+
+                saveCurrentProjectData();
+
+                final int fPatches = patches.size();
+                final int fModified = chaptersModified;
+                final int fSynced = syncedGlossary;
+
+                mainHandler.post(() -> {
+                    updateProgressUI();
+                    refreshGlossaryList();
+                    refreshChapterListView();
+                    appendLog("🎉 [LÀM MƯỢT 15 CHƯƠNG HOÀN TẤT] Đã sửa " + fPatches + " lỗi chính tả/danh xưng/Hán sót trên " + fModified + " chương! Đồng bộ " + fSynced + " từ vào Master Glossary.");
+                    Toast.makeText(MainActivity.this, "Đã làm mượt " + fPatches + " mục cho chương " + (fromIndex + 1) + " - " + (toIndex + 1), Toast.LENGTH_SHORT).show();
+                });
+            } else {
+                mainHandler.post(() -> appendLog("✨ [LÀM MƯỢT 15 CHƯƠNG] Bản dịch các chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + " đạt chuẩn 100%, không phát hiện lỗi."));
+            }
+        } catch (Exception e) {
+            mainHandler.post(() -> appendLog("⚠️ [LÀM MƯỢT 15 CHƯƠNG] Không thể kết nối AI (" + e.getMessage() + "), giữ nguyên bản dịch hiện tại."));
+        }
     }
 
     private void executeFinalGlobalPolish() {
@@ -4141,6 +4234,29 @@ public class MainActivity extends AppCompatActivity {
                 saveAllState();
                 refreshSettingsUI();
                 appendLog("⚙️ Đã đặt kích thước lô bóc từ điển: " + batchGlossarySize + " chương/đợt");
+            }));
+        }
+
+        // Tùy chọn Làm Mượt Cuốn Chiếu (Semantic JSON Patch mỗi 15 chương)
+        cardPipeline.addView(createSwitchRow(
+                "Làm Mượt Cuốn Chiếu (Semantic JSON Patch)",
+                "Cứ mỗi 15 chương, AI tự động quét rà soát toàn bộ văn bản để dọn sạch chữ Hán sót và sửa typo",
+                "settings_rolling_polish",
+                rollingPolishEnabled,
+                () -> {
+                    rollingPolishEnabled = !rollingPolishEnabled;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Làm mượt cuốn chiếu: " + (rollingPolishEnabled ? "BẬT" : "TẮT"));
+                }
+        ));
+
+        if (rollingPolishEnabled) {
+            cardPipeline.addView(createStepperRow("Khoảng cách đợt làm mượt (Nhấp để nhập số):", "settings_rolling_polish", rollingPolishBatchSize, "chương", 5, 50, newVal -> {
+                rollingPolishBatchSize = newVal;
+                saveAllState();
+                refreshSettingsUI();
+                appendLog("⚙️ Đã đặt khoảng cách làm mượt cuốn chiếu: " + rollingPolishBatchSize + " chương/đợt");
             }));
         }
 
