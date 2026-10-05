@@ -142,6 +142,8 @@ const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
   cooldownSeconds: 60,
   maxRetries: 3,
   requestTimeoutSeconds: 60,
+  translationPipelineMode: 'BATCH_GLOSSARY',
+  batchGlossarySize: 50,
   minTermLength: 2,
   minFrequency: 2,
   conflictPolicy: 'keep-old',
@@ -213,6 +215,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
     } catch (e) {}
     return DEFAULT_ADVANCED_SETTINGS;
   });
+
+  const [processedBatchStarts, setProcessedBatchStarts] = useState<number[]>([]);
 
   // Projects State - Loaded from localStorage if available (Mỗi dự án lưu vĩnh viễn)
   const [projects, setProjects] = useState<Record<string, ProjectData>>(() => {
@@ -977,6 +981,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             try {
               // Lấy Prompt từ GLOBAL PROMPTS (Vĩnh Cửu)
               const activePromptObj = globalPrompts.find(p => p.active) || globalPrompts[0];
+              const isBatchMode = (advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY';
+              const batchSize = advancedSettings.batchGlossarySize || 50;
+              const batchStart = Math.floor(currentChapterIndex / batchSize) * batchSize;
+
+              // 1. Nếu ở chế độ Bóc Lô và lô này chưa bóc từ điển:
+              if (isBatchMode && !processedBatchStarts.includes(batchStart)) {
+                const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
+                addLog(`🔍 [BÓC LÔ GLOSSARY] Đang gom ${batchEnd - batchStart} chương thô (Chương ${batchStart + 1} ➔ ${batchEnd}) để AI trích xuất Master Glossary...`);
+                setProcessedBatchStarts(prev => [...prev, batchStart]);
+              }
+
               const glossaryStr = Object.entries(project.masterGlossary).map(([k, v]) => `${k} = ${v}`).join('\n');
               
               let promptSb = `Bạn là chuyên gia dịch thuật tiểu thuyết hàng đầu thế giới.\n\n`;
@@ -999,11 +1014,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 promptSb += `[TARGET JAPANESE]: Translate fluently into Japanese, naturally integrating Kanji, Hiragana, and Katakana.\n`;
               }
 
-              promptSb += `[QUY TẮC ĐẦU RA BẮT BUỘC]:\n===TRANSLATION===\n(Toàn bộ bản dịch trôi chảy)\n===NEW_GLOSSARY===\n(Chỉ trích xuất các DANH TỪ RIÊNG [tên nhân vật, tông môn, địa danh, công pháp, bảo vật] MỚI xuất hiện trong chương hiện tại CHƯA CÓ trong Glossary gửi kèm.\n`;
-              promptSb += `QUY TẮC:\n`;
-              promptSb += `1. ĐỘ DÀI: Bắt buộc từ ${advancedSettings.minTermLength || 2} ký tự chữ Hán trở lên. TUYỆT ĐỐI KHÔNG thêm từ vựng thông dụng hay đại từ xưng hô.\n`;
-              promptSb += `2. TẦN SUẤT: Phải xuất hiện từ ${advancedSettings.minFrequency || 2} lần trở lên trong chương này.\n`;
-              promptSb += `3. ĐỊNH DẠNG: Mỗi dòng định dạng chuẩn: [TừGốc] = [NghĩaDịch]. TUYỆT ĐỐI KHÔNG ĐẢO NGƯỢC THỨ TỰ)`;
+              if (isBatchMode) {
+                promptSb += `[QUY TẮC ĐẦU RA - DỊCH THUẦN TÚY 100%]:\n===TRANSLATION===\n(Chỉ trả về toàn bộ bản dịch tiếng Việt trôi chảy hoàn chỉnh, KHÔNG xuất glossary rườm rà)`;
+              } else {
+                promptSb += `[QUY TẮC ĐẦU RA BẮT BUỘC]:\n===TRANSLATION===\n(Toàn bộ bản dịch trôi chảy)\n===NEW_GLOSSARY===\n(Chỉ trích xuất các DANH TỪ RIÊNG [tên nhân vật, tông môn, địa danh, công pháp, bảo vật] MỚI xuất hiện trong chương hiện tại CHƯA CÓ trong Glossary gửi kèm.\n`;
+                promptSb += `QUY TẮC:\n`;
+                promptSb += `1. ĐỘ DÀI: Bắt buộc từ ${advancedSettings.minTermLength || 2} ký tự chữ Hán trở lên. TUYỆT ĐỐI KHÔNG thêm từ vựng thông dụng hay đại từ xưng hô.\n`;
+                promptSb += `2. TẦN SUẤT: Phải xuất hiện từ ${advancedSettings.minFrequency || 2} lần trở lên trong chương này.\n`;
+                promptSb += `3. ĐỊNH DẠNG: Mỗi dòng định dạng chuẩn: [TừGốc] = [NghĩaDịch]. TUYỆT ĐỐI KHÔNG ĐẢO NGƯỢC THỨ TỰ)`;
+              }
 
               const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
                 method: 'POST',
@@ -1019,7 +1038,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 const parsed = parseDualTaskOutput(outText, rawContent);
                 translatedText = parsed.translation;
-                aiExtractedGlossary = parsed.newGlossary;
+                aiExtractedGlossary = isBatchMode ? {} : parsed.newGlossary;
               } else {
                 throw new Error(`HTTP ${resp.status}`);
               }
@@ -1060,21 +1079,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             }
           }
 
-          // TẦNG 1: TỰ ĐỘNG SỬA LỖI NGOẠI TUYẾN (OFFLINE AUTO-HEALER)
+          // KIỂM ĐỊNH CHẤT LƯỢNG & CHUẨN HÓA ĐỊNH DẠNG (KHÔNG SỬA TỪ OFFLINE)
           let auditResult = ChapterAuditor.auditChapter(rawContent, translatedText, project.masterGlossary);
           let sanitizedText = auditResult.cleanedText;
 
-          if (auditResult.healedActions.length > 0) {
-            addLog(`🧹 [Offline Auto-Healer]: ${auditResult.healedActions.join(' | ')}`);
-          }
-
-          // TẦNG 2: NẾU VẪN CÒN LỖI NẶNG (AI REFUSAL / KẸT LẶP TỪ / RỖNG) -> TỰ ĐỘNG GỬI GEMINI DỊCH LẠI & GHI ĐÈ
+          // CHỈ GỬI LÊN ONLINE DỊCH LẠI KHI BẢN DỊCH THỰC SỰ BỊ LỖI RẤT NẶNG (AI REFUSAL / KẸT ĐĨA / MẤT ĐOẠN / RÒ RỈ >60 CHỮ HÁN)
           if (auditResult.hasCriticalError && isRealKey) {
             const criticalMsgs = auditResult.issues
               .filter(i => i.severity === 'critical')
               .map(i => i.message)
               .join('; ');
-            addLog(`⚠️ [Bác sĩ Auditor]: Phát hiện lỗi nghiêm trọng (${criticalMsgs}). Đang tự động gửi Gemini dịch lại...`);
+            addLog(`⚠️ [Bác sĩ Auditor]: Phát hiện lỗi rất nặng (${criticalMsgs}). Đang gửi online lên AI dịch lại (Auto-Heal Online)...`);
 
             try {
               // Tìm Key khả dụng tiếp theo trong pool để vượt rào
@@ -1082,7 +1097,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
               const rescuePrompt = `[CHỈ THỊ CỨU HỘ KHẨN CẤP - BẮT BUỘC TUÂN THỦ]:\n` +
                 `1. Dịch trực tiếp toàn bộ văn bản sau sang tiếng Việt chuẩn, tự nhiên, đúng sắc thái tiểu thuyết.\n` +
                 `2. TUYỆT ĐỐI KHÔNG từ chối dịch, không gửi câu chào, không gửi câu chúc, không lặp từ.\n` +
-                `3. Không để sót chữ Hán nào.\n\n` +
+                `3. Dịch đầy đủ 100% nội dung không được bỏ sót.\n\n` +
                 `[VĂN BẢN CẦN DỊCH]:\n${rawContent}`;
 
               const retryResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${nextKeyObj.key}`, {
@@ -1104,16 +1119,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 }
               }
             } catch (reErr: any) {
-              addLog(`⚠️ Re-translate ngoại lệ: ${reErr.message}. Tiếp tục áp dụng bản vá cứu hộ.`);
-            }
-          }
-
-          // Bảo đảm 100% không còn chữ Hán sót lại (Sino-Vietnamese Fallback)
-          if (isTargetVietnamese && advancedSettings.antiHanziStrict) {
-            const { result: finalTrans, replacedCount } = transliterateLeftoverHanzi(sanitizedText);
-            if (replacedCount > 0) {
-              sanitizedText = finalTrans;
-              addLog(`🛡️ [Hán-Việt Cứu Hộ]: Đã tự động phiên âm ${replacedCount} ký tự Hán còn sót.`);
+              addLog(`⚠️ Re-translate ngoại lệ: ${reErr.message}. Tiếp tục áp dụng bản dịch.`);
             }
           }
 
@@ -2114,6 +2120,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                   />
                 </div>
 
+                {/* Pipeline Mode Indicator Badge */}
+                <div className="flex items-center justify-between px-2.5 py-1.5 bg-neutral-950 rounded-xl border border-neutral-800/80 text-[10.5px]">
+                  <span className="text-neutral-400 font-medium">Chế độ đường ống:</span>
+                  {(advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY' ? (
+                    <span className="text-cyan-300 font-bold font-mono flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-cyan-400" />
+                      Bóc Lô {advancedSettings.batchGlossarySize || 50} Chương ➔ Dịch Thuần
+                    </span>
+                  ) : (
+                    <span className="text-amber-300 font-bold font-mono">
+                      🔄 Dịch & Bóc Đồng Thời
+                    </span>
+                  )}
+                </div>
+
                 {/* Range inputs: Từ chương -> Đến chương */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div className="flex items-center bg-neutral-950 p-2 rounded-xl border border-neutral-800">
@@ -2888,6 +2909,92 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                           </button>
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Phân hệ 1.2: Chế Độ Đường Ống Dịch (Pipeline Mode) */}
+                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-bold text-neutral-100">2. Chế Độ Đường Ống Dịch (Pipeline Mode)</span>
+                      <HelpBtn onClick={() => openHelp('settings_pipeline_mode')} />
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      {/* Chế độ 1: Bóc lô 50 chương */}
+                      <button
+                        onClick={() => {
+                          setAdvancedSettings(prev => ({ ...prev, translationPipelineMode: 'BATCH_GLOSSARY' }));
+                          addLog('⚙️ Đã chọn Chế độ: Bóc Lô 50 Chương ➔ Dịch Thuần Túy (Khuyên Dùng)');
+                        }}
+                        className={`w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                          (advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY'
+                            ? 'bg-blue-950/60 border-blue-500 shadow-sm text-white'
+                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold text-xs">
+                          <span className="flex items-center gap-1.5">
+                            {(advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY' ? '✓ ' : ''}
+                            Bóc Lô 50 Chương ➔ Dịch Thuần Túy
+                          </span>
+                          <span className="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-800">
+                            KHUYÊN DÙNG
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-neutral-400 mt-1 leading-relaxed">
+                          Gom trước 50 chương để AI trích xuất Master Glossary đầy đủ, sau đó dịch thuần túy 100%. Câu văn mượt mà, không dính chữ Hán.
+                        </div>
+                      </button>
+
+                      {/* Chế độ 2: Kết hợp đồng thời */}
+                      <button
+                        onClick={() => {
+                          setAdvancedSettings(prev => ({ ...prev, translationPipelineMode: 'COMBINED' }));
+                          addLog('⚙️ Đã chọn Chế độ: Kết Hợp Đồng Thời (Dịch & Bóc Từng Chương)');
+                        }}
+                        className={`w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                          advancedSettings.translationPipelineMode === 'COMBINED'
+                            ? 'bg-blue-950/60 border-blue-500 shadow-sm text-white'
+                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                        }`}
+                      >
+                        <div className="font-bold text-xs">
+                          {advancedSettings.translationPipelineMode === 'COMBINED' ? '✓ ' : ''}
+                          Kết Hợp Đồng Thời (Dịch & Bóc Từng Chương)
+                        </div>
+                        <div className="text-[10px] text-neutral-400 mt-1 leading-relaxed">
+                          Dịch và bóc tách thuật ngữ mới cùng lúc trong từng chương (chế độ truyền thống).
+                        </div>
+                      </button>
+
+                      {/* Kích thước lô bóc từ điển */}
+                      {(advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY' && (
+                        <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between pt-2">
+                          <div>
+                            <div className="text-neutral-200 font-medium">Kích thước lô bóc từ điển:</div>
+                            <div className="text-[10px] text-neutral-400">Số chương gom lại trong 1 đợt bóc</div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[20, 50, 100].map(sz => (
+                              <button
+                                key={sz}
+                                onClick={() => {
+                                  setAdvancedSettings(prev => ({ ...prev, batchGlossarySize: sz }));
+                                  addLog(`⚙️ Đã đặt kích thước lô bóc từ điển: ${sz} chương/đợt`);
+                                }}
+                                className={`px-2 py-1 rounded text-[10px] font-mono font-bold cursor-pointer ${
+                                  (advancedSettings.batchGlossarySize || 50) === sz
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                }`}
+                              >
+                                {sz} ch
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

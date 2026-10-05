@@ -27,7 +27,7 @@ export interface AuditResult {
 }
 
 /**
- * Các mẫu câu AI từ chối dịch hoặc vi phạm an toàn (Lỗi NẶNG)
+ * Các mẫu câu AI từ chối dịch hoặc vi phạm an toàn (Lỗi THỰC SỰ NẶNG - Cần Online Retry)
  */
 const AI_REFUSAL_PATTERNS = [
   /tôi không thể (hoàn thành|dịch|hỗ trợ|xử lý)/i,
@@ -37,10 +37,11 @@ const AI_REFUSAL_PATTERNS = [
   /vi phạm chính sách (nội dung|an toàn)/i,
   /safety guidelines/i,
   /content policy/i,
+  /không thể hỗ trợ yêu cầu này/i,
 ];
 
 /**
- * Các mẫu câu AI mở đầu giao tiếp thừa (Lỗi NHẸ - Tự dọn offline được)
+ * Các mẫu câu AI mở đầu giao tiếp thừa
  */
 const AI_INTRO_PATTERNS = [
   /^(dưới đây là|sau đây là|đây là) bản dịch( trôi chảy| chi tiết| hoàn chỉnh)?(:|\.)?/im,
@@ -50,7 +51,7 @@ const AI_INTRO_PATTERNS = [
 ];
 
 /**
- * Các mẫu câu AI kết thúc giao tiếp thừa (Lỗi NHẸ - Tự dọn offline được)
+ * Các mẫu câu AI kết thúc giao tiếp thừa
  */
 const AI_OUTRO_PATTERNS = [
   /(hy vọng|chúc bạn)( đọc truyện vui vẻ| thích bản dịch này| hài lòng).*$/im,
@@ -69,11 +70,11 @@ export class ChapterAuditor {
   }
 
   /**
-   * Tự động làm sạch và sửa chữa các lỗi nhẹ Offline không tốn Gemini
+   * Chỉ dọn dẹp các thẻ định dạng, vỏ bọc Markdown (Giữ nguyên văn bản dịch từ AI, KHÔNG sửa từ/chữ Hán offline)
    */
   public static cleanChapterOffline(
     text: string,
-    glossary: Record<string, string> = {}
+    _glossary: Record<string, string> = {}
   ): { cleaned: string; healedActions: string[] } {
     if (!text) return { cleaned: '', healedActions: [] };
 
@@ -140,51 +141,11 @@ export class ChapterAuditor {
       healedActions.push('Cắt bỏ câu chúc / chào kết thúc của AI');
     }
 
-    // 4. Khử câu thoại tiếng Hán kèm dịch trong ngoặc
-    const beforeQuotes = cleaned;
-    cleaned = cleaned.replace(/"[\u4e00-\u9fa5，？,。!！\s\?]+"[ \t]*\(([^)]+)\)/g, '"$1"');
-    if (cleaned !== beforeQuotes) {
-      healedActions.push('Chuẩn hóa câu thoại kèm tiếng Trung trong ngoặc');
-    }
-
-    // 5. Khử lỗi gõ Telex phổ biến
-    const beforeTelex = cleaned;
-    cleaned = cleaned
-      .replace(/\b([A-Za-zÀ-ỹ]+)ngk\b/gi, '$1ng')
-      .replace(/\b([A-Za-zÀ-ỹ]+)awk\b/gi, '$1ă')
-      .replace(/\b([A-Za-zÀ-ỹ]+)owk\b/gi, '$1ơ')
-      .replace(/\b([A-Za-zÀ-ỹ]+)uwk\b/gi, '$1ư')
-      .replace(/\bphad\b/gi, 'phải không');
-    if (cleaned !== beforeTelex) {
-      healedActions.push('Sửa lỗi kẹt phím bộ gõ Telex (ngk, awk, owk, uwk, phad)');
-    }
-
-    // 6. Khử bão dòng trắng (quá nhiều dòng trống liên tiếp)
+    // 4. Khử bão dòng trắng (quá nhiều dòng trống liên tiếp)
     const beforeLines = cleaned;
     cleaned = cleaned.replace(/\n{4,}/g, '\n\n\n');
     if (cleaned !== beforeLines) {
       healedActions.push('Nén gọn các dòng trống dư thừa');
-    }
-
-    // 7. Thế bù tự động từ Glossary đối với chữ Hán còn sót lại
-    if (glossary && Object.keys(glossary).length > 0) {
-      let substitutedCount = 0;
-      for (const [rawTerm, viTerm] of Object.entries(glossary)) {
-        if (rawTerm && viTerm && cleaned.includes(rawTerm)) {
-          cleaned = cleaned.split(rawTerm).join(viTerm);
-          substitutedCount++;
-        }
-      }
-      if (substitutedCount > 0) {
-        healedActions.push(`Thế bù tự động ${substitutedCount} thuật ngữ Hán còn sót từ Glossary`);
-      }
-    }
-
-    // 8. Phiên âm tự động toàn bộ chữ Hán còn sót lại và sửa lỗi dở dang (ví dụ "Trần Th硕" -> "Trần Thạc")
-    const { result: transliterated, replacedCount } = transliterateLeftoverHanzi(cleaned);
-    if (replacedCount > 0) {
-      cleaned = transliterated;
-      healedActions.push(`Phiên âm tự động ${replacedCount} ký tự Hán thành âm Hán-Việt chuẩn`);
     }
 
     return {
@@ -218,7 +179,14 @@ export class ChapterAuditor {
   }
 
   /**
-   * Hàm kiểm tra chất lượng chương toàn diện (Audit Engine)
+   * Hàm kiểm định chất lượng chương:
+   * - Chỉ đánh dấu Critical (Lỗi rất nặng cần Online Retry) khi:
+   *   1. Rỗng nội dung
+   *   2. AI từ chối dịch (ai_refusal)
+   *   3. Lặp câu / kẹt đĩa vô tận (repetition_loop)
+   *   4. Mất chữ nghiêm trọng (< 35% bản gốc)
+   *   5. Rò rỉ nguyên văn tiếng Trung quy mô lớn (> 60 chữ Hán)
+   * - Sót vài chữ Hán / từ lai rải rác: Giữ nguyên văn, coi là bình thường để Bộ Quét Làm Mượt Final xử lý sau.
    */
   public static auditChapter(
     rawText: string,
@@ -228,11 +196,11 @@ export class ChapterAuditor {
     const issues: AuditIssue[] = [];
     let score = 100;
 
-    // Bước 1: Chạy dọn dẹp lỗi nhẹ offline trước
-    const { cleaned: healedText, healedActions } = this.cleanChapterOffline(translatedText, glossary);
+    // Bước 1: Dọn dẹp thẻ cấu trúc / codeblock
+    const { cleaned: formattedText, healedActions } = this.cleanChapterOffline(translatedText, glossary);
 
-    // 1. Kiểm tra trống nội dung
-    if (!healedText || healedText.trim().length === 0) {
+    // 1. Kiểm tra trống nội dung -> CRITICAL
+    if (!formattedText || formattedText.trim().length === 0) {
       issues.push({
         type: 'empty_content',
         severity: 'critical',
@@ -249,14 +217,14 @@ export class ChapterAuditor {
       };
     }
 
-    // 2. Kiểm tra câu từ chối dịch của AI
+    // 2. Kiểm tra câu từ chối dịch của AI -> CRITICAL
     for (const pattern of AI_REFUSAL_PATTERNS) {
-      if (pattern.test(healedText)) {
-        if (healedText.length < 500) {
+      if (pattern.test(formattedText)) {
+        if (formattedText.length < 500) {
           issues.push({
             type: 'ai_refusal',
             severity: 'critical',
-            message: 'Gemini từ chối dịch chương này do chính sách an toàn hoặc hạn chế.',
+            message: 'Gemini từ chối dịch chương này do chính sách an toàn hoặc kiểm duyệt.',
           });
           score -= 90;
           break;
@@ -264,82 +232,63 @@ export class ChapterAuditor {
       }
     }
 
-    // 3. Kiểm tra tỷ lệ độ dài (Length Ratio)
-    const rawLen = rawText ? rawText.trim().length : 0;
-    const transLen = healedText.length;
-
-    if (rawLen > 200) {
-      const ratio = transLen / rawLen;
-      if (ratio < 0.30) {
-        issues.push({
-          type: 'length_too_short',
-          severity: 'critical',
-          message: `Nội dung quá ngắn so với văn bản gốc (${transLen}/${rawLen} kt, Tỷ lệ: ${Math.round(ratio * 100)}%). AI có thể đã ngắt giữa chừng.`,
-        });
-        score -= 50;
-      } else if (ratio < 0.50) {
-        issues.push({
-          type: 'length_too_short',
-          severity: 'mild',
-          message: `Độ dài bản dịch hơi ngắn so với nguyên tác (${Math.round(ratio * 100)}%).`,
-        });
-        score -= 15;
-      }
-    }
-
-    // 4. Kiểm tra lọt chữ Hán (Hanzi Leakage)
-    const hanziCount = this.countChineseChars(healedText);
-    if (hanziCount > 0) {
-      const sampleHanzi = healedText.match(/[\u4e00-\u9fa5]+/)?.[0] || '';
-      issues.push({
-        type: 'excessive_hanzi',
-        severity: 'critical',
-        message: `Bản dịch còn sót ${hanziCount} chữ Hán chưa được dịch (Ký tự: '${sampleHanzi}'). Cần dịch lại.`,
-      });
-      score -= 50;
-    }
-
-    // 5. Kiểm tra lặp từ vô tận
-    if (this.detectRepetitionLoop(healedText)) {
+    // 3. Kiểm tra lặp từ / kẹt đĩa vô tận -> CRITICAL
+    if (this.detectRepetitionLoop(formattedText)) {
       issues.push({
         type: 'repetition_loop',
         severity: 'critical',
-        message: 'Phát hiện lỗi suy thoái mô hình (Degeneration loop): AI lặp đi lặp lại một câu hoặc một từ vô tận.',
+        message: 'Phát hiện AI bị kẹt đĩa (lặp đi lặp lại câu văn vô tận).',
       });
       score -= 60;
     }
 
-    // 6. Ghi nhận các lỗi nhẹ đã tự sửa
-    if (healedActions.length > 0) {
-      for (const act of healedActions) {
-        if (act.includes('câu chào')) {
-          issues.push({
-            type: 'ai_conversational_intro',
-            severity: 'mild',
-            message: 'Đã tự động cắt bỏ câu chào AI mở đầu.',
-          });
-        }
-        if (act.includes('câu chúc')) {
-          issues.push({
-            type: 'ai_conversational_outro',
-            severity: 'mild',
-            message: 'Đã tự động cắt bỏ câu chúc kết AI.',
-          });
-        }
+    // 4. Kiểm tra tỷ lệ độ dài (Length Ratio) -> CRITICAL nếu < 35% với bản gốc dài
+    const rawLen = rawText ? rawText.trim().length : 0;
+    const transLen = formattedText.length;
+
+    if (rawLen > 200) {
+      const ratio = transLen / rawLen;
+      if (ratio < 0.35) {
+        issues.push({
+          type: 'length_too_short',
+          severity: 'critical',
+          message: `Mất chữ nghiêm trọng so với nguyên tác (${transLen}/${rawLen} ký tự, chỉ đạt ${Math.round(ratio * 100)}%).`,
+        });
+        score -= 50;
       }
     }
 
+    // 5. Kiểm tra chữ Hán:
+    // - Nếu > 60 chữ Hán: AI copy nguyên xi cả đoạn văn bản tiếng Trung mà không dịch -> CRITICAL (Cần dịch lại)
+    // - Nếu <= 60 chữ Hán: Vài từ tiếng Trung sót, từ lai, tên riêng -> MILD / Bình thường (Giữ nguyên cho Bộ Quét Làm Mượt Final xử lý)
+    const hanziCount = this.countChineseChars(formattedText);
+    if (hanziCount > 60) {
+      issues.push({
+        type: 'excessive_hanzi',
+        severity: 'critical',
+        message: `Bản dịch bị rò rỉ nguyên đoạn tiếng Trung (${hanziCount} chữ Hán thô chưa dịch).`,
+      });
+      score -= 50;
+    } else if (hanziCount > 0) {
+      issues.push({
+        type: 'excessive_hanzi',
+        severity: 'mild',
+        message: `Sót nhẹ ${hanziCount} chữ Hán/từ lai (Giữ nguyên cho chức năng Làm Mượt Final xử lý).`,
+      });
+      score -= Math.min(10, Math.ceil(hanziCount / 5));
+    }
+
     const hasCriticalError = issues.some((i) => i.severity === 'critical');
-    const hasMildError = issues.some((i) => i.severity === 'mild') || healedActions.length > 0;
+    const hasMildError = issues.some((i) => i.severity === 'mild');
     const finalScore = Math.max(0, Math.min(100, score));
 
     return {
-      isValid: !hasCriticalError && finalScore >= 50,
+      isValid: !hasCriticalError && finalScore >= 40,
       score: finalScore,
       issues,
       hasCriticalError,
       hasMildError,
-      cleanedText: healedText,
+      cleanedText: formattedText,
       healedActions,
     };
   }

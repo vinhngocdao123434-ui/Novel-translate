@@ -3151,18 +3151,7 @@ public class MainActivity extends AppCompatActivity {
                         newGlossaryRaw = (result.length > 1) ? result[1] : "";
                     }
 
-                    // Lớp 2: Hậu kiểm Regex chống lọt chữ Hán cho bản dịch tiếng Việt
-                    if (targetLanguage.contains("Việt") && antiHanziStrict) {
-                        List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(masterGlossary.entrySet());
-                        sortedEntries.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
-                        for (Map.Entry<String, String> gEntry : sortedEntries) {
-                            if (translatedText.contains(gEntry.getKey())) {
-                                translatedText = translatedText.replace(gEntry.getKey(), gEntry.getValue());
-                            }
-                        }
-                    }
-
-                    // TẦNG KIỂM ĐỊNH NGOẠI TUYẾN (Offline Quality Audit)
+                    // TẦNG KIỂM ĐỊNH CHẤT LƯỢNG (Audit Engine)
                     ChapterAuditor.AuditResult audit = ChapterAuditor.auditChapter(
                             rawChapters.get(chapIndex),
                             translatedText,
@@ -3171,10 +3160,10 @@ public class MainActivity extends AppCompatActivity {
                             antiHanziStrict
                     );
 
-                    // TỰ ĐỘNG ĐẨY LÊN ONLINE DỊCH LẠI & GHI ĐÈ NẾU BẢN DỊCH BỊ LỖI NẶNG
+                    // CHỈ TỰ ĐỘNG ĐẨY LÊN ONLINE DỊCH LẠI & GHI ĐÈ NẾU BẢN DỊCH THỰC SỰ BỊ LỖI RẤT NẶNG
                     if (autoHealOnlineEnabled && !audit.isValid && audit.hasCriticalError) {
                         final String primaryIssue = audit.getPrimaryIssue();
-                        mainHandler.post(() -> appendLog("⚠️ [PHÁT HIỆN LỖI NẶNG] Chương " + (chapIndex + 1) + ": " + primaryIssue + ". Đang đẩy lên AI dịch lại (Auto-Heal Online)..."));
+                        mainHandler.post(() -> appendLog("⚠️ [PHÁT HIỆN LỖI RẤT NẶNG] Chương " + (chapIndex + 1) + ": " + primaryIssue + ". Đang gửi online lên AI dịch lại (Auto-Heal Online)..."));
 
                         String rescuePrompt = "LỆNH CỨU HỘ ĐẶC BIỆT: Bản dịch trước bị lỗi nghiêm trọng [" + primaryIssue + "]. "
                                 + "YÊU CẦU DỊCH LẠI TOÀN BỘ: Dịch trọn vẹn chương sau sang " + targetLanguage + " đầy đủ 100%, tuyệt đối không tóm tắt, không bỏ sót câu chữ nào, không để sót chữ Hán thô trong câu văn, không lặp lại câu vô nghĩa.";
@@ -3213,16 +3202,6 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
 
-                            if (targetLanguage.contains("Việt") && antiHanziStrict) {
-                                List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(masterGlossary.entrySet());
-                                sortedEntries.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
-                                for (Map.Entry<String, String> gEntry : sortedEntries) {
-                                    if (rescueTranslated.contains(gEntry.getKey())) {
-                                        rescueTranslated = rescueTranslated.replace(gEntry.getKey(), gEntry.getValue());
-                                    }
-                                }
-                            }
-
                             ChapterAuditor.AuditResult rescueAudit = ChapterAuditor.auditChapter(
                                     rawChapters.get(chapIndex),
                                     rescueTranslated,
@@ -3234,21 +3213,17 @@ public class MainActivity extends AppCompatActivity {
                             if (rescueAudit.isValid || rescueAudit.score > audit.score) {
                                 translatedText = rescueAudit.cleanedText;
                                 final int finalScore = rescueAudit.score;
-                                mainHandler.post(() -> appendLog("🎯 [CỨU HỘ THÀNH CÔNG] Chương " + (chapIndex + 1) + " đã được dịch lại chuẩn (Điểm: " + finalScore + "/100). Ghi đè vào bộ nhớ!"));
+                                mainHandler.post(() -> appendLog("🎯 [CỨU HỘ THÀNH CÔNG] Chương " + (chapIndex + 1) + " đã được dịch lại chuẩn trực tuyến (Điểm: " + finalScore + "/100). Ghi đè vào bộ nhớ!"));
                             } else {
                                 translatedText = audit.cleanedText;
-                                mainHandler.post(() -> appendLog("🛡️ [CỨU HỘ NGOẠI TUYẾN] Dùng bản vá sạch ngoại tuyến cho Chương " + (chapIndex + 1) + "."));
+                                mainHandler.post(() -> appendLog("🛡️ Giữ bản dịch hiện tại cho Chương " + (chapIndex + 1) + "."));
                             }
                         } catch (Exception exRescue) {
                             translatedText = audit.cleanedText;
-                            mainHandler.post(() -> appendLog("🛡️ [LỖI MẠNG CỨU HỘ] Dùng bản vá sạch ngoại tuyến cho Chương " + (chapIndex + 1) + ": " + exRescue.getMessage()));
+                            mainHandler.post(() -> appendLog("🛡️ [LỖI MẠNG CỨU HỘ] Giữ bản dịch cho Chương " + (chapIndex + 1) + ": " + exRescue.getMessage()));
                         }
                     } else {
                         translatedText = audit.cleanedText;
-                        if (!audit.healedActions.isEmpty()) {
-                            final String actions = String.join(", ", audit.healedActions);
-                            mainHandler.post(() -> appendLog("🧹 [TỰ VÁ OFFLINE] Chương " + (chapIndex + 1) + ": Đã " + actions));
-                        }
                     }
 
                     translatedChapters.put(chapIndex, translatedText);

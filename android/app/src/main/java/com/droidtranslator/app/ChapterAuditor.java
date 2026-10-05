@@ -112,22 +112,22 @@ public class ChapterAuditor {
         }
 
         // 4. Kiểm tra chữ Hán:
-        // - Nếu > 60 chữ Hán: AI copy nguyên xi cả đoạn văn bản tiếng Trung mà không dịch -> CRITICAL
-        // - Nếu từ 1 - 60 chữ Hán: Lỗi nhẹ rải rác (Từ lai, tên riêng, đồ vật) -> MILD (Chấp nhận bản dịch, Bộ Quét Final sẽ xử lý tự động)
+        // - Nếu > 60 chữ Hán: AI copy nguyên xi cả đoạn văn bản tiếng Trung mà không dịch -> CRITICAL (Cần gửi online dịch lại)
+        // - Nếu từ 1 - 60 chữ Hán: Lỗi nhẹ rải rác (Vài từ tiếng Trung sót, từ lai, tên riêng) -> MILD (Giữ nguyên cho Bộ Quét Làm Mượt Final xử lý)
         if (targetLanguage != null && targetLanguage.contains("Việt") && antiHanziStrict) {
-            if (rawHanzi > 5) {
+            if (rawHanzi > 60) {
                 res.hasCriticalError = true;
-                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch bị lọt " + rawHanzi + " chữ Hán thô"));
+                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch bị rò rỉ nguyên đoạn tiếng Trung (" + rawHanzi + " chữ Hán thô chưa dịch)"));
                 score -= 50;
             } else if (rawHanzi > 0) {
                 res.hasMildError = true;
-                res.issues.add(new AuditIssue("mild_hanzi", "mild", "Lọt nhẹ " + rawHanzi + " chữ Hán/từ lai (Đã tự động phiên âm Hán-Việt 100% tại nguồn)"));
-                score -= Math.min(15, rawHanzi);
+                res.issues.add(new AuditIssue("mild_hanzi", "mild", "Sót nhẹ " + rawHanzi + " chữ Hán/từ lai (Giữ nguyên cho Bộ Quét Làm Mượt Final xử lý)"));
+                score -= Math.min(10, Math.max(1, rawHanzi / 6));
             }
         }
 
         res.score = Math.max(0, Math.min(100, score));
-        res.isValid = !res.hasCriticalError && res.score >= 50;
+        res.isValid = !res.hasCriticalError && res.score >= 40;
         return res;
     }
 
@@ -164,13 +164,6 @@ public class ChapterAuditor {
         if (!stripped.equals(cleaned)) {
             cleaned = stripped;
             if (healedActions != null) healedActions.add("Xóa thẻ XML/HTML rò rỉ");
-        }
-
-        // Phiên âm tức thì dựa trên SinoVietnameseDictionary cho toàn bộ chữ Hán & làm sạch từ lai tại nguồn
-        String transliterated = SinoVietnameseDictionary.transliterateAndCleanMixedTokens(cleaned);
-        if (!transliterated.equals(cleaned)) {
-            cleaned = transliterated;
-            if (healedActions != null) healedActions.add("Phiên âm Hán-Việt & làm sạch từ lai 100%");
         }
 
         return cleaned.trim();

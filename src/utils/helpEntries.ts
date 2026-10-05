@@ -134,6 +134,20 @@ export const HELP_ENTRIES: Record<string, HelpInfoItem> = {
     howToUse: '• KHUYÊN DÙNG: NÊN BẬT (Nút gạt xanh ngọc).\n• TÁC DỤNG: Bạn không cần phải ngồi canh máy bấm dịch lại từng câu.',
     proTip: 'BẬT tính năng này giúp bạn có thể cắm máy dịch tự động cả đêm.'
   },
+  'settings_pipeline_mode': {
+    title: 'Chế Độ Đường Ống Dịch (Pipeline Mode)',
+    category: 'Chế Độ Dịch',
+    whatIsIt: 'Cách thức AI xử lý câu chữ và từ điển khi dịch truyện.',
+    howToUse: '• CHẾ ĐỘ BÓC LÔ 50 CHƯƠNG (KHUYÊN DÙNG): Bóc từ điển trước cho 50 chương, sau đó dịch thuần túy 100%. Bản dịch cực sạch, không rườm rà output.\n• CHẾ ĐỘ ĐỒNG THỜI: Dịch và bóc từ điển cùng lúc trong từng chương.',
+    proTip: 'Nên chọn "Bóc Lô 50 Chương ➔ Dịch Thuần" để câu văn thuần Việt và mượt mà nhất.'
+  },
+  'settings_batch_glossary_size': {
+    title: 'Kích Thước Lô Bóc Từ Điển',
+    category: 'Kích Thước Lô',
+    whatIsIt: 'Số chương truyện được gom lại trong 1 lượt gọi để AI bóc tách toàn bộ tên nhân vật và địa danh.',
+    howToUse: '• Khuyên dùng: 50 chương mỗi đợt.\n• Đọc trước 50 chương giúp AI nắm toàn cảnh nhân vật chính/phụ và đặt tên đồng nhất.',
+    proTip: 'Giữ ở mức 50 chương để có tốc độ và độ chính xác cao nhất.'
+  },
   'settings_target_language': {
     title: 'Ngôn Ngữ Đích',
     category: 'Ngôn Ngữ',

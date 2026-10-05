@@ -19,6 +19,10 @@ export interface AdvancedSettings {
   maxRetries: number; // e.g. 3
   requestTimeoutSeconds: number; // e.g. 60s
 
+  // Pipeline Mode Settings
+  translationPipelineMode: 'BATCH_GLOSSARY' | 'COMBINED'; // 'BATCH_GLOSSARY' (Bóc Lô 50 Chương -> Dịch Thuần Túy) | 'COMBINED' (Dịch & Bóc Đồng Thời)
+  batchGlossarySize: number; // e.g. 50 chapters per batch
+
   // Glossary AI Auto-Learning Settings
   minTermLength: number; // e.g. 2 chars (1 - 8)
   minFrequency: number; // e.g. 2 occurrences (1 - 10)
