@@ -3112,6 +3112,9 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
 
+                    String translatedText = "";
+                    String newGlossaryRaw = "";
+
                     Map<String, String> chapterRelevantGlossary = GlossaryManager.filterRelevantGlossary(masterGlossary, rawChapters.get(chapIndex));
                     final int relCount = chapterRelevantGlossary.size();
                     final int totalCount = masterGlossary.size();
