@@ -934,6 +934,7 @@ public class MainActivity extends AppCompatActivity {
             proj.rawChapters = new ArrayList<>(rawChapters);
             proj.translatedChapters = new HashMap<>(translatedChapters);
             proj.masterGlossary = new LinkedHashMap<>(masterGlossary);
+            proj.processedBatchStartIndices = new ArrayList<>(processedBatchGlossaryStartIndices);
             proj.lastModified = System.currentTimeMillis();
 
             storageManager.saveProject(proj);
@@ -947,6 +948,7 @@ public class MainActivity extends AppCompatActivity {
             rawChapters.clear();
             translatedChapters.clear();
             masterGlossary.clear();
+            processedBatchGlossaryStartIndices.clear();
             loadedRawContent = "";
             currentChapterIdx = 0;
 
@@ -958,6 +960,7 @@ public class MainActivity extends AppCompatActivity {
                 if (proj.rawChapters != null) rawChapters.addAll(proj.rawChapters);
                 if (proj.translatedChapters != null) translatedChapters.putAll(proj.translatedChapters);
                 if (proj.masterGlossary != null) masterGlossary.putAll(proj.masterGlossary);
+                if (proj.processedBatchStartIndices != null) processedBatchGlossaryStartIndices.addAll(proj.processedBatchStartIndices);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -2422,6 +2425,7 @@ public class MainActivity extends AppCompatActivity {
                 rawChapters.clear();
                 translatedChapters.clear();
                 masterGlossary.clear();
+                processedBatchGlossaryStartIndices.clear();
                 loadedRawContent = "";
                 currentChapterIdx = 0;
 
@@ -2742,6 +2746,7 @@ public class MainActivity extends AppCompatActivity {
 
         edtFromChap.setText("1");
         edtToChap.setText(String.valueOf(rawChapters.size()));
+        processedBatchGlossaryStartIndices.clear();
         saveCurrentProjectData();
         saveAllState();
 
@@ -3168,21 +3173,39 @@ public class MainActivity extends AppCompatActivity {
                                 + "YÊU CẦU DỊCH LẠI TOÀN BỘ: Dịch trọn vẹn chương sau sang " + targetLanguage + " đầy đủ 100%, tuyệt đối không tóm tắt, không bỏ sót câu chữ nào, không để sót chữ Hán thô trong câu văn, không lặp lại câu vô nghĩa.";
 
                         try {
-                            String[] rescueResult = engine.translateChapter(
-                                    rawChapters.get(chapIndex),
-                                    prevSnippet,
-                                    activePrompt,
-                                    masterGlossary,
-                                    currentModel,
-                                    targetLanguage,
-                                    antiHanziStrict,
-                                    minTermLength,
-                                    minFrequency,
-                                    rescuePrompt,
-                                    msg -> mainHandler.post(() -> appendLog(msg))
-                            );
+                            String rescueTranslated = "";
+                            if ("BATCH_GLOSSARY".equals(translationPipelineMode)) {
+                                rescueTranslated = engine.translateChapterPure(
+                                        rawChapters.get(chapIndex),
+                                        prevSnippet,
+                                        activePrompt,
+                                        masterGlossary,
+                                        currentModel,
+                                        targetLanguage,
+                                        antiHanziStrict,
+                                        rescuePrompt,
+                                        msg -> mainHandler.post(() -> appendLog(msg))
+                                );
+                            } else {
+                                String[] rescueResult = engine.translateChapter(
+                                        rawChapters.get(chapIndex),
+                                        prevSnippet,
+                                        activePrompt,
+                                        masterGlossary,
+                                        currentModel,
+                                        targetLanguage,
+                                        antiHanziStrict,
+                                        minTermLength,
+                                        minFrequency,
+                                        rescuePrompt,
+                                        msg -> mainHandler.post(() -> appendLog(msg))
+                                );
+                                rescueTranslated = rescueResult[0];
+                                if (rescueResult.length > 1 && rescueResult[1] != null && !rescueResult[1].trim().isEmpty()) {
+                                    newGlossaryRaw = rescueResult[1];
+                                }
+                            }
 
-                            String rescueTranslated = rescueResult[0];
                             if (targetLanguage.contains("Việt") && antiHanziStrict) {
                                 List<Map.Entry<String, String>> sortedEntries = new ArrayList<>(masterGlossary.entrySet());
                                 sortedEntries.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
@@ -3203,9 +3226,6 @@ public class MainActivity extends AppCompatActivity {
 
                             if (rescueAudit.isValid || rescueAudit.score > audit.score) {
                                 translatedText = rescueAudit.cleanedText;
-                                if (rescueResult.length > 1 && rescueResult[1] != null && !rescueResult[1].trim().isEmpty()) {
-                                    newGlossaryRaw = rescueResult[1];
-                                }
                                 final int finalScore = rescueAudit.score;
                                 mainHandler.post(() -> appendLog("🎯 [CỨU HỘ THÀNH CÔNG] Chương " + (chapIndex + 1) + " đã được dịch lại chuẩn (Điểm: " + finalScore + "/100). Ghi đè vào bộ nhớ!"));
                             } else {
@@ -4134,7 +4154,7 @@ public class MainActivity extends AppCompatActivity {
         cardPipeline.addView(rowPipeChoice);
 
         if (isBatchMode) {
-            cardPipeline.addView(createStepperRow("Kích thước lô bóc từ điển:", "settings_batch_glossary_size", batchGlossarySize, "chương", 10, 100, newVal -> {
+            cardPipeline.addView(createStepperRow("Kích thước lô bóc từ điển (Nhấp để nhập số):", "settings_batch_glossary_size", batchGlossarySize, "chương", 10, 500, newVal -> {
                 batchGlossarySize = newVal;
                 saveAllState();
                 refreshSettingsUI();
@@ -4456,10 +4476,12 @@ public class MainActivity extends AppCompatActivity {
         }
         row.addView(tRow, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
-        // Stepper Container: [ - ]  [ 2 ký tự ]  [ + ]
+        // Stepper Container: [ - ]  [ 50 chương ]  [ + ]
         LinearLayout stepper = new LinearLayout(this);
         stepper.setOrientation(LinearLayout.HORIZONTAL);
         stepper.setGravity(Gravity.CENTER_VERTICAL);
+
+        final int step = (maxVal >= 50) ? 10 : 1;
 
         Button btnMinus = createButton("-", "#1A1C28");
         btnMinus.setTextSize(13f);
@@ -4468,7 +4490,7 @@ public class MainActivity extends AppCompatActivity {
         btnMinus.setOnClickListener(v -> {
             triggerHaptic();
             if (currentVal > minVal) {
-                listener.onChanged(currentVal - 1);
+                listener.onChanged(Math.max(minVal, currentVal - step));
             }
         });
         stepper.addView(btnMinus, new LinearLayout.LayoutParams(dp(30), dp(30)));
@@ -4479,8 +4501,19 @@ public class MainActivity extends AppCompatActivity {
         tvVal.setTextSize(12f);
         tvVal.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         tvVal.setGravity(Gravity.CENTER);
-        tvVal.setPadding(dp(6), dp(2), dp(6), dp(2));
-        stepper.addView(tvVal, new LinearLayout.LayoutParams(dp(64), ViewGroup.LayoutParams.WRAP_CONTENT));
+        tvVal.setPadding(dp(6), dp(4), dp(6), dp(4));
+        GradientDrawable valBg = new GradientDrawable();
+        valBg.setColor(Color.parseColor("#151824"));
+        valBg.setCornerRadius(dp(8));
+        valBg.setStroke(dp(1), Color.parseColor("#1E293B"));
+        tvVal.setBackground(valBg);
+
+        tvVal.setOnClickListener(v -> {
+            triggerHaptic();
+            showDirectNumberInputDialog(title, currentVal, minVal, maxVal, unit, listener);
+        });
+
+        stepper.addView(tvVal, new LinearLayout.LayoutParams(dp(72), ViewGroup.LayoutParams.WRAP_CONTENT));
 
         Button btnPlus = createButton("+", "#1A1C28");
         btnPlus.setTextSize(13f);
@@ -4489,13 +4522,72 @@ public class MainActivity extends AppCompatActivity {
         btnPlus.setOnClickListener(v -> {
             triggerHaptic();
             if (currentVal < maxVal) {
-                listener.onChanged(currentVal + 1);
+                listener.onChanged(Math.min(maxVal, currentVal + step));
             }
         });
         stepper.addView(btnPlus, new LinearLayout.LayoutParams(dp(30), dp(30)));
 
         row.addView(stepper);
         return row;
+    }
+
+    private void showDirectNumberInputDialog(String title, int currentVal, int minVal, int maxVal, String unit, ValueChangedListener listener) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(title);
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(36, 24, 36, 16);
+
+        TextView tvLabel = new TextView(this);
+        tvLabel.setText("Nhập số trực tiếp (" + minVal + " ➔ " + maxVal + " " + (unit != null ? unit : "") + "):");
+        tvLabel.setTextColor(Color.parseColor("#94A3B8"));
+        tvLabel.setTextSize(12f);
+        layout.addView(tvLabel);
+
+        final EditText edtNum = createStyledEditText(String.valueOf(currentVal));
+        edtNum.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        edtNum.setText(String.valueOf(currentVal));
+        layout.addView(edtNum);
+
+        TextView tvPresetLabel = new TextView(this);
+        tvPresetLabel.setText("Lựa chọn nhanh:");
+        tvPresetLabel.setTextColor(Color.parseColor("#94A3B8"));
+        tvPresetLabel.setTextSize(11f);
+        tvPresetLabel.setPadding(0, dp(12), 0, dp(6));
+        layout.addView(tvPresetLabel);
+
+        LinearLayout rowPresets = new LinearLayout(this);
+        rowPresets.setOrientation(LinearLayout.HORIZONTAL);
+
+        int[] presets = (maxVal >= 50) ? new int[]{10, 20, 30, 50, 100, 200} : new int[]{minVal, 2, 3, 5, 10};
+        for (int p : presets) {
+            if (p >= minVal && p <= maxVal) {
+                Button btnP = createButton(String.valueOf(p), "#1E293B");
+                btnP.setTextSize(11f);
+                btnP.setMinHeight(dp(32));
+                btnP.setPadding(dp(4), dp(2), dp(4), dp(2));
+                btnP.setOnClickListener(v -> {
+                    triggerHaptic();
+                    edtNum.setText(String.valueOf(p));
+                });
+                LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f);
+                plp.rightMargin = dp(4);
+                rowPresets.addView(btnP, plp);
+            }
+        }
+        layout.addView(rowPresets);
+
+        builder.setView(layout);
+        builder.setPositiveButton("Xác Nhận", (dialog, which) -> {
+            try {
+                int parsed = Integer.parseInt(edtNum.getText().toString().trim());
+                int clamped = Math.max(minVal, Math.min(maxVal, parsed));
+                listener.onChanged(clamped);
+            } catch (Exception ignored) {}
+        });
+        builder.setNegativeButton("Hủy", null);
+        builder.show();
     }
 
     private void exportFullNovelData() {

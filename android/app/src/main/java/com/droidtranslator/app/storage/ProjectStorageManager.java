@@ -40,6 +40,7 @@ public class ProjectStorageManager {
         public List<String> rawChapters = new ArrayList<>();
         public Map<Integer, String> translatedChapters = new HashMap<>();
         public Map<String, String> masterGlossary = new LinkedHashMap<>();
+        public List<Integer> processedBatchStartIndices = new ArrayList<>();
         public long lastModified = System.currentTimeMillis();
     }
 

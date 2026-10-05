@@ -253,7 +253,13 @@ public class GeminiEngine {
 
                 StringBuilder systemInstructionSb = new StringBuilder();
                 systemInstructionSb.append("Bạn là Đại Sư Bóc Tách Thuật Ngữ Văn Học Tiếng Trung chuyên nghiệp.").append(nl);
-                systemInstructionSb.append("Nhiệm vụ: Rà soát toàn bộ các chương truyện được cung cấp bên dưới, phát hiện và trích xuất TẤT CẢ DANH TỪ RIÊNG MỚI (Tên người, địa danh, môn phái, bảo vật, chiêu thức).").append(nl);
+                systemInstructionSb.append("Nhiệm vụ: Rà soát toàn bộ các chương truyện được cung cấp bên dưới, phát hiện và trích xuất TOÀN BỘ CÁC DANH TỪ RIÊNG VÀ THUẬT NGỮ CÓ GIÁ TRỊ thuộc 6 nhóm sau:").append(nl);
+                systemInstructionSb.append("1. TÊN NHÂN VẬT & TÊN XƯƠNG HÔ: (VD: 林辰 -> Lâm Thần, 韩立 -> Hàn Lập, 二愣子 -> Nhị Lăng Tử)").append(nl);
+                systemInstructionSb.append("2. ĐỊA DANH / MÔN PHÁI / BANG HỘI / THÀNH TRÌ: (VD: 青云宗 -> Thanh Vân Tông, 彩霞山 -> Thải Hà Sơn, 燕家堡 -> Yến Gia Bảo)").append(nl);
+                systemInstructionSb.append("3. PHÁP BẢO / LINH BẢO / THẦN KHÍ / TRANG BỊ: (VD: 斩仙剑 -> Trảm Tiên Kiếm, 掌天瓶 -> Chưởng Thiên Bình, 储物袋 -> Trữ Đồ Đại)").append(nl);
+                systemInstructionSb.append("4. CÔNG PHÁP / CHIÊU THỨC / THÂN PHÁP / KHẨU QUYẾT: (VD: 长春功 -> Trường Xuân Công, 罗烟步 -> La Yên Bộ, 巨剑术 -> Cự Kiếm Thuật)").append(nl);
+                systemInstructionSb.append("5. LINH THÚ / YÊU THÚ / THẦN THÚ / THỦ PHÁP: (VD: 赤眼金毛狮 -> Xích Nhãn Kim Mao Sư, 墨蛟 -> Mặc Giao)").append(nl);
+                systemInstructionSb.append("6. CẢNH GIỚI TU LUYỆN / ĐAN DƯỢC / DƯỢC LIỆU / ĐỘC DƯỢC: (VD: 筑基期 -> Trúc Cơ Kỳ, 洗髓丹 -> Tẩy Tủy Đan, 升仙丸 -> Thăng Tiên Hoàn)").append(nl).append(nl);
                 systemInstructionSb.append("QUY TẮC BẮT BUỘC:").append(nl);
                 systemInstructionSb.append("1. Chỉ trích xuất từ có độ dài chữ Hán >= ").append(minTermLength).append(" ký tự.").append(nl);
                 systemInstructionSb.append("2. BẢO TOÀN TỪ ĐIỂN CŨ: Nếu từ gốc đã tồn tại trong Danh Sách Đã Có bên dưới, TUYỆT ĐỐI KHÔNG ghi đè hay thay đổi nghĩa.").append(nl);

@@ -1,6 +1,6 @@
 {
-  "summary":  "Cập nhật kế hoạch Chế độ Dịch Theo Lô: Đảm bảo nguyên tắc Giữ Cũ Bỏ Mới (KEEP_OLD) để thống nhất tên nhân vật xuyên suốt bộ truyện không bị xung đột với các lô trước",
-  "updatedAt":  "2026-10-05T01:49:14.133253148Z",
+  "summary":  "Kế hoạch sửa đổi & nâng cấp toàn diện Chế độ Bóc Lô Glossary (Batch-Glossary Mode): Lưu vết lô bền vững theo dự án, thêm ô nhập số trực tiếp lô chương, mở rộng bóc tách đầy đủ các thể loại (Pháp bảo, công pháp, địa danh, môn phái...), và kích hoạt Bộ kiểm định lỗi Auto-Heal Online cho chế độ mới.",
+  "updatedAt":  "2026-10-05T02:19:37.471593135Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
