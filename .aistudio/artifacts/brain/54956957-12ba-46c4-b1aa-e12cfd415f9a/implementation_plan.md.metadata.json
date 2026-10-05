@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch sửa đổi & nâng cấp toàn diện Chế độ Bóc Lô Glossary (Batch-Glossary Mode): Lưu vết lô bền vững theo dự án, thêm ô nhập số trực tiếp lô chương, mở rộng bóc tách đầy đủ các thể loại (Pháp bảo, công pháp, địa danh, môn phái...), và kích hoạt Bộ kiểm định lỗi Auto-Heal Online cho chế độ mới.",
-  "updatedAt":  "2026-10-05T02:19:37.471593135Z",
+  "summary":  "Kế hoạch triệt tiêu 100% chữ Hán và từ lai ngay từ đầu trong chế độ Dịch Thuần Túy (Batch-Glossary Mode): Thắt chặt kỷ luật Prompt Zero-Hanzi Tolerance, tích hợp Bộ phiên âm Hán-Việt toàn diện ngay tại nguồn, và kích hoạt Auto-Heal tức thì nếu phát hiện chữ Hán lọt lưới.",
+  "updatedAt":  "2026-10-05T02:44:13.909095114Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

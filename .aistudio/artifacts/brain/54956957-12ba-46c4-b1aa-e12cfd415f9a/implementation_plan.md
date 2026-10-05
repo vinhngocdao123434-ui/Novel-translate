@@ -1,45 +1,40 @@
-# Kế Hoạch Sửa Đổi & Nâng Cấp: Chế Độ Dịch Theo Lô (Batch-Glossary Pipeline Mode)
+# Kế Hoạch Triệt Tiêu 100% Chữ Hán & Từ Lai Ngay Từ Đầu (Zero-Hanzi at Source)
 
-## 📋 Tóm Tắt Phản Hồi Của Người Dùng & Giải Pháp Kỹ Thuật
-
-### 1. Khắc Phục Lỗi Quản Lý Vết Lô Bóc Từ Điển (Bền Vững Theo Dự Án)
-* **Vấn đề:** Trạng thái lô đã bóc trước đây chỉ lưu trên RAM. Khi đổi dự án, hủy dịch hoặc mở lại app, có thể dẫn đến việc dịch luôn mà chưa bóc từ điển cho đợt chương đó.
-* **Giải pháp:** 
-  * Lưu danh sách `processedBatchStartIndices` trực tiếp vào tệp JSON của từng dự án (`ProjectDataHolder`).
-  * Khi chuyển dự án hoặc bắt đầu dịch (`startRangeTranslation` / `startFillGapsTranslation`), kiểm tra chính xác đợt chương hiện tại đã được bóc từ điển chưa.
-  * Nếu chưa bóc, hệ thống **bắt buộc chạy bóc tách lô trước 100%**, hoàn tất nạp từ điển Master rồi mới tiến hành dịch chương 1 của lô.
-
-### 2. Mở Rộng Toàn Diện Các Thể Loại Thuật Ngữ Bóc Tách
-* **Vấn đề:** Prompt bóc lô cũ quá thiên về tên nhân vật, dễ bỏ sót địa danh, tổ chức, pháp bảo, công pháp...
-* **Giải pháp:** Cập nhật Prompt trong `extractBatchGlossary` trích xuất đầy đủ 6 nhóm thuật ngữ:
-  1. **Tên nhân vật / Tên xưng hô:** (Lâm Thần, Triệu Bá Thiên, Nhị Lăng Tử...)
-  2. **Địa danh / Bang hội / Môn phái:** (Thanh Vân Tông, Thải Hà Sơn, Hắc Phong Trại...)
-  3. **Pháp bảo / Linh bảo / Vật phẩm:** (Trảm Tiên Kiếm, Hỗn Độn Chung, Nhẫn Trữ Đồ...)
-  4. **Công pháp / Chiêu thức / Khẩu quyết:** (Cửu Chuyển Kim Thân Độc, Thái Cực Kiếm Pháp...)
-  5. **Linh thú / Yêu thú / Thần thú:** (Xích Nhãn Kim Mao Sư, Cửu Vĩ Thiên Hồ...)
-  6. **Cảnh giới / Đan dược / Độc dược:** (Trúc Cơ Kỳ, Tẩy Tủy Đan, Hóa Cốt Phấn...)
-
-### 3. Thêm Nút Nhập Số Trực Tiếp Cho Kích Thước Lô Chương
-* **Vấn đề:** Giao diện cũ dùng nút `+` và `-` bấm từng đơn vị, mất nhiều thời gian khi muốn chỉnh từ 50 về 30 hoặc lên 100 chương.
-* **Giải pháp:** 
-  * Cho phép **bấm trực tiếp vào chữ `[50 chương]`** để hiển thị Hộp Thoại Nhập Số Trực Tiếp (EditText) kèm các nút chọn nhanh (10, 20, 30, 50, 100, 200 chương).
-  * Chỉnh nút `+` và `-` tăng/giảm theo bước nhảy 10 chương (hoặc 5 chương) thay vì 1 chương.
-
-### 4. Tích Hợp Trọn Vẹn Bộ Kiểm Định Lỗi & Cứu Hộ Online (ChapterAuditor & Auto-Heal)
-* **Vấn đề:** Cần đảm bảo chế độ dịch thuần túy (`BATCH_GLOSSARY`) vẫn chạy qua bộ kiểm định chất lượng offline và tự động gửi lệnh dịch lại cứu hộ (`autoHealOnlineEnabled`) khi phát hiện lỗi nặng.
-* **Giải pháp:**
-  * Trong hàm `startTranslationLoop`, đối với chế độ `BATCH_GLOSSARY`, sau khi có `translatedText` từ `translateChapterPure`, đưa qua `ChapterAuditor.auditChapter(...)`.
-  * Nếu phát hiện lỗi nghiêm trọng (cắt câu, mất đoạn, lọt chữ Hán thô...), kích hoạt quy trình **Auto-Heal Online**: Gọi lại `translateChapterPure` kèm `rescueInstruction` khẩn cấp để AI dịch lại trọn vẹn 100%.
+## 🎯 Mục Tiêu
+Đảm bảo bản dịch trong chế độ **Dịch Thuần Túy (`BATCH_GLOSSARY`)** luôn **sạch 100% tiếng Việt ngay tại thời điểm dịch xong từng chương**, tuyệt đối không để lọt bất kỳ chữ Hán hay từ lai nào (như `Diệp辰`, `Ngư璇`) vào bộ nhớ tác phẩm.
 
 ---
 
-## 🛠️ Danh Sách File Cần Cập Nhật
-1. **`ProjectStorageManager.java`:** Thêm `List<Integer> processedBatchStartIndices` vào `ProjectDataHolder`.
-2. **`GeminiEngine.java`:** Mở rộng System Instruction bóc tách trọn vẹn 6 nhóm thuật ngữ.
-3. **`MainActivity.java`:**
-   - Cập nhật UI Stepper `createStepperRow` / Dialog nhập số trực tiếp cho lô chương.
-   - Lưu vết `processedBatchStartIndices` theo từng dự án truyện.
-   - Tích hợp `ChapterAuditor` và `Auto-Heal Online` cho phương thức `translateChapterPure`.
+## 🛠️ Nguyên Nhân & Giải Pháp Kỹ Thuật
+
+### 1. Thắt Chặt Kỷ Luật Prompt "Zero Hanzi Tolerance" Cho Gemini (`GeminiEngine.java`)
+* **Vấn đề:** Khi dịch câu văn có chứa thuật ngữ lạ chưa có trong Glossary, AI đôi khi lười phiên âm và giữ nguyên chữ Hán hoặc tạo ra từ lai dính chữ Hán.
+* **Giải pháp:** Cập nhật System Instruction của `translateChapterPure()` với quy tắc Kỷ Luật Thép:
+  * **CẤM TUYỆT ĐỐI TỪ LAI:** Nghiêm cấm tạo từ dính chữ Hán với chữ Việt (như `Diệp辰`, `Ngư璇`).
+  * **TỰ PHIÊN ÂM HÁN-VIỆT TẤT CẢ TÊN LẠ:** Với bất kỳ tên người, địa danh, vật phẩm chưa có trong Glossary, AI **bắt buộc phải tự dịch/phiên âm sang âm Hán-Việt chuẩn** (VD: `辰` -> `Thần`, `璇` -> `Tuyền`).
+  * **OUTPUT TRỰC TIẾP:** Đảm bảo 100% văn bản trả về là tiếng Việt thuần túy.
+
+### 2. Tích Hợp Tầng Phiên ÂM Hán-Việt Tự Động Ngay Tại Nguồn (`SinoVietnameseDictionary.java` & `ChapterAuditor.java`)
+* **Vấn đề:** Từ điển Hán-Việt tĩnh cũ chỉ có ~70 ký tự nên khi AI vô tình bỏ sót chữ Hán lạ, hệ thống không thể phiên âm hết.
+* **Giải pháp:**
+  * Mở rộng bảng phiên âm `SinoVietnameseDictionary` lên hàng ngàn ký tự Hán phổ biến trong tiểu thuyết (hoặc cơ chế tra cứu Unicode Hán-Việt đầy đủ).
+  * Ngay khi AI trả bản dịch về cho chương $N$, ứng dụng chạy ngay tầng lọc tại nguồn:
+    1. Thay thế 100% theo Master Glossary (Longest Match First).
+    2. Tự động chuyển đổi toàn bộ các ký tự CJK Unicode còn lại sang âm Hán-Việt chuẩn.
+    3. Ghép nối và làm sạch các từ lai dính chữ (VD: `Diệp` + `辰` -> `Diệp Thần`).
+
+### 3. Tự Động Kích Hoạt Auto-Heal Online Ngay Khi Phát Hiện Chữ Hán (`MainActivity.java`)
+* **Vấn đề:** Trước đây nếu chương chỉ lọt vài chữ Hán (`rawHanzi <= 60`), hệ thống xếp vào lỗi nhẹ và giữ nguyên bản dịch lỗi.
+* **Giải pháp:**
+  * Nếu bật `Auto-Heal Online`, chỉ cần phát hiện **bất kỳ chữ Hán thô nào lọt lưới trong bản dịch gốc của AI**, hệ thống lập tức kích hoạt lệnh **Cứu hộ Khẩn cấp** gửi lại cho AI dịch lại chương đó ngay lập tức với yêu cầu triệt tiêu chữ Hán.
+
+---
+
+## 📋 Danh Sách File Cần Cập Nhật
+1. **`GeminiEngine.java`:** Siết chặt Prompt `translateChapterPure` theo tiêu chuẩn Zero Hanzi Tolerance.
+2. **`SinoVietnameseDictionary.java`:** Tích hợp bộ chuyển đổi Hán-Việt toàn diện hỗ trợ hàng ngàn Hán tự.
+3. **`ChapterAuditor.java`:** Tự động sửa từ lai và phiên âm Hán-Việt 100% ngay tại nguồn.
+4. **`MainActivity.java`:** Siết chặt logic kiểm tra chữ Hán để kích hoạt Auto-Heal hoặc sửa sạch 100% trước khi lưu bản dịch vào bộ nhớ.
 
 ---
 

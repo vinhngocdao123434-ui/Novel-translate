@@ -387,7 +387,10 @@ public class GeminiEngine {
                 systemInstructionSb.append("[QUY TẮC ĐẦU RA]: Trả về TRỰC TIẾP văn bản bản dịch hoàn chỉnh. CẤM thêm bất kỳ thẻ định dạng nào như ===TRANSLATION=== hay ===NEW_GLOSSARY===, cấm giải thích thừa.").append(nl);
 
                 if (targetLanguage == null || targetLanguage.toLowerCase().contains("việt")) {
-                    systemInstructionSb.append("[KỶ LUẬT CHỐNG LỌT CHỮ HÁN]: CẤM 100% CHỮ HÁN NẰM TRONG BẢN DỊCH. Toàn bộ tên riêng, chức vị, vật phẩm phải phiên âm Hán-Việt hoặc thuần Việt chuẩn.").append(nl);
+                    systemInstructionSb.append("[KỶ LUẬT CHỐNG LỌT CHỮ HÁN & TỪ LAI TUYỆT ĐỐI (ZERO HANZI TOLERANCE)]:").append(nl);
+                    systemInstructionSb.append("1. CẤM 100% CHỮ HÁN NẰM TRONG BẢN DỊCH VÀ CẤM TẠO TỪ LAI DÍNH CHỮ HÁN (NHƯ 'Diệp辰', 'Ngư璇').").append(nl);
+                    systemInstructionSb.append("2. Với bất kỳ tên riêng, địa danh, vật phẩm chưa có trong Bảng Từ Điển bên dưới, BẠN BẮT BUỘC PHẢI TỰ PHIÊN ÂM HÁN-VIỆT CHUẨN SANG TIẾNG VIỆT (VD: 辰 -> Thần, 璇 -> Tuyền, 宗 -> Tông).").append(nl);
+                    systemInstructionSb.append("3. Bản dịch phải là 100% tiếng Việt mượt mà, thuần túy, đọc tự nhiên.").append(nl);
                 }
 
                 StringBuilder promptSb = new StringBuilder();

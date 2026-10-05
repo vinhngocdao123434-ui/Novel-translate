@@ -115,13 +115,13 @@ public class ChapterAuditor {
         // - Nếu > 60 chữ Hán: AI copy nguyên xi cả đoạn văn bản tiếng Trung mà không dịch -> CRITICAL
         // - Nếu từ 1 - 60 chữ Hán: Lỗi nhẹ rải rác (Từ lai, tên riêng, đồ vật) -> MILD (Chấp nhận bản dịch, Bộ Quét Final sẽ xử lý tự động)
         if (targetLanguage != null && targetLanguage.contains("Việt") && antiHanziStrict) {
-            if (rawHanzi > 60) {
+            if (rawHanzi > 5) {
                 res.hasCriticalError = true;
-                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch bị lỗi copy nguyên văn tiếng Trung (" + rawHanzi + " chữ Hán)"));
+                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch bị lọt " + rawHanzi + " chữ Hán thô"));
                 score -= 50;
             } else if (rawHanzi > 0) {
                 res.hasMildError = true;
-                res.issues.add(new AuditIssue("mild_hanzi", "mild", "Sót " + rawHanzi + " chữ Hán/từ lai (Bộ Quét Final sẽ làm mượt tự động)"));
+                res.issues.add(new AuditIssue("mild_hanzi", "mild", "Lọt nhẹ " + rawHanzi + " chữ Hán/từ lai (Đã tự động phiên âm Hán-Việt 100% tại nguồn)"));
                 score -= Math.min(15, rawHanzi);
             }
         }
@@ -166,30 +166,11 @@ public class ChapterAuditor {
             if (healedActions != null) healedActions.add("Xóa thẻ XML/HTML rò rỉ");
         }
 
-        // Phiên âm tức thì dựa trên SinoVietnameseDictionary cho các chữ Hán đơn lẻ
-        StringBuilder sb = new StringBuilder();
-        boolean substituted = false;
-        for (int i = 0; i < cleaned.length(); i++) {
-            char c = cleaned.charAt(i);
-            Character.UnicodeBlock block = Character.UnicodeBlock.of(c);
-            if (block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
-                    || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
-                    || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS) {
-                String sino = SinoVietnameseDictionary.lookup(String.valueOf(c));
-                if (sino != null && !sino.isEmpty()) {
-                    sb.append(sino);
-                    substituted = true;
-                } else {
-                    sb.append(c);
-                }
-            } else {
-                sb.append(c);
-            }
-        }
-
-        if (substituted) {
-            cleaned = sb.toString();
-            if (healedActions != null) healedActions.add("Phiên âm Hán-Việt tự động");
+        // Phiên âm tức thì dựa trên SinoVietnameseDictionary cho toàn bộ chữ Hán & làm sạch từ lai tại nguồn
+        String transliterated = SinoVietnameseDictionary.transliterateAndCleanMixedTokens(cleaned);
+        if (!transliterated.equals(cleaned)) {
+            cleaned = transliterated;
+            if (healedActions != null) healedActions.add("Phiên âm Hán-Việt & làm sạch từ lai 100%");
         }
 
         return cleaned.trim();
