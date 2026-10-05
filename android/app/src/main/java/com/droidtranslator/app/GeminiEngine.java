@@ -381,16 +381,40 @@ public class GeminiEngine {
                 String glossaryText = GlossaryManager.getGlossaryAsString(glossary);
                 String nl = String.valueOf((char) 10);
 
-                StringBuilder systemInstructionSb = new StringBuilder();
-                systemInstructionSb.append("Bạn là đại sư dịch thuật tiểu thuyết văn học và huyền huyễn đỉnh cao hàng đầu thế giới.").append(nl);
-                systemInstructionSb.append("[NGÔN NGỮ ĐÍCH BẮT BUỘC]: ").append(targetLanguage != null ? targetLanguage : "Tiếng Việt").append(nl);
-                systemInstructionSb.append("[QUY TẮC ĐẦU RA]: Trả về TRỰC TIẾP văn bản bản dịch hoàn chỉnh. CẤM thêm bất kỳ thẻ định dạng nào như ===TRANSLATION=== hay ===NEW_GLOSSARY===, cấm giải thích thừa.").append(nl);
+                boolean isViet = (targetLanguage == null || targetLanguage.toLowerCase().contains("việt"));
+                boolean isEng = (targetLanguage != null && (targetLanguage.toLowerCase().contains("anh") || targetLanguage.toLowerCase().contains("eng")));
+                boolean isJap = (targetLanguage != null && (targetLanguage.toLowerCase().contains("nhật") || targetLanguage.toLowerCase().contains("jap")));
 
-                if (targetLanguage == null || targetLanguage.toLowerCase().contains("việt")) {
-                    systemInstructionSb.append("[KỶ LUẬT CHỐNG LỌT CHỮ HÁN & TỪ LAI TUYỆT ĐỐI (ZERO HANZI TOLERANCE)]:").append(nl);
-                    systemInstructionSb.append("1. CẤM 100% CHỮ HÁN NẰM TRONG BẢN DỊCH VÀ CẤM TẠO TỪ LAI DÍNH CHỮ HÁN (NHƯ 'Diệp辰', 'Ngư璇').").append(nl);
-                    systemInstructionSb.append("2. Với bất kỳ tên riêng, địa danh, vật phẩm chưa có trong Bảng Từ Điển bên dưới, BẠN BẮT BUỘC PHẢI TỰ PHIÊN ÂM HÁN-VIỆT CHUẨN SANG TIẾNG VIỆT (VD: 辰 -> Thần, 璇 -> Tuyền, 宗 -> Tông).").append(nl);
-                    systemInstructionSb.append("3. Bản dịch phải là 100% tiếng Việt mượt mà, thuần túy, đọc tự nhiên.").append(nl);
+                StringBuilder systemInstructionSb = new StringBuilder();
+                if (isViet) {
+                    systemInstructionSb.append("Bạn là dịch giả văn học Trung - Việt chuyên nghiệp.").append(nl);
+                    systemInstructionSb.append("Nhiệm vụ: Dịch hoàn chỉnh văn bản gốc sang Tiếng Việt thuần túy, tự nhiên, mượt mà.").append(nl).append(nl);
+                    systemInstructionSb.append("QUY TẮC BẮT BUỘC:").append(nl);
+                    systemInstructionSb.append("- TUÂN THỦ TỪ ĐIỂN: Sử dụng chính xác các cặp từ trong Bảng Từ Điển đi kèm.").append(nl);
+                    systemInstructionSb.append("- TIẾNG VIỆT THUẦN TÚY (ZERO CHỮ HÁN): Không để lại bất kỳ chữ Hán hay từ lai dính chữ Hán nào trong bản dịch. Nếu gặp tên riêng chưa có trong từ điển, tự phiên âm Hán-Việt chuẩn. Chú ý không gõ sai chính tả từ Hán-Việt (ví dụ: không gõ \"Bộ khoái\" thành \"Bộ khoai\").").append(nl);
+                    systemInstructionSb.append("- GIỮ NGUYÊN ĐỊNH DẠNG: Giữ nguyên cấu trúc xuống dòng, ngắt đoạn của văn bản gốc.").append(nl);
+                    systemInstructionSb.append("- ĐẦU RA TRỰC TIẾP: Chỉ trả về nội dung bản dịch hoàn chỉnh. Không thêm lời giải thích, không dùng thẻ cấu trúc hay markdown codeblock.").append(nl);
+                } else if (isEng) {
+                    systemInstructionSb.append("You are a professional literary translator into English.").append(nl);
+                    systemInstructionSb.append("Task: Translate the source text completely into fluent, natural English.").append(nl).append(nl);
+                    systemInstructionSb.append("MANDATORY RULES:").append(nl);
+                    systemInstructionSb.append("- GLOSSARY ADHERENCE: Strictly use the term pairs in the attached Glossary.").append(nl);
+                    systemInstructionSb.append("- PRESERVE FORMATTING: Retain the original line break and paragraph structure.").append(nl);
+                    systemInstructionSb.append("- DIRECT OUTPUT: Output only the complete translation text. Do not add explanations or markdown codeblocks.").append(nl);
+                } else if (isJap) {
+                    systemInstructionSb.append("あなたはプロの文芸翻訳家です。").append(nl);
+                    systemInstructionSb.append("任務: 原文を自然で流暢な日本語に完全翻訳すること。").append(nl).append(nl);
+                    systemInstructionSb.append("必須ルール:").append(nl);
+                    systemInstructionSb.append("- 用語集の遵守: 添付された用語集の訳語を正確に使用すること。").append(nl);
+                    systemInstructionSb.append("- フォーマット維持: 原文の改行と段落構成をそのまま維持すること。").append(nl);
+                    systemInstructionSb.append("- 直接出力: 翻訳テキストのみを出力し、解説やコードブロックは一切含めないこと。").append(nl);
+                } else {
+                    systemInstructionSb.append("You are a professional literary translator.").append(nl);
+                    systemInstructionSb.append("Task: Translate the source text completely into natural " + (targetLanguage != null ? targetLanguage : "English") + ".").append(nl).append(nl);
+                    systemInstructionSb.append("MANDATORY RULES:").append(nl);
+                    systemInstructionSb.append("- GLOSSARY ADHERENCE: Strictly use the term pairs in the attached Glossary.").append(nl);
+                    systemInstructionSb.append("- PRESERVE FORMATTING: Retain original line breaks and paragraph structure.").append(nl);
+                    systemInstructionSb.append("- DIRECT OUTPUT: Output only the complete translation. Do not add explanations.").append(nl);
                 }
 
                 StringBuilder promptSb = new StringBuilder();

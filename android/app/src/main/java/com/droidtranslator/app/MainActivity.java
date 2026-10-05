@@ -3112,15 +3112,19 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
 
-                    String translatedText = "";
-                    String newGlossaryRaw = "";
+                    Map<String, String> chapterRelevantGlossary = GlossaryManager.filterRelevantGlossary(masterGlossary, rawChapters.get(chapIndex));
+                    final int relCount = chapterRelevantGlossary.size();
+                    final int totalCount = masterGlossary.size();
+                    if (totalCount > 0) {
+                        mainHandler.post(() -> appendLog("🔍 [LỌC TỪ ĐIỂN] Chương " + (chapIndex + 1) + ": Lọc " + relCount + "/" + totalCount + " từ thực sự xuất hiện trong chương"));
+                    }
 
                     if ("BATCH_GLOSSARY".equals(translationPipelineMode)) {
                         translatedText = engine.translateChapterPure(
                                 rawChapters.get(chapIndex),
                                 prevSnippet,
                                 activePrompt,
-                                masterGlossary,
+                                chapterRelevantGlossary,
                                 currentModel,
                                 targetLanguage,
                                 antiHanziStrict,
@@ -3132,7 +3136,7 @@ public class MainActivity extends AppCompatActivity {
                                 rawChapters.get(chapIndex),
                                 prevSnippet,
                                 activePrompt,
-                                masterGlossary,
+                                chapterRelevantGlossary,
                                 currentModel,
                                 targetLanguage,
                                 antiHanziStrict,
@@ -3179,7 +3183,7 @@ public class MainActivity extends AppCompatActivity {
                                         rawChapters.get(chapIndex),
                                         prevSnippet,
                                         activePrompt,
-                                        masterGlossary,
+                                        chapterRelevantGlossary,
                                         currentModel,
                                         targetLanguage,
                                         antiHanziStrict,
@@ -3191,7 +3195,7 @@ public class MainActivity extends AppCompatActivity {
                                         rawChapters.get(chapIndex),
                                         prevSnippet,
                                         activePrompt,
-                                        masterGlossary,
+                                        chapterRelevantGlossary,
                                         currentModel,
                                         targetLanguage,
                                         antiHanziStrict,

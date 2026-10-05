@@ -134,6 +134,24 @@ public class GlossaryManager {
         return mergeNewEntries(targetMap, newGlossaryBlock, null, 2, 2, "keep-old");
     }
 
+    public static Map<String, String> filterRelevantGlossary(Map<String, String> masterGlossary, String text) {
+        if (masterGlossary == null || masterGlossary.isEmpty()) {
+            return new LinkedHashMap<>();
+        }
+        if (text == null || text.trim().isEmpty()) {
+            return new LinkedHashMap<>(masterGlossary);
+        }
+
+        Map<String, String> filtered = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : masterGlossary.entrySet()) {
+            String key = entry.getKey();
+            if (key != null && !key.trim().isEmpty() && text.contains(key)) {
+                filtered.put(key, entry.getValue());
+            }
+        }
+        return filtered;
+    }
+
     public static String getGlossaryAsString(Map<String, String> map) {
         if (map == null || map.isEmpty()) {
             return "";

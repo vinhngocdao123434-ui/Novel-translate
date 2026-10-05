@@ -1,40 +1,56 @@
-# Kế Hoạch Triệt Tiêu 100% Chữ Hán & Từ Lai Ngay Từ Đầu (Zero-Hanzi at Source)
+# Kế Hoạch Chuẩn Hóa SystemInstruction Đa Ngôn Ngữ & Lọc Từ Điển Thông Minh Theo Chương
 
 ## 🎯 Mục Tiêu
-Đảm bảo bản dịch trong chế độ **Dịch Thuần Túy (`BATCH_GLOSSARY`)** luôn **sạch 100% tiếng Việt ngay tại thời điểm dịch xong từng chương**, tuyệt đối không để lọt bất kỳ chữ Hán hay từ lai nào (như `Diệp辰`, `Ngư璇`) vào bộ nhớ tác phẩm.
+1. **Áp Dụng Đúng 100% SystemInstruction Do Người Dùng Cung Cấp (Cho Tiếng Việt):** Tinh gọn, bao gồm lưu ý chống sai chính tả Hán-Việt ("Bộ khoái" thay vì "Bộ khoai") và giữ nguyên định dạng ngắt đoạn.
+2. **Cơ Chế Đa Ngôn Ngữ Tự Động:** Nếu ngôn ngữ đích là Tiếng Anh, Tiếng Nhật, Tiếng Pháp... hệ thống tự động đổi `systemInstruction` tương ứng phù hợp với ngôn ngữ đó.
+3. **Lọc Từ Điển Tối Ưu Theo Chương (Relevant Glossary Filtering):** Chỉ lọc và gửi những từ xuất hiện trong văn bản gốc của chương đó.
 
 ---
 
-## 🛠️ Nguyên Nhân & Giải Pháp Kỹ Thuật
+## 📄 NỘI DUNG `systemInstruction` THEO NGÔN NGỮ ĐÍCH
 
-### 1. Thắt Chặt Kỷ Luật Prompt "Zero Hanzi Tolerance" Cho Gemini (`GeminiEngine.java`)
-* **Vấn đề:** Khi dịch câu văn có chứa thuật ngữ lạ chưa có trong Glossary, AI đôi khi lười phiên âm và giữ nguyên chữ Hán hoặc tạo ra từ lai dính chữ Hán.
-* **Giải pháp:** Cập nhật System Instruction của `translateChapterPure()` với quy tắc Kỷ Luật Thép:
-  * **CẤM TUYỆT ĐỐI TỪ LAI:** Nghiêm cấm tạo từ dính chữ Hán với chữ Việt (như `Diệp辰`, `Ngư璇`).
-  * **TỰ PHIÊN ÂM HÁN-VIỆT TẤT CẢ TÊN LẠ:** Với bất kỳ tên người, địa danh, vật phẩm chưa có trong Glossary, AI **bắt buộc phải tự dịch/phiên âm sang âm Hán-Việt chuẩn** (VD: `辰` -> `Thần`, `璇` -> `Tuyền`).
-  * **OUTPUT TRỰC TIẾP:** Đảm bảo 100% văn bản trả về là tiếng Việt thuần túy.
+### 1. Khi Ngôn Ngữ Đích Là Tiếng Việt (Default):
+```text
+Bạn là dịch giả văn học Trung - Việt chuyên nghiệp.
+Nhiệm vụ: Dịch hoàn chỉnh văn bản gốc sang Tiếng Việt thuần túy, tự nhiên, mượt mà.
 
-### 2. Tích Hợp Tầng Phiên ÂM Hán-Việt Tự Động Ngay Tại Nguồn (`SinoVietnameseDictionary.java` & `ChapterAuditor.java`)
-* **Vấn đề:** Từ điển Hán-Việt tĩnh cũ chỉ có ~70 ký tự nên khi AI vô tình bỏ sót chữ Hán lạ, hệ thống không thể phiên âm hết.
-* **Giải pháp:**
-  * Mở rộng bảng phiên âm `SinoVietnameseDictionary` lên hàng ngàn ký tự Hán phổ biến trong tiểu thuyết (hoặc cơ chế tra cứu Unicode Hán-Việt đầy đủ).
-  * Ngay khi AI trả bản dịch về cho chương $N$, ứng dụng chạy ngay tầng lọc tại nguồn:
-    1. Thay thế 100% theo Master Glossary (Longest Match First).
-    2. Tự động chuyển đổi toàn bộ các ký tự CJK Unicode còn lại sang âm Hán-Việt chuẩn.
-    3. Ghép nối và làm sạch các từ lai dính chữ (VD: `Diệp` + `辰` -> `Diệp Thần`).
+QUY TẮC BẮT BUỘC:
+- TUÂN THỦ TỪ ĐIỂN: Sử dụng chính xác các cặp từ trong Bảng Từ Điển đi kèm.
+- TIẾNG VIỆT THUẦN TÚY (ZERO CHỮ HÁN): Không để lại bất kỳ chữ Hán hay từ lai dính chữ Hán nào trong bản dịch. Nếu gặp tên riêng chưa có trong từ điển, tự phiên âm Hán-Việt chuẩn. Chú ý không gõ sai chính tả từ Hán-Việt (ví dụ: không gõ "Bộ khoái" thành "Bộ khoai").
+- GIỮ NGUYÊN ĐỊNH DẠNG: Giữ nguyên cấu trúc xuống dòng, ngắt đoạn của văn bản gốc.
+- ĐẦU RA TRỰC TIẾP: Chỉ trả về nội dung bản dịch hoàn chỉnh. Không thêm lời giải thích, không dùng thẻ cấu trúc hay markdown codeblock.
+```
 
-### 3. Tự Động Kích Hoạt Auto-Heal Online Ngay Khi Phát Hiện Chữ Hán (`MainActivity.java`)
-* **Vấn đề:** Trước đây nếu chương chỉ lọt vài chữ Hán (`rawHanzi <= 60`), hệ thống xếp vào lỗi nhẹ và giữ nguyên bản dịch lỗi.
-* **Giải pháp:**
-  * Nếu bật `Auto-Heal Online`, chỉ cần phát hiện **bất kỳ chữ Hán thô nào lọt lưới trong bản dịch gốc của AI**, hệ thống lập tức kích hoạt lệnh **Cứu hộ Khẩn cấp** gửi lại cho AI dịch lại chương đó ngay lập tức với yêu cầu triệt tiêu chữ Hán.
+### 2. Khi Ngôn Ngữ Đích Là Tiếng Anh (English):
+```text
+You are a professional literary translator.
+Task: Translate the source text completely into fluent, natural English.
+
+MANDATORY RULES:
+- GLOSSARY ADHERENCE: Strictly use the term pairs in the attached Glossary.
+- ACCURATE TRANSLITERATION: Ensure proper names and terms not in the glossary are properly transliterated into pinyin or standard English equivalents.
+- PRESERVE FORMATTING: Retain the original line break and paragraph structure.
+- DIRECT OUTPUT: Output only the complete translation text. Do not add explanations or markdown codeblocks.
+```
+
+### 3. Khi Ngôn Ngữ Đích Là Ngôn Ngữ Khác (Japanese, French, German...):
+Tự động điều chỉnh prompt hệ thống tương ứng theo ngôn ngữ đích được chọn.
 
 ---
 
-## 📋 Danh Sách File Cần Cập Nhật
-1. **`GeminiEngine.java`:** Siết chặt Prompt `translateChapterPure` theo tiêu chuẩn Zero Hanzi Tolerance.
-2. **`SinoVietnameseDictionary.java`:** Tích hợp bộ chuyển đổi Hán-Việt toàn diện hỗ trợ hàng ngàn Hán tự.
-3. **`ChapterAuditor.java`:** Tự động sửa từ lai và phiên âm Hán-Việt 100% ngay tại nguồn.
-4. **`MainActivity.java`:** Siết chặt logic kiểm tra chữ Hán để kích hoạt Auto-Heal hoặc sửa sạch 100% trước khi lưu bản dịch vào bộ nhớ.
+## 🛠️ Chi Tiết Đổi Cách Hoạt Động Của Glossary (`GlossaryManager.java`)
+
+1. **Thêm hàm `getRelevantGlossary(Map<String, String> masterGlossary, String chapterText)`:**
+   - Quét từng thuật ngữ tiếng Trung trong `masterGlossary`.
+   - Nếu `chapterText.contains(entry.getKey())` ➔ Thêm cặp từ đó vào `filteredGlossary`.
+   - Giảm 90% dung lượng Token gửi cho AI, giúp AI không bị loạn tên nhân vật.
+
+---
+
+## 📋 Các File Cần Thay Đổi
+1. **`GlossaryManager.java`:** Thêm logic lọc từ điển thông minh theo văn bản chương.
+2. **`GeminiEngine.java`:** Áp dụng `systemInstruction` mới chuẩn hóa cho Tiếng Việt và các ngôn ngữ khác.
+3. **`MainActivity.java`:** Truyền `filteredGlossary` vào tiến trình dịch.
 
 ---
 

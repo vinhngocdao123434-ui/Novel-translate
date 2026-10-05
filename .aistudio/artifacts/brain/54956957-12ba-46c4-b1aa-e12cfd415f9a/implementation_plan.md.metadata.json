@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch triệt tiêu 100% chữ Hán và từ lai ngay từ đầu trong chế độ Dịch Thuần Túy (Batch-Glossary Mode): Thắt chặt kỷ luật Prompt Zero-Hanzi Tolerance, tích hợp Bộ phiên âm Hán-Việt toàn diện ngay tại nguồn, và kích hoạt Auto-Heal tức thì nếu phát hiện chữ Hán lọt lưới.",
-  "updatedAt":  "2026-10-05T02:44:13.909095114Z",
+  "summary":  "Cập nhật Kế hoạch theo đúng SystemInstruction do người dùng cung cấp cho Tiếng Việt (thêm chú ý không sai chính tả Hán-Việt và giữ nguyên định dạng ngắt đoạn), cùng cơ chế tự động chuyển SystemInstruction phù hợp khi ngôn ngữ đích là Tiếng Anh, Tiếng Nhật... Tích hợp Lọc Từ Điển Tối Ưu Theo Chương (Relevant Glossary Filtering).",
+  "updatedAt":  "2026-10-05T03:40:59.671097757Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
