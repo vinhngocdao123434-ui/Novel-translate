@@ -41,6 +41,8 @@ public class ProjectStorageManager {
         public Map<Integer, String> translatedChapters = new HashMap<>();
         public Map<String, String> masterGlossary = new LinkedHashMap<>();
         public Map<String, String> patchDictionary = new LinkedHashMap<>();
+        public int lastPolishedChapterIndex = -1;
+        public List<Integer> polishedChapterIndices = new ArrayList<>();
         public List<Integer> processedBatchStartIndices = new ArrayList<>();
         public long lastModified = System.currentTimeMillis();
     }
@@ -139,6 +141,7 @@ public class ProjectStorageManager {
             JsonObject root = new JsonObject();
             root.addProperty("name", proj.name);
             root.addProperty("lastModified", System.currentTimeMillis());
+            root.addProperty("lastPolishedChapterIndex", proj.lastPolishedChapterIndex);
 
             // Lưu các chương thô
             JsonArray rawArr = new JsonArray();
@@ -182,6 +185,15 @@ public class ProjectStorageManager {
             }
             root.add("patchDictionary", patchObj);
 
+            // Lưu danh sách chương đã làm mượt cuốn chiếu
+            JsonArray polishedArr = new JsonArray();
+            if (proj.polishedChapterIndices != null) {
+                for (Integer pIdx : proj.polishedChapterIndices) {
+                    if (pIdx != null) polishedArr.add(pIdx);
+                }
+            }
+            root.add("polishedChapterIndices", polishedArr);
+
             return writeAtomic(file, gson.toJson(root));
         } catch (Exception e) {
             Log.e(TAG, "Failed to save project: " + proj.name, e);
@@ -211,6 +223,16 @@ public class ProjectStorageManager {
             ProjectDataHolder proj = new ProjectDataHolder();
             if (root.has("name")) proj.name = root.get("name").getAsString();
             if (root.has("lastModified")) proj.lastModified = root.get("lastModified").getAsLong();
+            if (root.has("lastPolishedChapterIndex")) proj.lastPolishedChapterIndex = root.get("lastPolishedChapterIndex").getAsInt();
+
+            if (root.has("polishedChapterIndices")) {
+                JsonArray polishedArr = root.getAsJsonArray("polishedChapterIndices");
+                for (JsonElement el : polishedArr) {
+                    try {
+                        proj.polishedChapterIndices.add(el.getAsInt());
+                    } catch (Exception ignored) {}
+                }
+            }
 
             if (root.has("rawChapters")) {
                 JsonArray rawArr = root.getAsJsonArray("rawChapters");

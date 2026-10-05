@@ -34,6 +34,46 @@ public class GlossaryManager {
         return count;
     }
 
+    public static boolean isValidGlossaryKey(String key, int minTermLength) {
+        if (key == null) return false;
+        String trimmed = cleanTerm(key).trim();
+        if (trimmed.isEmpty()) return false;
+
+        // Bắt buộc phải có chữ Hán và đạt độ dài tối thiểu
+        int chineseCount = countChineseChars(trimmed);
+        if (chineseCount < (minTermLength > 0 ? minTermLength : 2)) return false;
+
+        // Loại bỏ các tiêu đề danh mục / prompt header bị AI sao chép lại
+        String upper = trimmed.toUpperCase();
+        if (upper.contains("CÔNG PHÁP") || upper.contains("CHIÊU THỨC") || upper.contains("THÂN PHÁP") ||
+            upper.contains("KHẨU QUYẾT") || upper.contains("TÊN NHÂN VẬT") || upper.contains("ĐỊA DANH") ||
+            upper.contains("MÔN PHÁI") || upper.contains("BANG HỘI") || upper.contains("THÀNH TRÌ") ||
+            upper.contains("PHÁP BẢO") || upper.contains("LINH BẢO") || upper.contains("THẦN KHÍ") ||
+            upper.contains("LINH THÚ") || upper.contains("YÊU THÚ") || upper.contains("THẦN THÚ") ||
+            upper.contains("CẢNH GIỚI") || upper.contains("ĐAN DƯỢC") || upper.contains("DƯỢC LIỆU") ||
+            upper.contains("GLOSSARY") || upper.contains("THUẬT NGỮ") || upper.contains("DANH TỪ") ||
+            upper.contains("CHƯƠNG") || upper.contains("CHAPTER")) {
+            return false;
+        }
+        return true;
+    }
+
+    public static int purgeInvalidEntries(Map<String, String> glossary, int minTermLength) {
+        if (glossary == null || glossary.isEmpty()) return 0;
+        int removed = 0;
+        Iterator<Map.Entry<String, String>> it = glossary.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, String> entry = it.next();
+            String key = entry.getKey();
+            String val = entry.getValue();
+            if (!isValidGlossaryKey(key, minTermLength) || val == null || val.trim().isEmpty() || key.trim().equalsIgnoreCase(val.trim())) {
+                it.remove();
+                removed++;
+            }
+        }
+        return removed;
+    }
+
     public static GlossaryEntry parseLine(String line, String chapterRawText, int minTermLength, int minFrequency) {
         if (line == null) return null;
         String trimmed = line.trim();
@@ -47,7 +87,7 @@ public class GlossaryManager {
             parts = trimmed.split("➔", 2);
         } else if (trimmed.contains("->")) {
             parts = trimmed.split("->", 2);
-        } else if (trimmed.contains(":")) {
+        } else if (trimmed.contains(":") && !trimmed.matches("(?i).*\\b(?:chương|chapter|nhóm|tên|địa danh|công pháp|pháp bảo|cảnh giới)\\b.*")) {
             parts = trimmed.split(":", 2);
         }
 
@@ -64,11 +104,13 @@ public class GlossaryManager {
                     val = temp;
                 }
 
-                // 2. LỌC ĐỘ DÀI: Tuân thủ cài đặt minTermLength (mặc định: >= 2 ký tự chữ Hán)
-                int finalChineseCount = countChineseChars(raw);
-                if (finalChineseCount < (minTermLength > 0 ? minTermLength : 2)) return null;
+                // 2. LỌC ĐỘ DÀI VÀ HỢP LỆ: Phải có chữ Hán thực sự, không phải nhãn danh mục
+                if (!isValidGlossaryKey(raw, minTermLength)) return null;
 
-                // 3. ĐIỀU KIỆN TẦN SUẤT: Phải xuất hiện từ minFrequency lần trở lên trong văn bản gốc
+                // 3. Loại bỏ nếu 2 bên giống hệt nhau mà không có nghĩa tiếng Việt
+                if (raw.equalsIgnoreCase(val)) return null;
+
+                // 4. ĐIỀU KIỆN TẦN SUẤT: Phải xuất hiện từ minFrequency lần trở lên trong văn bản gốc
                 if (chapterRawText != null && !chapterRawText.isEmpty()) {
                     int occ = countOccurrences(chapterRawText, raw);
                     if (occ < (minFrequency > 0 ? minFrequency : 2)) return null;

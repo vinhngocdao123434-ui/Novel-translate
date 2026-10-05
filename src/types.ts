@@ -65,6 +65,7 @@ export interface ProjectData {
   translatedChapters: Record<number, string>;
   masterGlossary: Record<string, string>;
   patchDictionary?: Record<string, string>;
+  polishedChapterIndices?: number[];
   createdAt?: number;
   lastUpdated?: number;
 }

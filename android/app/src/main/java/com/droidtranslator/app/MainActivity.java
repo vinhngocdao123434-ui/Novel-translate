@@ -854,7 +854,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean rollingPolishEnabled = true;
     private int rollingPolishBatchSize = 15; // 10, 15, 20, 25
     private final Map<String, String> patchDictionary = new LinkedHashMap<>();
-    private final Set<Integer> processedRollingPolishMilestones = new HashSet<>();
+    private final Set<Integer> polishedChapterIndices = new HashSet<>();
+    private Button btnRepolishUnpolished;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -950,6 +951,9 @@ public class MainActivity extends AppCompatActivity {
             proj.translatedChapters = new HashMap<>(translatedChapters);
             proj.masterGlossary = new LinkedHashMap<>(masterGlossary);
             proj.patchDictionary = new LinkedHashMap<>(patchDictionary);
+            synchronized (polishedChapterIndices) {
+                proj.polishedChapterIndices = new ArrayList<>(polishedChapterIndices);
+            }
             proj.processedBatchStartIndices = new ArrayList<>(processedBatchGlossaryStartIndices);
             proj.lastModified = System.currentTimeMillis();
 
@@ -966,7 +970,9 @@ public class MainActivity extends AppCompatActivity {
             masterGlossary.clear();
             patchDictionary.clear();
             processedBatchGlossaryStartIndices.clear();
-            processedRollingPolishMilestones.clear();
+            synchronized (polishedChapterIndices) {
+                polishedChapterIndices.clear();
+            }
             loadedRawContent = "";
             currentChapterIdx = 0;
 
@@ -977,8 +983,16 @@ public class MainActivity extends AppCompatActivity {
             if (proj != null) {
                 if (proj.rawChapters != null) rawChapters.addAll(proj.rawChapters);
                 if (proj.translatedChapters != null) translatedChapters.putAll(proj.translatedChapters);
-                if (proj.masterGlossary != null) masterGlossary.putAll(proj.masterGlossary);
+                if (proj.masterGlossary != null) {
+                    masterGlossary.putAll(proj.masterGlossary);
+                    GlossaryManager.purgeInvalidEntries(masterGlossary, minTermLength);
+                }
                 if (proj.patchDictionary != null) patchDictionary.putAll(proj.patchDictionary);
+                if (proj.polishedChapterIndices != null) {
+                    synchronized (polishedChapterIndices) {
+                        polishedChapterIndices.addAll(proj.polishedChapterIndices);
+                    }
+                }
                 if (proj.processedBatchStartIndices != null) processedBatchGlossaryStartIndices.addAll(proj.processedBatchStartIndices);
             }
         } catch (Exception e) {
@@ -2316,6 +2330,16 @@ public class MainActivity extends AppCompatActivity {
         });
         cardProgress.addView(btnFinalPolish);
 
+        btnRepolishUnpolished = createGradientButton("🪄 LÀM MƯỢT LẠI CÁC CHƯƠNG CHƯA XỬ LÝ (CUỐN CHIẾU)", Color.parseColor("#DB2777"), Color.parseColor("#C026D3"));
+        LinearLayout.LayoutParams rplp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        rplp.setMargins(0, dp(10), 0, 0);
+        btnRepolishUnpolished.setLayoutParams(rplp);
+        btnRepolishUnpolished.setOnClickListener(v -> {
+            triggerHaptic();
+            repolishUnpolishedChapters();
+        });
+        cardProgress.addView(btnRepolishUnpolished);
+
         content.addView(cardProgress);
 
         // =====================================================================
@@ -2782,6 +2806,12 @@ public class MainActivity extends AppCompatActivity {
         if (llGlossaryList == null) return;
         llGlossaryList.removeAllViews();
 
+        // Tự động thanh lọc các mục rác / tiêu đề prompt lọt vào
+        int purged = GlossaryManager.purgeInvalidEntries(masterGlossary, minTermLength);
+        if (purged > 0) {
+            saveCurrentProjectData();
+        }
+
         if (tvGlossaryHeader != null) {
             tvGlossaryHeader.setText("Từ Điển Master Glossary (" + masterGlossary.size() + " từ):");
         }
@@ -3092,10 +3122,12 @@ public class MainActivity extends AppCompatActivity {
                             int newlyAddedBatch = 0;
                             if (batchExtracted != null) {
                                 for (Map.Entry<String, String> bEntry : batchExtracted.entrySet()) {
-                                    // Áp dụng quy tắc GIỮ CŨ BỎ MỚI (KEEP_OLD): Chỉ thêm từ mới chưa tồn tại
-                                    if (!masterGlossary.containsKey(bEntry.getKey())) {
-                                        masterGlossary.put(bEntry.getKey(), bEntry.getValue());
-                                        newlyAddedBatch++;
+                                    if (GlossaryManager.isValidGlossaryKey(bEntry.getKey(), minTermLength)) {
+                                        // Áp dụng quy tắc GIỮ CŨ BỎ MỚI (KEEP_OLD): Chỉ thêm từ mới chưa tồn tại
+                                        if (!masterGlossary.containsKey(bEntry.getKey())) {
+                                            masterGlossary.put(bEntry.getKey(), bEntry.getValue());
+                                            newlyAddedBatch++;
+                                        }
                                     }
                                 }
                             }
@@ -3277,15 +3309,27 @@ public class MainActivity extends AppCompatActivity {
 
                     currentChapterIdx++;
 
-                    // BƯỚC LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG (Rolling Polish)
+                    // BƯỚC LÀM MƯỢT CUỐN CHIẾU (Rolling Polish) - KHÔNG BAO GIỜ BỎ SÓT CHƯƠNG!
                     if (rollingPolishEnabled) {
-                        int finishedCount = (chapIndex + 1);
-                        boolean isMilestone = (finishedCount % rollingPolishBatchSize == 0) || (chapIndex == rangeToChap - 1) || (chapIndex == rawChapters.size() - 1);
-                        if (isMilestone && !processedRollingPolishMilestones.contains(chapIndex)) {
-                            processedRollingPolishMilestones.add(chapIndex);
-                            int pFrom = Math.max(0, chapIndex - rollingPolishBatchSize + 1);
-                            int pTo = chapIndex;
-                            performRollingPolish(pFrom, pTo);
+                        boolean isEndOfRange = (chapIndex >= rangeToChap - 1) || (chapIndex >= rawChapters.size() - 1);
+                        List<Integer> unpolished = getUnpolishedChapterIndices(chapIndex);
+
+                        // Kích hoạt khi tích lũy đủ số chương theo lô (VD: 15 chương) hoặc khi dịch xong chương cuối của khoảng
+                        if (unpolished.size() >= rollingPolishBatchSize || (isEndOfRange && !unpolished.isEmpty())) {
+                            while (!unpolished.isEmpty() && isTranslating) {
+                                int chunkSize = Math.min(rollingPolishBatchSize, unpolished.size());
+                                List<Integer> chunk = new ArrayList<>(unpolished.subList(0, chunkSize));
+
+                                boolean batchSuccess = performRollingPolishBatch(chunk);
+                                if (batchSuccess) {
+                                    unpolished = getUnpolishedChapterIndices(chapIndex);
+                                } else {
+                                    // Thất bại sau các lần thử lại!
+                                    // Không đánh dấu polished, dừng vòng lặp cuốn chiếu hiện tại để tiếp tục dịch
+                                    // Ở mốc tiếp theo (hoặc chương cuối), các chương này sẽ được ưu tiên làm mượt đầu tiên!
+                                    break;
+                                }
+                            }
                         }
                     }
 
@@ -3304,8 +3348,28 @@ public class MainActivity extends AppCompatActivity {
                     appendLog("🎉 Đã hoàn thành khoảng chương yêu cầu!");
                     Toast.makeText(MainActivity.this, "Đã hoàn thành dịch khoảng chương!", Toast.LENGTH_LONG).show();
 
-                    // TỰ ĐỘNG KÍCH HOẠT BỘ QUÉT LÀM MƯỢT FINAL SAU KHI DỊCH XONG TOÀN BỘ CHƯƠNG CUỐI
-                    if (currentChapterIdx >= rawChapters.size() || currentChapterIdx >= rangeToChap) {
+                    // TỰ ĐỘNG LÀM MƯỢT VÉT TOÀN BỘ CÁC CHƯƠNG CHƯA LÀM MƯỢT CUỐN CHIẾU
+                    List<Integer> remainingUnpolished = getUnpolishedChapterIndices(rawChapters.size() - 1);
+                    if (rollingPolishEnabled && !remainingUnpolished.isEmpty()) {
+                        appendLog("🔄 [QUÉT VÉT CUỐN CHIẾU] Phát hiện còn " + remainingUnpolished.size() + " chương chưa được làm mượt cuốn chiếu, tự động xử lý vét...");
+                        new Thread(() -> {
+                            List<Integer> rem = getUnpolishedChapterIndices(rawChapters.size() - 1);
+                            while (!rem.isEmpty()) {
+                                int chunkSize = Math.min(rollingPolishBatchSize, rem.size());
+                                List<Integer> chunk = new ArrayList<>(rem.subList(0, chunkSize));
+                                boolean ok = performRollingPolishBatch(chunk);
+                                if (!ok) break;
+                                rem = getUnpolishedChapterIndices(rawChapters.size() - 1);
+                            }
+
+                            // TỰ ĐỘNG KÍCH HOẠT BỘ QUÉT LÀM MƯỢT FINAL SAU KHI VÉT CUỐN CHIẾU XONG
+                            mainHandler.post(() -> {
+                                appendLog("🚀 [AUTO POLISH] Đang tự động kích hoạt Bộ Quét Làm Mượt Final...");
+                                executeFinalGlobalPolish();
+                            });
+                        }).start();
+                    } else {
+                        // TỰ ĐỘNG KÍCH HOẠT BỘ QUÉT LÀM MƯỢT FINAL
                         appendLog("🚀 [AUTO POLISH] Đang tự động kích hoạt Bộ Quét Làm Mượt Final...");
                         executeFinalGlobalPolish();
                     }
@@ -3314,63 +3378,194 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void performRollingPolish(int fromIndex, int toIndex) {
-        if (fromIndex > toIndex || fromIndex < 0 || toIndex >= rawChapters.size()) return;
-        List<String> chaptersToPolish = new ArrayList<>();
-        List<Integer> chapterIndices = new ArrayList<>();
-        for (int i = fromIndex; i <= toIndex; i++) {
-            if (translatedChapters.containsKey(i) && translatedChapters.get(i) != null) {
-                chaptersToPolish.add(translatedChapters.get(i));
-                chapterIndices.add(i);
-            }
-        }
-        if (chaptersToPolish.isEmpty()) return;
-
-        String targetPolishModel = (polishModel != null && !polishModel.isEmpty()) ? polishModel : "gemini-3.6-flash";
-        mainHandler.post(() -> appendLog("✨ [LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG] Đang gom " + chaptersToPolish.size() + " chương (Chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + ") gửi " + targetPolishModel + " để trích xuất JSON Patch..."));
-
-        try {
-            List<GlossaryManager.PatchEntry> patches = engine.extractRollingPatches(chaptersToPolish, targetPolishModel, msg -> mainHandler.post(() -> appendLog(msg)));
-            if (patches != null && !patches.isEmpty()) {
-                int chaptersModified = 0;
-
-                for (int cIdx : chapterIndices) {
-                    String orig = translatedChapters.get(cIdx);
-                    if (orig == null) continue;
-                    String patched = GlossaryManager.applyPatches(orig, patches);
-                    if (!orig.equals(patched)) {
-                        translatedChapters.put(cIdx, patched);
-                        chaptersModified++;
+    private List<Integer> getUnpolishedChapterIndices(int upToChapIndex) {
+        List<Integer> list = new ArrayList<>();
+        int max = Math.min(upToChapIndex, rawChapters.size() - 1);
+        synchronized (polishedChapterIndices) {
+            for (int i = 0; i <= max; i++) {
+                if (translatedChapters.containsKey(i) && translatedChapters.get(i) != null && !translatedChapters.get(i).trim().isEmpty()) {
+                    if (!polishedChapterIndices.contains(i)) {
+                        list.add(i);
                     }
                 }
+            }
+        }
+        return list;
+    }
 
-                // Lưu vào Patch Dictionary
-                for (GlossaryManager.PatchEntry p : patches) {
-                    patchDictionary.put(p.oldText, p.newText);
+    private boolean performRollingPolishBatch(List<Integer> chapterIndices) {
+        if (chapterIndices == null || chapterIndices.isEmpty()) return true;
+        int fromIndex = chapterIndices.get(0);
+        int toIndex = chapterIndices.get(chapterIndices.size() - 1);
+
+        List<String> chaptersToPolish = new ArrayList<>();
+        for (int idx : chapterIndices) {
+            String t = translatedChapters.get(idx);
+            if (t != null && !t.trim().isEmpty()) chaptersToPolish.add(t);
+        }
+        if (chaptersToPolish.isEmpty()) {
+            synchronized (polishedChapterIndices) {
+                polishedChapterIndices.addAll(chapterIndices);
+            }
+            return true;
+        }
+
+        String targetPolishModel = (polishModel != null && !polishModel.isEmpty()) ? polishModel : "gemini-3.6-flash";
+        int maxAttempts = 5; // Tự động thử lại nhiều lần với luân chuyển key & exponential backoff
+        int attempt = 0;
+        boolean succeeded = false;
+
+        while (attempt < maxAttempts && !succeeded) {
+            attempt++;
+            final int currentAttempt = attempt;
+            mainHandler.post(() -> appendLog("✨ [LÀM MƯỢT CUỐN CHIẾU" + (currentAttempt > 1 ? " (THỬ LẠI " + currentAttempt + "/" + maxAttempts + ")" : "") + "] Đang gom " + chaptersToPolish.size() + " chương (Chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + ") gửi " + targetPolishModel + " để trích xuất JSON Patch..."));
+
+            try {
+                List<GlossaryManager.PatchEntry> patches = engine.extractRollingPatches(chaptersToPolish, targetPolishModel, msg -> mainHandler.post(() -> appendLog(msg)));
+
+                if (patches != null && !patches.isEmpty()) {
+                    int chaptersModified = 0;
+
+                    for (int cIdx : chapterIndices) {
+                        String orig = translatedChapters.get(cIdx);
+                        if (orig == null) continue;
+                        String patched = GlossaryManager.applyPatches(orig, patches);
+                        if (!orig.equals(patched)) {
+                            translatedChapters.put(cIdx, patched);
+                            chaptersModified++;
+                        }
+                    }
+
+                    // Lưu vào Patch Dictionary
+                    for (GlossaryManager.PatchEntry p : patches) {
+                        patchDictionary.put(p.oldText, p.newText);
+                    }
+
+                    // Đồng bộ ngược lại Master Glossary (Hán -> Việt)
+                    int syncedGlossary = GlossaryManager.syncPatchesToMasterGlossary(masterGlossary, patches);
+
+                    final int fPatches = patches.size();
+                    final int fModified = chaptersModified;
+                    final int fSynced = syncedGlossary;
+
+                    mainHandler.post(() -> {
+                        updateProgressUI();
+                        refreshGlossaryList();
+                        refreshChapterListView();
+                        appendLog("🎉 [LÀM MƯỢT HOÀN TẤT] Chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + ": Đã sửa " + fPatches + " lỗi chính tả/danh xưng/Hán sót trên " + fModified + " chương! Đồng bộ " + fSynced + " từ vào Master Glossary.");
+                        Toast.makeText(MainActivity.this, "Đã làm mượt " + fPatches + " mục cho chương " + (fromIndex + 1) + " - " + (toIndex + 1), Toast.LENGTH_SHORT).show();
+                    });
+                } else {
+                    mainHandler.post(() -> appendLog("✨ [LÀM MƯỢT HOÀN TẤT] Bản dịch các chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + " đạt chuẩn 100%, không phát hiện lỗi."));
                 }
 
-                // Đồng bộ ngược lại Master Glossary (Hán -> Việt)
-                int syncedGlossary = GlossaryManager.syncPatchesToMasterGlossary(masterGlossary, patches);
-
+                // ĐÁNH DẤU CHÍNH THỨC ĐÃ LÀM MƯỢT THÀNH CÔNG VÀ LƯU DỮ LIỆU
+                synchronized (polishedChapterIndices) {
+                    polishedChapterIndices.addAll(chapterIndices);
+                }
                 saveCurrentProjectData();
+                succeeded = true;
+                return true;
+            } catch (Exception e) {
+                final String errMsg = e.getMessage();
+                mainHandler.post(() -> appendLog("⚠️ [LỖI LÀM MƯỢT LẦN " + currentAttempt + "/" + maxAttempts + "] " + errMsg));
+                if (attempt < maxAttempts) {
+                    try {
+                        Thread.sleep(2000L * attempt); // Chờ tăng dần chống nghẽn mạng
+                    } catch (InterruptedException ignored) {}
+                }
+            }
+        }
 
-                final int fPatches = patches.size();
-                final int fModified = chaptersModified;
-                final int fSynced = syncedGlossary;
+        if (!succeeded) {
+            mainHandler.post(() -> {
+                appendLog("❌ [LÀM MƯỢT TẠM HOÃN] Các chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + " chưa thể hoàn tất làm mượt sau " + maxAttempts + " lần thử. Các chương này KHÔNG BỊ BỎ RƠI, hệ thống sẽ tự động thử lại ở đợt tiếp theo hoặc bạn có thể bấm nút 'Làm Mượt Lại Các Chương Chưa Xử Lý'.");
+                Toast.makeText(MainActivity.this, "Tạm hoãn làm mượt ch. " + (fromIndex + 1) + " - " + (toIndex + 1) + ", sẽ tự động thử lại!", Toast.LENGTH_SHORT).show();
+            });
+        }
+        return false;
+    }
+
+    private void repolishUnpolishedChapters() {
+        if (isPolishing || isTranslating) {
+            Toast.makeText(this, "Đang có tiến trình dịch hoặc làm mượt đang chạy!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (translatedChapters.isEmpty()) {
+            Toast.makeText(this, "Chưa có bản dịch nào để làm mượt!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<Integer> unpolished = getUnpolishedChapterIndices(rawChapters.size() - 1);
+        if (unpolished.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Toàn Bộ Chương Đã Được Làm Mượt")
+                    .setMessage("Tất cả " + translatedChapters.size() + " chương đã dịch đều đã được làm mượt cuốn chiếu đạt chuẩn 100%!\n\nBạn có muốn làm mượt lại toàn bộ từ đầu không?")
+                    .setPositiveButton("Làm Mượt Lại Tất Cả", (dialog, which) -> {
+                        synchronized (polishedChapterIndices) {
+                            polishedChapterIndices.clear();
+                        }
+                        saveCurrentProjectData();
+                        startRepolishWorker();
+                    })
+                    .setNegativeButton("Hủy", null)
+                    .show();
+            return;
+        }
+
+        startRepolishWorker();
+    }
+
+    private void startRepolishWorker() {
+        if (isPolishing) return;
+        isPolishing = true;
+        appendLog("🚀 [LÀM MƯỢT LẠI] Bắt đầu rà soát làm mượt các chương chưa hoàn tất...");
+
+        new Thread(() -> {
+            try {
+                List<Integer> unpolished = getUnpolishedChapterIndices(rawChapters.size() - 1);
+                if (unpolished.isEmpty()) {
+                    mainHandler.post(() -> {
+                        appendLog("🎉 Không có chương nào chưa được làm mượt!");
+                        Toast.makeText(MainActivity.this, "Toàn bộ chương đã được làm mượt!", Toast.LENGTH_SHORT).show();
+                    });
+                    return;
+                }
+
+                mainHandler.post(() -> appendLog("🔍 Phát hiện " + unpolished.size() + " chương chưa làm mượt. Bắt đầu chia lô " + rollingPolishBatchSize + " chương để xử lý..."));
+
+                int totalBatches = (int) Math.ceil((double) unpolished.size() / rollingPolishBatchSize);
+                int batchNum = 0;
+
+                for (int i = 0; i < unpolished.size(); i += rollingPolishBatchSize) {
+                    batchNum++;
+                    int end = Math.min(i + rollingPolishBatchSize, unpolished.size());
+                    List<Integer> batch = new ArrayList<>(unpolished.subList(i, end));
+
+                    final int currentBatchNum = batchNum;
+                    mainHandler.post(() -> appendLog("📦 [LÔ " + currentBatchNum + "/" + totalBatches + "] Đang làm mượt Chương " + (batch.get(0) + 1) + " ➔ " + (batch.get(batch.size() - 1) + 1) + "..."));
+
+                    boolean success = performRollingPolishBatch(batch);
+                    if (!success) {
+                        mainHandler.post(() -> appendLog("⚠️ [DỪNG LÀM MƯỢT LẠI] Lô " + currentBatchNum + " gặp sự cố kết nối, các chương còn lại được giữ trong hàng đợi."));
+                        break;
+                    }
+                    try { Thread.sleep(1000); } catch (Exception ignored) {}
+                }
 
                 mainHandler.post(() -> {
                     updateProgressUI();
                     refreshGlossaryList();
                     refreshChapterListView();
-                    appendLog("🎉 [LÀM MƯỢT 15 CHƯƠNG HOÀN TẤT] Đã sửa " + fPatches + " lỗi chính tả/danh xưng/Hán sót trên " + fModified + " chương! Đồng bộ " + fSynced + " từ vào Master Glossary.");
-                    Toast.makeText(MainActivity.this, "Đã làm mượt " + fPatches + " mục cho chương " + (fromIndex + 1) + " - " + (toIndex + 1), Toast.LENGTH_SHORT).show();
+                    appendLog("🏁 [HOÀN TẤT LÀM MƯỢT LẠI] Đã xử lý xong các lô chương chưa làm mượt!");
+                    Toast.makeText(MainActivity.this, "Đã làm mượt xong các chương chưa xử lý!", Toast.LENGTH_LONG).show();
                 });
-            } else {
-                mainHandler.post(() -> appendLog("✨ [LÀM MƯỢT 15 CHƯƠNG] Bản dịch các chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + " đạt chuẩn 100%, không phát hiện lỗi."));
+            } catch (Exception e) {
+                mainHandler.post(() -> appendLog("❌ Lỗi làm mượt lại: " + e.getMessage()));
+            } finally {
+                isPolishing = false;
             }
-        } catch (Exception e) {
-            mainHandler.post(() -> appendLog("⚠️ [LÀM MƯỢT 15 CHƯƠNG] Không thể kết nối AI (" + e.getMessage() + "), giữ nguyên bản dịch hiện tại."));
-        }
+        }).start();
     }
 
     private void executeFinalGlobalPolish() {
@@ -3500,7 +3695,20 @@ public class MainActivity extends AppCompatActivity {
         if (progressBar != null) {
             progressBar.setMax(Math.max(rawChapters.size(), 1));
             progressBar.setProgress(translatedChapters.size());
-            tvProgressText.setText("Tiến độ: " + translatedChapters.size() + " / " + rawChapters.size() + " chương");
+
+            int polishedCount = 0;
+            synchronized (polishedChapterIndices) {
+                for (int cIdx : translatedChapters.keySet()) {
+                    if (polishedChapterIndices.contains(cIdx)) polishedCount++;
+                }
+            }
+            int totalTrans = translatedChapters.size();
+            int unpolishedCount = totalTrans - polishedCount;
+            String polishStatus = (unpolishedCount > 0)
+                    ? " • ⚠️ " + unpolishedCount + " ch. chưa làm mượt"
+                    : (totalTrans > 0 ? " • ✨ Đã mượt " + polishedCount + " ch." : "");
+
+            tvProgressText.setText("Tiến độ: " + totalTrans + " / " + rawChapters.size() + " chương" + polishStatus);
         }
     }
 

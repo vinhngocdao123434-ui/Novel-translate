@@ -253,7 +253,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           '林辰': 'Lâm Thần',
           '青石村': 'Thôn Thanh Thạch',
           '青云宗': 'Thanh Vân Tông'
-        }
+        },
+        polishedChapterIndices: [0]
       },
       'Pham_Nhan_Tu_Tien': {
         name: 'Pham_Nhan_Tu_Tien',
@@ -276,7 +277,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           '韩立': 'Hàn Lập',
           '七玄门': 'Thất Huyền Môn',
           '彩霞山': 'Thải Hà Sơn'
-        }
+        },
+        polishedChapterIndices: []
       }
     };
   });
@@ -298,6 +300,25 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       localStorage.setItem(STORAGE_CURRENT_PROJ_KEY, currentProjectName);
     } catch (e) {}
   }, [projects, currentProjectName]);
+
+  // Tự động thanh lọc các mục rác / tiêu đề prompt nếu đã lọt vào localStorage từ trước
+  useEffect(() => {
+    let hasPurged = false;
+    const cleaned = { ...projects };
+    for (const [pName, pData] of Object.entries(cleaned)) {
+      if (pData.masterGlossary) {
+        const purgedGloss = purgeInvalidGlossaryEntries(pData.masterGlossary);
+        if (Object.keys(purgedGloss).length !== Object.keys(pData.masterGlossary).length) {
+          cleaned[pName] = { ...pData, masterGlossary: purgedGloss };
+          hasPurged = true;
+        }
+      }
+    }
+    if (hasPurged) {
+      setProjects(cleaned);
+      addLog('🧹 Đã tự động dọn sạch các nhãn tiêu đề rác lọt vào Master Glossary!');
+    }
+  }, []);
 
   // Auto-save Global API Keys, Prompts, and Advanced Settings
   useEffect(() => {
@@ -814,6 +835,40 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
     return count;
   };
 
+  // Helper: Validate valid Chinese glossary key and reject prompt category labels
+  const isValidGlossaryKey = (key: string): boolean => {
+    if (!key) return false;
+    const cleanKey = key.trim().replace(/[*_"`'\[\]【】]/g, '');
+    if (countChineseChars(cleanKey) < (advancedSettings.minTermLength || 2)) return false;
+
+    const upper = cleanKey.toUpperCase();
+    if (
+      upper.includes('CÔNG PHÁP') || upper.includes('CHIÊU THỨC') || upper.includes('THÂN PHÁP') ||
+      upper.includes('KHẨU QUYẾT') || upper.includes('TÊN NHÂN VẬT') || upper.includes('ĐỊA DANH') ||
+      upper.includes('MÔN PHÁI') || upper.includes('BANG HỘI') || upper.includes('THÀNH TRÌ') ||
+      upper.includes('PHÁP BẢO') || upper.includes('LINH BẢO') || upper.includes('THẦN KHÍ') ||
+      upper.includes('LINH THÚ') || upper.includes('YÊU THÚ') || upper.includes('THẦN THÚ') ||
+      upper.includes('CẢNH GIỚI') || upper.includes('ĐAN DƯỢC') || upper.includes('DƯỢC LIỆU') ||
+      upper.includes('GLOSSARY') || upper.includes('THUẬT NGỮ') || upper.includes('DANH TỪ') ||
+      upper.includes('CHƯƠNG') || upper.includes('CHAPTER')
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  // Helper: Purge invalid labels and non-Chinese keys from Master Glossary
+  const purgeInvalidGlossaryEntries = (dict: Record<string, string>): Record<string, string> => {
+    if (!dict) return {};
+    const cleaned: Record<string, string> = {};
+    for (const [k, v] of Object.entries(dict)) {
+      if (isValidGlossaryKey(k) && v && v.trim() && k.trim().toLowerCase() !== v.trim().toLowerCase()) {
+        cleaned[k.trim()] = v.trim();
+      }
+    }
+    return cleaned;
+  };
+
   // Robust 1-Request 2-Tasks parser
   const parseDualTaskOutput = (text: string, currentChapterRawText?: string) => {
     let translation = text;
@@ -914,7 +969,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       const trimmedVal = val.trim();
       if (!trimmedKey || !trimmedVal) continue;
 
-      if (countChineseChars(trimmedKey) < (advancedSettings.minTermLength || 2)) continue;
+      if (!isValidGlossaryKey(trimmedKey)) continue;
+      if (trimmedKey.toLowerCase() === trimmedVal.toLowerCase()) continue;
 
       if (chapterRawContent && countOccurrences(chapterRawContent, trimmedKey) < (advancedSettings.minFrequency || 2)) {
         continue;
@@ -1152,18 +1208,28 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
           addLog(`✅ Đã xong Chương ${currentChapterIndex + 1}${previousSnippet ? ' (Đã nối ngữ cảnh chương trước)' : ''}`);
           
-          // BƯỚC LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG (Rolling Polish)
+          // BƯỚC LÀM MƯỢT CUỐN CHIẾU (Rolling Polish) - KHÔNG BAO GIỜ BỎ SÓT CHƯƠNG!
           const isRollingEnabled = advancedSettings.rollingPolishEnabled ?? true;
           const rollingInterval = advancedSettings.rollingPolishBatchSize || 15;
-          const currentCount = currentChapterIndex + 1;
-          const isMilestone = (currentCount % rollingInterval === 0) || (currentCount === targetEnd);
-          if (isRollingEnabled && isMilestone && !processedRollingPolishMilestones.includes(currentChapterIndex)) {
-            setProcessedRollingPolishMilestones(prev => [...prev, currentChapterIndex]);
-            const pFrom = Math.max(0, currentChapterIndex - rollingInterval + 1);
-            const pTo = currentChapterIndex;
-            setTimeout(() => {
-              performRollingPolish15Chapters(pFrom, pTo);
-            }, 300);
+          const isEndOfRange = (currentChapterIndex + 1 >= targetEnd);
+
+          if (isRollingEnabled) {
+            // Quét các chương đã dịch nhưng chưa được làm mượt cuốn chiếu
+            const curPolished = project.polishedChapterIndices || [];
+            const unpolished: number[] = [];
+            for (let i = 0; i <= currentChapterIndex; i++) {
+              if ((project.translatedChapters[i] || i === currentChapterIndex) && !curPolished.includes(i)) {
+                unpolished.push(i);
+              }
+            }
+
+            if (unpolished.length >= rollingInterval || (isEndOfRange && unpolished.length > 0)) {
+              // Lấy lô các chương chưa làm mượt sớm nhất (đảm bảo không bao giờ bỏ sót chương 1..15!)
+              const batchToPolish = unpolished.slice(0, rollingInterval);
+              setTimeout(() => {
+                performRollingPolishBatch(batchToPolish);
+              }, 300);
+            }
           }
 
           if (currentChapterIndex + 1 < targetEnd) {
@@ -1174,8 +1240,24 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             setStatusText('🎉 Đã hoàn thành khoảng chương yêu cầu!');
             addLog(`🎉 Hoàn tất dịch từ Chương ${fromChapInput} đến ${targetEnd}!`);
             
-            // TỰ ĐỘNG KÍCH HOẠT LÀM MƯỢT FINAL SAU KHI DỊCH XONG
-            setTimeout(() => {
+            // TỰ ĐỘNG LÀM MƯỢT VÉT CÁC CHƯƠNG CHƯA XỬ LÝ VÀ KÍCH HOẠT LÀM MƯỢT FINAL
+            setTimeout(async () => {
+              const curProj = projects[currentProjectName];
+              if (curProj && (advancedSettings.rollingPolishEnabled ?? true)) {
+                const curPolished = curProj.polishedChapterIndices || [];
+                const remUnpolished = Object.keys(curProj.translatedChapters)
+                  .map(Number)
+                  .filter(idx => !curPolished.includes(idx))
+                  .sort((a, b) => a - b);
+
+                if (remUnpolished.length > 0) {
+                  addLog(`🔄 [QUÉT VÉT CUỐN CHIẾU] Còn ${remUnpolished.length} chương chưa làm mượt, tự động xử lý vét...`);
+                  for (let i = 0; i < remUnpolished.length; i += rollingInterval) {
+                    const chunk = remUnpolished.slice(i, i + rollingInterval);
+                    await performRollingPolishBatch(chunk);
+                  }
+                }
+              }
               handleExecuteFinalGlobalPolish();
             }, 800);
           }
@@ -1183,86 +1265,113 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       }
     }
     return () => clearTimeout(timer);
-  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, processedRollingPolishMilestones, advancedSettings.rollingPolishEnabled, advancedSettings.rollingPolishBatchSize]);
+  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, advancedSettings.rollingPolishEnabled, advancedSettings.rollingPolishBatchSize]);
 
-  // Hàm thực hiện Làm Mượt Cuốn Chiếu 15 Chương (Semantic JSON Patch)
-  const performRollingPolish15Chapters = async (fromIdx: number, toIdx: number) => {
-    if (!project) return;
+  // Hàm thực hiện Làm Mượt Cuốn Chiếu (Semantic JSON Patch) với cơ chế Thử Lại Nhiều Lần & Không Bỏ Rơi
+  const performRollingPolishBatch = async (indices: number[]): Promise<boolean> => {
+    if (!project || indices.length === 0) return true;
     const chaptersToPolish: string[] = [];
-    const indices: number[] = [];
-    for (let i = fromIdx; i <= toIdx; i++) {
-      if (project.translatedChapters[i]) {
-        chaptersToPolish.push(project.translatedChapters[i]);
-        indices.push(i);
+    const validIndices: number[] = [];
+    for (const idx of indices) {
+      if (project.translatedChapters[idx]) {
+        chaptersToPolish.push(project.translatedChapters[idx]);
+        validIndices.push(idx);
       }
     }
-    if (chaptersToPolish.length === 0) return;
+    if (chaptersToPolish.length === 0) return true;
 
-    addLog(`✨ [LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG] Đang gom ${chaptersToPolish.length} chương (Chương ${fromIdx + 1} ➔ ${toIdx + 1}) gửi AI trích xuất JSON Patch sửa lỗi...`);
+    const fromChapNum = validIndices[0] + 1;
+    const toChapNum = validIndices[validIndices.length - 1] + 1;
 
     const activeKeyObj = globalApiKeys.find(k => k.state === 'ACTIVE') || globalApiKeys[0];
     const isRealKey = activeKeyObj && activeKeyObj.key && !activeKeyObj.key.includes('DemoSample');
+    const targetModel = polishModel || 'gemini-3.6-flash';
+
+    const maxAttempts = isRealKey ? 4 : 1;
+    let attempt = 0;
+    let success = false;
     let patches: Array<{ old: string; new: string }> = [];
 
-    if (isRealKey) {
-      try {
-        let promptSb = `Bạn là chuyên gia biên tập và hiệu đính văn học cao cấp.\n`;
-        promptSb += `Nhiệm vụ: Đọc kỹ các chương bản dịch bên dưới và trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:\n`;
-        promptSb += `1. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').\n`;
-        promptSb += `2. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng').\n`;
-        promptSb += `3. Lỗi nhầm lẫn danh xưng hoặc tên nhân vật lặp lại (VD: 'Trưởng công tử' -> 'Trưởng công chúa').\n`;
-        promptSb += `4. Các câu thô/sai ngữ pháp nghiêm trọng.\n\n`;
-        promptSb += `QUY TẮC ĐẦU RA BẮT BUỘC:\n`;
-        promptSb += `- TUYỆT ĐỐI KHÔNG xuất lại toàn bộ nội dung các chương.\n`;
-        promptSb += `- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' và 'new':\n`;
-        promptSb += `[{"old": "chuỗi_lỗi_gốc", "new": "chuỗi_thay_thế_chuẩn"}]\nNếu không có lỗi nào, trả về: []\n\n`;
-        promptSb += `[CÁC CHƯƠNG BẢN DỊCH]:\n` + chaptersToPolish.map((c, i) => `--- CHƯƠNG ${fromIdx + i + 1} ---\n${c}`).join('\n\n');
+    while (attempt < maxAttempts && !success) {
+      attempt++;
+      const currentAttempt = attempt;
+      addLog(`✨ [LÀM MƯỢT CUỐN CHIẾU${currentAttempt > 1 ? ` (THỬ LẠI ${currentAttempt}/${maxAttempts})` : ''}] Đang gom ${chaptersToPolish.length} chương (Chương ${fromChapNum} ➔ ${toChapNum}) gửi ${targetModel} trích xuất JSON Patch...`);
 
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${polishModel || 'gemini-3.6-flash'}:generateContent?key=${activeKeyObj.key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptSb }] }],
-            generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
-          })
-        });
+      if (isRealKey) {
+        try {
+          let promptSb = `Bạn là chuyên gia biên tập và hiệu đính văn học cao cấp.\n`;
+          promptSb += `Nhiệm vụ: Đọc kỹ các chương bản dịch bên dưới và trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:\n`;
+          promptSb += `1. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').\n`;
+          promptSb += `2. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng').\n`;
+          promptSb += `3. Lỗi nhầm lẫn danh xưng hoặc tên nhân vật lặp lại (VD: 'Trưởng công tử' -> 'Trưởng công chúa').\n`;
+          promptSb += `4. Các câu thô/sai ngữ pháp nghiêm trọng.\n\n`;
+          promptSb += `QUY TẮC ĐẦU RA BẮT BUỘC:\n`;
+          promptSb += `- TUYỆT ĐỐI KHÔNG xuất lại toàn bộ nội dung các chương.\n`;
+          promptSb += `- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' và 'new':\n`;
+          promptSb += `[{"old": "chuỗi_lỗi_gốc", "new": "chuỗi_thay_thế_chuẩn"}]\nNếu không có lỗi nào, trả về: []\n\n`;
+          promptSb += `[CÁC CHƯƠNG BẢN DỊCH]:\n` + chaptersToPolish.map((c, i) => `--- CHƯƠNG ${validIndices[i] + 1} ---\n${c}`).join('\n\n');
 
-        if (resp.ok) {
-          const data = await resp.json();
-          const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          let cleanJson = outText.trim();
-          if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
-          else if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
-          if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
-          const sIdx = cleanJson.indexOf('[');
-          const eIdx = cleanJson.lastIndexOf(']');
-          if (sIdx !== -1 && eIdx !== -1) {
-            cleanJson = cleanJson.substring(sIdx, eIdx + 1);
-            const parsedArr = JSON.parse(cleanJson);
-            if (Array.isArray(parsedArr)) {
-              patches = parsedArr.filter(p => p.old && p.new && p.old !== p.new);
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${activeKeyObj.key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptSb }] }],
+              generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
+            })
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            let cleanJson = outText.trim();
+            if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
+            else if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
+            if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
+            const sIdx = cleanJson.indexOf('[');
+            const eIdx = cleanJson.lastIndexOf(']');
+            if (sIdx !== -1 && eIdx !== -1) {
+              cleanJson = cleanJson.substring(sIdx, eIdx + 1);
+              const parsedArr = JSON.parse(cleanJson);
+              if (Array.isArray(parsedArr)) {
+                patches = parsedArr.filter(p => p.old && p.new && p.old !== p.new);
+              }
+            }
+            success = true;
+          } else {
+            addLog(`⚠️ [LỖI API LÀM MƯỢT] HTTP ${resp.status} trên lần thử ${currentAttempt}/${maxAttempts}`);
+            if (attempt < maxAttempts) {
+              await new Promise(r => setTimeout(r, 2000 * attempt));
             }
           }
+        } catch (err: any) {
+          addLog(`⚠️ [LỖI KẾT NỐI LÀM MƯỢT] (${err.message}) trên lần thử ${currentAttempt}/${maxAttempts}`);
+          if (attempt < maxAttempts) {
+            await new Promise(r => setTimeout(r, 2000 * attempt));
+          }
         }
-      } catch (err: any) {
-        addLog(`⚠️ Không gọi được API làm mượt (${err.message}), áp dụng rà soát mẫu cục bộ.`);
+      } else {
+        // Fallback demo mode
+        patches = [
+          { old: 'bộ khoai', new: 'bộ khoái' },
+          { old: 'phì đồ', new: 'phỉ đồ' }
+        ];
+        success = true;
       }
     }
 
-    if (patches.length === 0) {
-      patches = [
-        { old: 'bộ khoai', new: 'bộ khoái' },
-        { old: 'phì đồ', new: 'phỉ đồ' }
-      ];
+    if (!success) {
+      addLog(`❌ [LÀM MƯỢT TẠM HOÃN] Các chương ${fromChapNum} ➔ ${toChapNum} chưa thể hoàn tất làm mượt sau ${maxAttempts} lần thử. Các chương này KHÔNG BỊ BỎ RƠI, hệ thống sẽ tự động thử lại hoặc bạn có thể bấm 'Làm Mượt Lại Các Chương Chưa Xử Lý'.`);
+      return false;
     }
 
-    if (patches.length > 0) {
-      setProjects(prev => {
-        const cur = prev[currentProjectName];
-        const newTrans = { ...cur.translatedChapters };
-        let modifiedChaps = 0;
+    // Áp dụng patch và ĐÁNH DẤU CHÍNH THỨC CÁC CHƯƠNG ĐÃ LÀM MƯỢT
+    setProjects(prev => {
+      const cur = prev[currentProjectName];
+      const newTrans = { ...cur.translatedChapters };
+      let modifiedChaps = 0;
 
-        indices.forEach(cIdx => {
+      if (patches.length > 0) {
+        validIndices.forEach(cIdx => {
           let text = newTrans[cIdx];
           if (!text) return;
           let changed = false;
@@ -1277,9 +1386,11 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             modifiedChaps++;
           }
         });
+      }
 
-        const updatedMaster = { ...cur.masterGlossary };
-        let syncedGlossCount = 0;
+      const updatedMaster = { ...cur.masterGlossary };
+      let syncedGlossCount = 0;
+      if (patches.length > 0) {
         patches.forEach(p => {
           Object.keys(updatedMaster).forEach(k => {
             if (updatedMaster[k] === p.old || updatedMaster[k].includes(p.old)) {
@@ -1288,26 +1399,91 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             }
           });
         });
+      }
 
-        const updatedPatchDict = { ...(cur.patchDictionary || {}) };
+      const updatedPatchDict = { ...(cur.patchDictionary || {}) };
+      if (patches.length > 0) {
         patches.forEach(p => {
           updatedPatchDict[p.old] = p.new;
         });
+      }
 
-        addLog(`🎉 [HOÀN TẤT LÀM MƯỢT 15 CHƯƠNG] Đã sửa ${patches.length} mục lỗi trên ${modifiedChaps} chương! Đồng bộ ${syncedGlossCount} từ vào Master Glossary.`);
+      // Cập nhật danh sách chương đã làm mượt
+      const prevPolished = cur.polishedChapterIndices || [];
+      const updatedPolished = Array.from(new Set([...prevPolished, ...validIndices])).sort((a, b) => a - b);
 
-        return {
+      if (patches.length > 0) {
+        addLog(`🎉 [HOÀN TẤT LÀM MƯỢT] Chương ${fromChapNum} ➔ ${toChapNum}: Đã sửa ${patches.length} mục lỗi trên ${modifiedChaps} chương! Đồng bộ ${syncedGlossCount} từ vào Master Glossary.`);
+      } else {
+        addLog(`✨ [HOÀN TẤT LÀM MƯỢT] Bản dịch các chương ${fromChapNum} ➔ ${toChapNum} đã chuẩn mực 100%, không phát hiện lỗi.`);
+      }
+
+      return {
+        ...prev,
+        [currentProjectName]: {
+          ...cur,
+          translatedChapters: newTrans,
+          masterGlossary: updatedMaster,
+          patchDictionary: updatedPatchDict,
+          polishedChapterIndices: updatedPolished
+        }
+      };
+    });
+
+    return true;
+  };
+
+  // Nút Làm Mượt Lại Các Chương Chưa Xử Lý (hoặc làm mượt lại tất cả)
+  const handleRepolishUnpolishedChapters = async () => {
+    if (isPolishing || isTranslating) {
+      alert('Đang có tiến trình dịch hoặc làm mượt đang chạy!');
+      return;
+    }
+    if (!project || Object.keys(project.translatedChapters).length === 0) {
+      alert('Chưa có bản dịch nào để làm mượt!');
+      return;
+    }
+
+    const curPolished = project.polishedChapterIndices || [];
+    let unpolished = Object.keys(project.translatedChapters)
+      .map(Number)
+      .filter(idx => !curPolished.includes(idx))
+      .sort((a, b) => a - b);
+
+    if (unpolished.length === 0) {
+      if (confirm(`Tất cả ${Object.keys(project.translatedChapters).length} chương đã dịch đều đã được làm mượt cuốn chiếu đạt chuẩn 100%!\n\nBạn có muốn làm mượt lại toàn bộ từ đầu không?`)) {
+        setProjects(prev => ({
           ...prev,
           [currentProjectName]: {
-            ...cur,
-            translatedChapters: newTrans,
-            masterGlossary: updatedMaster,
-            patchDictionary: updatedPatchDict
+            ...prev[currentProjectName],
+            polishedChapterIndices: []
           }
-        };
-      });
-    } else {
-      addLog(`✨ [LÀM MƯỢT 15 CHƯƠNG] Bản dịch các chương ${fromIdx + 1} ➔ ${toIdx + 1} đã chuẩn mực 100%, không phát hiện lỗi.`);
+        }));
+        unpolished = Object.keys(project.translatedChapters).map(Number).sort((a, b) => a - b);
+      } else {
+        return;
+      }
+    }
+
+    setIsPolishing(true);
+    addLog(`🚀 [LÀM MƯỢT LẠI] Bắt đầu rà soát làm mượt ${unpolished.length} chương chưa xử lý...`);
+    const batchSize = advancedSettings.rollingPolishBatchSize || 15;
+
+    try {
+      for (let i = 0; i < unpolished.length; i += batchSize) {
+        const chunk = unpolished.slice(i, i + batchSize);
+        addLog(`📦 [LÔ ${Math.floor(i / batchSize) + 1}/${Math.ceil(unpolished.length / batchSize)}] Đang làm mượt Chương ${chunk[0] + 1} ➔ ${chunk[chunk.length - 1] + 1}...`);
+        const ok = await performRollingPolishBatch(chunk);
+        if (!ok) {
+          addLog(`⚠️ [DỪNG LÀM MƯỢT LẠI] Gặp sự cố kết nối, các chương còn lại được giữ trong hàng đợi.`);
+          break;
+        }
+      }
+      addLog(`🏁 [HOÀN TẤT LÀM MƯỢT LẠI] Đã xử lý xong các lô chương chưa làm mượt!`);
+    } catch (e: any) {
+      addLog(`❌ Lỗi khi làm mượt lại: ${e.message}`);
+    } finally {
+      setIsPolishing(false);
     }
   };
 
@@ -2248,9 +2424,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     <span className="text-xs font-bold text-neutral-100">2. Tiến Độ Dịch Thuật & Điều Khiển</span>
                     <HelpBtn onClick={() => openHelp('range_progress')} />
                   </div>
-                  <span className="text-[11px] font-mono text-blue-400 font-semibold">
-                    {project ? Object.keys(project.translatedChapters).length : 0} / {project ? project.chapters.length : 0} chương
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[11px] font-mono text-blue-400 font-semibold">
+                      {project ? Object.keys(project.translatedChapters).length : 0} / {project ? project.chapters.length : 0} chương
+                    </span>
+                    {project && Object.keys(project.translatedChapters).length > 0 && (
+                      <span className={`text-[9.5px] font-mono font-medium ${(project.polishedChapterIndices?.length || 0) < Object.keys(project.translatedChapters).length ? 'text-amber-400' : 'text-purple-400'}`}>
+                        {(project.polishedChapterIndices?.length || 0) < Object.keys(project.translatedChapters).length
+                          ? `⚠️ Còn ${Object.keys(project.translatedChapters).length - (project.polishedChapterIndices?.length || 0)} ch. chưa mượt`
+                          : `✨ Đã mượt ${project.polishedChapterIndices?.length || 0} ch.`}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Progress bar */}
@@ -2401,6 +2586,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)</span>
+                </button>
+
+                {/* NÚT LÀM MƯỢT LẠI CÁC CHƯƠNG CHƯA XỬ LÝ (CUỐN CHIẾU) */}
+                <button
+                  disabled={isPolishing || isTranslating}
+                  onClick={handleRepolishUnpolishedChapters}
+                  className="w-full py-2.5 bg-gradient-to-r from-pink-600 to-fuchsia-600 hover:from-pink-500 hover:to-fuchsia-500 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-pink-600/20 cursor-pointer transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>
+                    🪄 Làm Mượt Lại Các Chương Chưa Xử Lý
+                    {project && Object.keys(project.translatedChapters).length > (project.polishedChapterIndices?.length || 0)
+                      ? ` (${Object.keys(project.translatedChapters).length - (project.polishedChapterIndices?.length || 0)} ch. chưa mượt)`
+                      : ''}
+                  </span>
                 </button>
 
                 {/* Rolling Context Banner */}

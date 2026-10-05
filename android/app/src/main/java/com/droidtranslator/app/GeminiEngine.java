@@ -264,6 +264,8 @@ public class GeminiEngine {
                 systemInstructionSb.append("1. Chỉ trích xuất từ có độ dài chữ Hán >= ").append(minTermLength).append(" ký tự.").append(nl);
                 systemInstructionSb.append("2. BẢO TOÀN TỪ ĐIỂN CŨ: Nếu từ gốc đã tồn tại trong Danh Sách Đã Có bên dưới, TUYỆT ĐỐI KHÔNG ghi đè hay thay đổi nghĩa.").append(nl);
                 systemInstructionSb.append("3. ĐỊNH DẠNG ĐẦU RA BẮT BUỘC: Mỗi dòng đúng 1 cặp [TừGốcChữHán] = [NghĩaDịchHánViệt], không thêm bớt bất kỳ lời giải thích hay ký tự thừa nào.").append(nl);
+                systemInstructionSb.append("4. CẤM XUẤT TIÊU ĐỀ: Tuyệt đối KHÔNG xuất lại các dòng tiêu đề danh mục (như 'CÔNG PHÁP / CHIÊU THỨC / THÂN PHÁP / KHẨU QUYẾT', 'TÊN NHÂN VẬT', 'ĐỊA DANH', 'PHÁP BẢO'...).").append(nl);
+                systemInstructionSb.append("5. CHỈ DÙNG DẤU BẰNG '=': Tuyệt đối không dùng dấu hai chấm (:) làm phân cách danh mục.").append(nl);
 
                 StringBuilder promptSb = new StringBuilder();
                 if (!existingGlossaryStr.isEmpty()) {
@@ -327,18 +329,9 @@ public class GeminiEngine {
                         if (outText != null && !outText.trim().isEmpty()) {
                             String[] lines = outText.split("\\r?\\n");
                             for (String line : lines) {
-                                String clean = line.trim();
-                                if (clean.isEmpty() || clean.startsWith("#") || clean.startsWith("=")) continue;
-                                String[] pair = null;
-                                if (clean.contains("=")) pair = clean.split("=", 2);
-                                else if (clean.contains(":")) pair = clean.split(":", 2);
-
-                                if (pair != null && pair.length == 2) {
-                                    String k = pair[0].replace("[", "").replace("]", "").trim();
-                                    String v = pair[1].replace("[", "").replace("]", "").trim();
-                                    if (!k.isEmpty() && !v.isEmpty()) {
-                                        extractedMap.put(k, v);
-                                    }
+                                GlossaryManager.GlossaryEntry entry = GlossaryManager.parseLine(line, null, minTermLength, minFrequency);
+                                if (entry != null && GlossaryManager.isValidGlossaryKey(entry.key, minTermLength)) {
+                                    extractedMap.put(entry.key, entry.value);
                                 }
                             }
                         }
@@ -604,8 +597,9 @@ public class GeminiEngine {
     }
 
     public List<GlossaryManager.PatchEntry> extractRollingPatches(List<String> translatedChapters, String modelName, LogCallback logger) throws Exception {
-        int maxRetries = Math.max(keys.size() * 2, 4);
+        int maxRetries = Math.max(keys.size() * 3, 6);
         int attempts = 0;
+        String currentAttemptModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
 
         while (attempts < maxRetries) {
             attempts++;
@@ -615,8 +609,10 @@ public class GeminiEngine {
             long now = System.currentTimeMillis();
             if (keyItem.cooldownUntil > now) {
                 long waitSec = Math.max((keyItem.cooldownUntil - now) / 1000, 1);
-                if (logger != null) logger.onLog("⏳ Tất cả Key đang cooldown, chờ " + waitSec + "s...");
-                Thread.sleep(waitSec * 1000);
+                if (waitSec > 10) keyItem.cooldownUntil = now + 5000;
+                long sleepSec = Math.min(waitSec, 5);
+                if (logger != null) logger.onLog("⏳ Key đang cooldown, chờ " + sleepSec + "s trước khi thử lại...");
+                Thread.sleep(sleepSec * 1000);
             }
 
             try {
@@ -667,7 +663,7 @@ public class GeminiEngine {
                 genConfig.addProperty("maxOutputTokens", 8192);
                 root.add("generationConfig", genConfig);
 
-                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+                String actualModel = currentAttemptModel;
                 String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
 
                 RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
@@ -720,13 +716,22 @@ public class GeminiEngine {
                     int statusCode = response.code();
                     if (statusCode == 429 || statusCode == 503) {
                         keyItem.state = "COOLDOWN (" + statusCode + ")";
-                        keyItem.cooldownUntil = System.currentTimeMillis() + 60000;
+                        keyItem.cooldownUntil = System.currentTimeMillis() + 15000;
+                        if (currentAttemptModel.toLowerCase().contains("pro")) {
+                            currentAttemptModel = "gemini-3.6-flash";
+                            if (logger != null) {
+                                logger.onLog("⚠️ Model Pro quá tải hạn ngạch (HTTP " + statusCode + "). Tự động chuyển sang model gemini-3.6-flash để tiếp tục làm mượt...");
+                            }
+                        }
                     } else {
                         keyItem.state = "ERROR (" + statusCode + ")";
                     }
                 }
             } catch (Exception e) {
                 keyItem.state = "FAIL";
+                if (currentAttemptModel.toLowerCase().contains("pro")) {
+                    currentAttemptModel = "gemini-3.6-flash";
+                }
             }
         }
         throw new Exception("Trích xuất Patch làm mượt thất bại sau các lượt thử Key.");
