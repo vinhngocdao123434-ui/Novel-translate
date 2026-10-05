@@ -7,9 +7,7 @@ import com.google.gson.JsonObject;
 import okhttp3.*;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class GeminiEngine {
@@ -330,8 +328,8 @@ public class GeminiEngine {
                                 else if (clean.contains(":")) pair = clean.split(":", 2);
 
                                 if (pair != null && pair.length == 2) {
-                                    String k = pair[0].replaceAll("[\\[\\]]", "").trim();
-                                    String v = pair[1].replaceAll("[\\[\\]]", "").trim();
+                                    String k = pair[0].replace("[", "").replace("]", "").trim();
+                                    String v = pair[1].replace("[", "").replace("]", "").trim();
                                     if (!k.isEmpty() && !v.isEmpty()) {
                                         extractedMap.put(k, v);
                                     }
