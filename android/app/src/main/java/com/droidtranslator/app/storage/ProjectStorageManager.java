@@ -57,6 +57,8 @@ public class ProjectStorageManager {
         public int delaySec = 2;
         public int readerFontSize = 16;
         public String readerTheme = "amoled";
+        public String translationPipelineMode = "BATCH_GLOSSARY";
+        public int batchGlossarySize = 50;
         public JsonArray apiKeys = new JsonArray();
         public JsonArray promptCards = new JsonArray();
     }

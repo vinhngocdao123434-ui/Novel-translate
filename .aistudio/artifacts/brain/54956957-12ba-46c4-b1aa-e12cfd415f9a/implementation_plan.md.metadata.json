@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch cập nhật: Sửa lỗi hiển thị tên dự án trên Header và xử lý lỗi HTTP 503 khi dùng Gemini 3.6 Flash bằng thuật toán Exponential Backoff & Key Rotation",
-  "updatedAt":  "2026-10-04T20:49:44.888662611Z",
+  "summary":  "Cập nhật kế hoạch Chế độ Dịch Theo Lô: Đảm bảo nguyên tắc Giữ Cũ Bỏ Mới (KEEP_OLD) để thống nhất tên nhân vật xuyên suốt bộ truyện không bị xung đột với các lô trước",
+  "updatedAt":  "2026-10-05T01:49:14.133253148Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

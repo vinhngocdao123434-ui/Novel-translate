@@ -1,51 +1,42 @@
-# Kế Hoạch Cập Nhật Code: Sửa Lỗi Hiển Thị Dự Án & Xử Lý HTTP 503 Gemini 3.6 Flash
+# Kế Hoạch Triển Khai: Chế Độ Dịch Theo Lô (Batch-Glossary Pipeline Mode)
 
-## 1. Phân Tích & Nguyên Nhân 2 Lỗi
-
-### Lỗi 1: Tên dự án trên Header không thay đổi khi đổi truyện (Duyệt theo ảnh chụp)
-- **Phát hiện:** Trong `MainActivity.java`, biến `tvCurrentProjectName` bị gán đè (re-assigned) 2 lần:
-  - Lần 1: Tại Header Tầng 3 (`tvCurrentProjectName = new TextView(this)`).
-  - Lần 2: Tại Tab 2 Card 1 (`tvCurrentProjectName = new TextView(this)`).
-- **Hậu quả:** Khi chọn đổi dự án, lệnh `tvCurrentProjectName.setText(...)` chỉ cập nhật TextView ở Tab 2, còn TextView ở Header Tầng 3 bị mất tham chiếu nên giữ nguyên tên truyện cũ (`Dai_Quan_Gia_Ma_Hoang ▾`).
-
-### Lỗi 2: Xử lý lỗi HTTP 503 (Service Unavailable) khi dùng Gemini 3.6 Flash
-- **Phát hiện:** HTTP 503 xuất hiện khi mô hình `gemini-3.6-flash` quá tải tạm thời trên Google API. `GeminiEngine.java` hiện chưa tự động xoay Key và chưa lùi thời gian lặp (exponential backoff), dẫn đến gửi dồn dập và bị từ chối liên tục.
+## 📋 Mục Tiêu
+Bổ sung tùy chọn Cài đặt **Chế độ đường ống dịch (Translation Pipeline Mode)** giúp người dùng linh hoạt chọn giữa:
+1. **Chế độ Kết hợp (Mặc định cũ):** 1 Request dịch + bóc từ điển từng chương cùng lúc.
+2. **Chế độ Lô Hai Bước (Batch-Glossary Mode mới):** Gọi 1 Request bóc tách Từ điển cho một lô N chương (20, 30, 50, 100 chương), sau đó dịch thuần túy N chương đó không chứa thẻ định dạng và cấm 100% chữ Hán.
 
 ---
 
-## 2. Giải Pháp Thực Hiện
+## 🛠️ Kế Hoạch Thay Đổi Kiến Trúc & Code
 
-### Bước 1: Sửa Triệt Để Lỗi Hiển Thị Tên Dự Án Trên Header (`MainActivity.java`)
-- Khai báo 2 biến riêng biệt:
-  - `tvHeaderProjectName` (cho Header Tầng 3).
-  - `tvTab2ProjectName` (cho Tab 2 Card 1).
-- Tạo phương thức tập trung `updateProjectNameUI()`:
-  ```java
-  private void updateProjectNameUI() {
-      if (tvHeaderProjectName != null) {
-          tvHeaderProjectName.setText(currentProjectName + " ▾");
-      }
-      if (tvTab2ProjectName != null) {
-          tvTab2ProjectName.setText("📖 Dự án: " + currentProjectName);
-      }
-  }
-  ```
-- Gọi `updateProjectNameUI()` bất cứ khi nào đổi dự án (`showSwitchProjectDialog`), tạo mới (`showNewProjectDialog`), xóa dự án (`deleteProject`), hoặc mở ứng dụng.
+### 1. Cấu Hình Cài Đặt (UI & Storage)
+* **Thêm SharedPreferences Keys:**
+  * `pref_translation_pipeline_mode`: Giá trị `"COMBINED"` (chế độ cũ) hoặc `"BATCH_GLOSSARY"` (chế độ hai bước).
+  * `pref_batch_glossary_size`: Số chương gom lô (`20`, `30`, `50`, `100` - Mặc định: `50`).
+* **Bổ sung UI ở Tab Cài Đặt (`MainActivity.java`):**
+  * Thêm mục **"Chế độ đường ống dịch (Pipeline Mode)"** với Spinner / Dropdown chọn 2 chế độ.
+  * Thêm mục **"Kích thước lô bóc từ điển (Batch Size)"** khi ở chế độ Batch-Glossary.
+  * Thêm nút `?` giải thích hai chế độ ngắn gọn, dễ hiểu cho người mới dùng.
 
-### Bước 2: Nâng Cấp `GeminiEngine.java` với Thuật Toán Exponential Backoff & Key Rotation
-- **Xử lý HTTP 503 / 500 / 502 / 504 / 429:**
-  - Bóc tách nội dung lỗi `error.message` từ Google API để hiển thị log chi tiết.
-  - Tự động gán `COOLDOWN` (20 giây) cho Key bị lỗi để hệ thống lập tức chuyển sang Key tiếp theo trong Pool.
-  - Tính thời gian chờ lùi lũy thừa `(2 ^ attempts) * 1000ms + Jitter (0-500ms)` trước khi gửi request tiếp theo.
-- **Thêm `maxOutputTokens`:** Thêm `genConfig.addProperty("maxOutputTokens", 8192);` cho mô hình Gemini 3.6 Flash.
+### 2. Nâng Cấp Engine AI (`GeminiEngine.java`)
+* **Phương thức Bóc Từ Điển Theo Lô (`extractBatchGlossary`):**
+  * Gom N chương thô truyền vào 1 Request duy nhất với `system_instruction` đóng vai trò Đại Sư Ngôn Ngữ trích xuất danh từ riêng unique.
+  * Truyền kèm danh sách **Master Glossary hiện có từ các lô trước** vào Prompt.
+  * Yêu cầu AI: *"Chỉ nhặt ra thuật ngữ hoàn toàn MỚI chưa từng có trong Glossary. Tuyệt đối không thay đổi hay ghi đè các tên riêng đã tồn tại."*
+* **Phương thức Dịch Thuần Túy (`translateChapterPure`):**
+  * Đưa toàn bộ quy tắc chống lọt chữ Hán vào `system_instruction`.
+  * Trả về **100% văn bản dịch sạch**, bỏ hoàn toàn các thẻ `===TRANSLATION===` và `===NEW_GLOSSARY===`.
 
-### Bước 3: Kiểm Tra Biên Dịch & Xác Nhận 100% Không Lỗi
-- Chạy `verify-java-final.mjs` kiểm tra cú pháp 10 file Java.
-- Đồng bộ dữ liệu native qua `scripts/sync-native-project-data.mjs`.
-- Chạy `lint_applet` và `compile_applet`.
+### 3. Điều Phối Tiến Trình Dịch (`TranslationForegroundService.java`) & Quy Tắc Kế Thừa (KEEP_OLD)
+* Khi ở Chế độ Batch-Glossary:
+  * Trước khi dịch một đợt chương mới (ví dụ từ Chương 1 đến 50), chạy tác vụ ngầm bóc tách Glossary cho cả lô 50 chương trước.
+  * **Chế độ Giữ Cũ Bỏ Mới (KEEP_OLD):** Khi hợp nhất thuật ngữ mới bóc tách được vào Master Glossary, áp dụng quy tắc kiểm tra trùng lặp nghiêm ngặt: Nếu từ gốc Chữ Hán đã tồn tại trong Master Glossary từ các lô trước, **GIỮ NGUYÊN NGHĨA CŨ, BỎ NGHĨA MỚI**. Điều này đảm bảo tên nhân vật từ Chương 1 đến cuối bộ truyện hoàn toàn nhất quán.
+  * Tiến hành dịch tuần tự từng chương trong lô bằng hàm `translateChapterPure`.
+  * Đã xong 50 chương, tiếp tục gọi bóc Glossary cho lô 50 chương kế tiếp (Chương 51 đến 100) lũy tiến từ điển.
 
 ---
 
-## 3. Kết Quả Dự Kiến
-- Header Tầng 3 và Tab 2 luôn hiển thị đồng bộ 100% đúng tên dự án đang chọn ngay khi chuyển truyện.
-- Dịch thuật và Làm mượt Final qua mô hình **Gemini 3.6 Flash** hoạt động trơn tru, tự động vượt lỗi HTTP 503 bằng cơ chế xoay Key và lùi thời gian thông minh.
+## 🧪 Kế Hoạch Kiểm Thử (Verification Plan)
+1. **Kiểm tra cú pháp & Biên dịch Java:** Chạy `npx tsx verify-java-final.mjs`.
+2. **Đồng bộ dữ liệu Native App:** Chạy `node scripts/sync-native-project-data.mjs`.
+3. **Lint & Biên dịch Applet:** Chạy `lint_applet` và `compile_applet` đảm bảo không có lỗi build.

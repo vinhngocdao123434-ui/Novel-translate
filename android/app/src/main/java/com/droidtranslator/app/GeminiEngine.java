@@ -232,6 +232,240 @@ public class GeminiEngine {
         throw new Exception("Quá số lần thử lại tối đa (" + maxRetries + ").");
     }
 
+    public Map<String, String> extractBatchGlossary(List<String> chapterTexts, Map<String, String> existingGlossary, String modelName, int minTermLength, int minFrequency, LogCallback logger) throws Exception {
+        int maxRetries = Math.max(keys.size() * 2, 4);
+        int attempts = 0;
+
+        while (attempts < maxRetries) {
+            attempts++;
+            ApiKeyItem keyItem = getNextAvailableKey();
+            if (keyItem == null) throw new Exception("Không có API Key nào trong kho lưu trữ!");
+
+            long now = System.currentTimeMillis();
+            if (keyItem.cooldownUntil > now) {
+                long waitSec = Math.max((keyItem.cooldownUntil - now) / 1000, 1);
+                if (logger != null) logger.onLog("⏳ Tất cả Key đang cooldown, chờ " + waitSec + "s...");
+                Thread.sleep(waitSec * 1000);
+            }
+
+            try {
+                keyItem.totalRequests++;
+                String nl = String.valueOf((char) 10);
+                String existingGlossaryStr = GlossaryManager.getGlossaryAsString(existingGlossary);
+
+                StringBuilder systemInstructionSb = new StringBuilder();
+                systemInstructionSb.append("Bạn là Đại Sư Bóc Tách Thuật Ngữ Văn Học Tiếng Trung chuyên nghiệp.").append(nl);
+                systemInstructionSb.append("Nhiệm vụ: Rà soát toàn bộ các chương truyện được cung cấp bên dưới, phát hiện và trích xuất TẤT CẢ DANH TỪ RIÊNG MỚI (Tên người, địa danh, môn phái, bảo vật, chiêu thức).").append(nl);
+                systemInstructionSb.append("QUY TẮC BẮT BUỘC:").append(nl);
+                systemInstructionSb.append("1. Chỉ trích xuất từ có độ dài chữ Hán >= ").append(minTermLength).append(" ký tự.").append(nl);
+                systemInstructionSb.append("2. BẢO TOÀN TỪ ĐIỂN CŨ: Nếu từ gốc đã tồn tại trong Danh Sách Đã Có bên dưới, TUYỆT ĐỐI KHÔNG ghi đè hay thay đổi nghĩa.").append(nl);
+                systemInstructionSb.append("3. ĐỊNH DẠNG ĐẦU RA BẮT BUỘC: Mỗi dòng đúng 1 cặp [TừGốcChữHán] = [NghĩaDịchHánViệt], không thêm bớt bất kỳ lời giải thích hay ký tự thừa nào.").append(nl);
+
+                StringBuilder promptSb = new StringBuilder();
+                if (!existingGlossaryStr.isEmpty()) {
+                    promptSb.append("[DANH SÁCH TỪ ĐIỂN ĐÃ CÓ TỪ CÁC LÔ TRƯỚC (GIỮ NGUYÊN TUYỆT ĐỐI)]:").append(nl);
+                    promptSb.append(existingGlossaryStr).append(nl).append(nl);
+                }
+
+                promptSb.append("[NỘI DUNG LÔ CHƯƠNG TRUYỆN CẦN TRÍCH XUẤT THUẬT NGỮ]:").append(nl);
+                for (int i = 0; i < chapterTexts.size(); i++) {
+                    promptSb.append("=== CHƯƠNG ").append(i + 1).append(" ===").append(nl);
+                    promptSb.append(chapterTexts.get(i)).append(nl).append(nl);
+                }
+
+                JsonObject root = new JsonObject();
+                JsonObject sysInstObj = new JsonObject();
+                JsonArray sysParts = new JsonArray();
+                JsonObject sysPart = new JsonObject();
+                sysPart.addProperty("text", systemInstructionSb.toString());
+                sysParts.add(sysPart);
+                sysInstObj.add("parts", sysParts);
+                root.add("systemInstruction", sysInstObj);
+
+                JsonArray contents = new JsonArray();
+                JsonObject contentObj = new JsonObject();
+                JsonArray parts = new JsonArray();
+                JsonObject partObj = new JsonObject();
+                partObj.addProperty("text", promptSb.toString());
+                parts.add(partObj);
+                contentObj.add("parts", parts);
+                contents.add(contentObj);
+                root.add("contents", contents);
+
+                JsonObject genConfig = new JsonObject();
+                genConfig.addProperty("temperature", 0.2);
+                genConfig.addProperty("maxOutputTokens", 8192);
+                root.add("generationConfig", genConfig);
+
+                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
+
+                RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
+                Request request = new Request.Builder().url(url).post(requestBody).build();
+
+                Response response = client.newCall(request).execute();
+                String respBody = response.body() != null ? response.body().string() : "";
+
+                if (response.isSuccessful()) {
+                    keyItem.successRequests++;
+                    keyItem.state = "ACTIVE";
+
+                    JsonObject respJson = gson.fromJson(respBody, JsonObject.class);
+                    JsonArray candidates = respJson.getAsJsonArray("candidates");
+                    Map<String, String> extractedMap = new LinkedHashMap<>();
+
+                    if (candidates != null && candidates.size() > 0) {
+                        JsonObject firstCand = candidates.get(0).getAsJsonObject();
+                        JsonObject content = firstCand.getAsJsonObject("content");
+                        JsonArray outParts = content.getAsJsonArray("parts");
+                        String outText = outParts.get(0).getAsJsonObject().get("text").getAsString();
+
+                        if (outText != null && !outText.trim().isEmpty()) {
+                            String[] lines = outText.split("\\r?\\n");
+                            for (String line : lines) {
+                                String clean = line.trim();
+                                if (clean.isEmpty() || clean.startsWith("#") || clean.startsWith("=")) continue;
+                                String[] pair = null;
+                                if (clean.contains("=")) pair = clean.split("=", 2);
+                                else if (clean.contains(":")) pair = clean.split(":", 2);
+
+                                if (pair != null && pair.length == 2) {
+                                    String k = pair[0].replaceAll("[\\[\\]]", "").trim();
+                                    String v = pair[1].replaceAll("[\\[\\]]", "").trim();
+                                    if (!k.isEmpty() && !v.isEmpty()) {
+                                        extractedMap.put(k, v);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return extractedMap;
+                } else {
+                    int statusCode = response.code();
+                    if (statusCode == 429 || statusCode == 503) {
+                        keyItem.state = "COOLDOWN (" + statusCode + ")";
+                        keyItem.cooldownUntil = System.currentTimeMillis() + 60000;
+                    } else {
+                        keyItem.state = "ERROR (" + statusCode + ")";
+                    }
+                }
+            } catch (Exception e) {
+                keyItem.state = "FAIL";
+            }
+        }
+        throw new Exception("Bóc tách Glossary theo lô thất bại sau các lượt thử Key.");
+    }
+
+    public String translateChapterPure(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, String rescueInstruction, LogCallback logger) throws Exception {
+        int maxRetries = Math.max(keys.size() * 2, 4);
+        int attempts = 0;
+
+        while (attempts < maxRetries) {
+            attempts++;
+            ApiKeyItem keyItem = getNextAvailableKey();
+            if (keyItem == null) throw new Exception("Không có API Key nào trong kho lưu trữ!");
+
+            long now = System.currentTimeMillis();
+            if (keyItem.cooldownUntil > now) {
+                long waitSec = Math.max((keyItem.cooldownUntil - now) / 1000, 1);
+                if (logger != null) logger.onLog("⏳ Tất cả Key đang cooldown, chờ " + waitSec + "s...");
+                Thread.sleep(waitSec * 1000);
+            }
+
+            try {
+                keyItem.totalRequests++;
+                String glossaryText = GlossaryManager.getGlossaryAsString(glossary);
+                String nl = String.valueOf((char) 10);
+
+                StringBuilder systemInstructionSb = new StringBuilder();
+                systemInstructionSb.append("Bạn là đại sư dịch thuật tiểu thuyết văn học và huyền huyễn đỉnh cao hàng đầu thế giới.").append(nl);
+                systemInstructionSb.append("[NGÔN NGỮ ĐÍCH BẮT BUỘC]: ").append(targetLanguage != null ? targetLanguage : "Tiếng Việt").append(nl);
+                systemInstructionSb.append("[QUY TẮC ĐẦU RA]: Trả về TRỰC TIẾP văn bản bản dịch hoàn chỉnh. CẤM thêm bất kỳ thẻ định dạng nào như ===TRANSLATION=== hay ===NEW_GLOSSARY===, cấm giải thích thừa.").append(nl);
+
+                if (targetLanguage == null || targetLanguage.toLowerCase().contains("việt")) {
+                    systemInstructionSb.append("[KỶ LUẬT CHỐNG LỌT CHỮ HÁN]: CẤM 100% CHỮ HÁN NẰM TRONG BẢN DỊCH. Toàn bộ tên riêng, chức vị, vật phẩm phải phiên âm Hán-Việt hoặc thuần Việt chuẩn.").append(nl);
+                }
+
+                StringBuilder promptSb = new StringBuilder();
+                promptSb.append("[YÊU CẦU DỊCH THUẬT PHONG CÁCH]:").append(nl).append(systemPrompt).append(nl).append(nl);
+                promptSb.append("[BẢNG TỪ ĐIỂN GLOSSARY BẮT BUỘC TUÂN THỦ TUYỆT ĐỐI (100% KHÔNG ĐỔI TÊN)]:").append(nl);
+                promptSb.append(glossaryText.isEmpty() ? "(Chưa có từ điển)" : glossaryText).append(nl).append(nl);
+
+                if (previousChapterSnippet != null && !previousChapterSnippet.trim().isEmpty()) {
+                    promptSb.append("[NGỮ CẢNH ĐOẠN CUỐI CHƯƠNG TRƯỚC (CHỈ THAM KHẢO XƯNG HÔ, TUYỆT ĐỐI KHÔNG DỊCH LẠI)]:").append(nl);
+                    promptSb.append(previousChapterSnippet.trim()).append(nl).append(nl);
+                }
+
+                promptSb.append("[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI]:").append(nl).append(chapterText).append(nl);
+
+                if (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) {
+                    promptSb.append(nl).append("[CHỈ THỊ CỨU HỘ KHẨN CẤP]: ").append(rescueInstruction.trim()).append(nl);
+                }
+
+                JsonObject root = new JsonObject();
+                JsonObject sysInstObj = new JsonObject();
+                JsonArray sysParts = new JsonArray();
+                JsonObject sysPart = new JsonObject();
+                sysPart.addProperty("text", systemInstructionSb.toString());
+                sysParts.add(sysPart);
+                sysInstObj.add("parts", sysParts);
+                root.add("systemInstruction", sysInstObj);
+
+                JsonArray contents = new JsonArray();
+                JsonObject contentObj = new JsonObject();
+                JsonArray parts = new JsonArray();
+                JsonObject partObj = new JsonObject();
+                partObj.addProperty("text", promptSb.toString());
+                parts.add(partObj);
+                contentObj.add("parts", parts);
+                contents.add(contentObj);
+                root.add("contents", contents);
+
+                JsonObject genConfig = new JsonObject();
+                genConfig.addProperty("temperature", (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) ? 0.15 : 0.3);
+                genConfig.addProperty("maxOutputTokens", 8192);
+                root.add("generationConfig", genConfig);
+
+                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
+
+                RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
+                Request request = new Request.Builder().url(url).post(requestBody).build();
+
+                Response response = client.newCall(request).execute();
+                String respBody = response.body() != null ? response.body().string() : "";
+
+                if (response.isSuccessful()) {
+                    keyItem.successRequests++;
+                    keyItem.state = "ACTIVE";
+
+                    JsonObject respJson = gson.fromJson(respBody, JsonObject.class);
+                    JsonArray candidates = respJson.getAsJsonArray("candidates");
+                    if (candidates != null && candidates.size() > 0) {
+                        JsonObject firstCand = candidates.get(0).getAsJsonObject();
+                        JsonObject content = firstCand.getAsJsonObject("content");
+                        JsonArray outParts = content.getAsJsonArray("parts");
+                        String outText = outParts.get(0).getAsJsonObject().get("text").getAsString();
+                        return outText != null ? outText.trim() : "";
+                    } else {
+                        throw new Exception("Không nhận được nội dung từ Gemini.");
+                    }
+                } else {
+                    int statusCode = response.code();
+                    if (statusCode == 429 || statusCode == 503) {
+                        keyItem.state = "COOLDOWN (" + statusCode + ")";
+                        keyItem.cooldownUntil = System.currentTimeMillis() + 60000;
+                    } else {
+                        keyItem.state = "ERROR (" + statusCode + ")";
+                    }
+                }
+            } catch (Exception e) {
+                keyItem.state = "FAIL";
+            }
+        }
+        throw new Exception("Dịch chương thuần túy thất bại sau các lượt thử Key.");
+    }
+
     public String[] translateChapter(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, LogCallback logger) throws Exception {
         return translateChapter(chapterText, previousChapterSnippet, systemPrompt, glossary, modelName, "Tiếng Việt", true, 2, 2, logger);
     }
