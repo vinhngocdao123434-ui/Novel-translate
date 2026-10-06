@@ -215,6 +215,8 @@ const STORAGE_CURRENT_PROJ_KEY = 'droidtranslator_active_proj_v10';
 const STORAGE_GLOBAL_KEYS = 'droid_global_api_keys_v10';
 const STORAGE_GLOBAL_PROMPTS = 'droid_global_prompts_v10';
 const STORAGE_ADVANCED_SETTINGS = 'droid_advanced_settings_v10';
+const STORAGE_SELECTED_MODEL = 'droid_selected_model_v10';
+const STORAGE_POLISH_MODEL = 'droid_polish_model_v10';
 
 export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isNativeMode }) => {
   const isDeviceNative = isNativeMode || (typeof window !== 'undefined' && (Boolean((window as any).AndroidBridge) || window.innerWidth < 768));
@@ -386,7 +388,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     }
   }, []);
 
-  // Auto-save Global API Keys, Prompts, and Advanced Settings
+  // Ensure selected model from localStorage is preserved across reloads & project switches
+  useEffect(() => {
+    try {
+      const savedModel = localStorage.getItem(STORAGE_SELECTED_MODEL);
+      if (savedModel && project && project.model !== savedModel) {
+        setProjects(prev => {
+          if (!prev[currentProjectName]) return prev;
+          return {
+            ...prev,
+            [currentProjectName]: { ...prev[currentProjectName], model: savedModel }
+          };
+        });
+      }
+    } catch (e) {}
+  }, [currentProjectName]);
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_GLOBAL_KEYS, JSON.stringify(globalApiKeys));
@@ -520,7 +536,19 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [isGapFillingMode, setIsGapFillingMode] = useState<boolean>(false);
-  const [polishModel, setPolishModel] = useState<string>('gemini-3.6-flash');
+  const [polishModel, setPolishModel] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_POLISH_MODEL);
+      if (saved) return saved;
+    } catch (e) {}
+    return 'gemini-3.6-flash';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_POLISH_MODEL, polishModel);
+    } catch (e) {}
+  }, [polishModel]);
   const [isPolishing, setIsPolishing] = useState<boolean>(false);
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number>(0);
   const [liveStreamText, setLiveStreamText] = useState<string>('');
@@ -868,7 +896,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       ...prev,
       [currentProjectName]: { ...prev[currentProjectName], model: modelId }
     }));
-    addLog(`Đã chọn model: ${modelId}`);
+    try {
+      localStorage.setItem(STORAGE_SELECTED_MODEL, modelId);
+    } catch (e) {}
+    addLog(`Đã chọn model: ${modelId} (Lưu mặc định vĩnh viễn)`);
   };
 
   // Apply Custom Model
@@ -898,7 +929,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       [cleanName]: {
         name: cleanName,
         path: `/sdcard/Projects/${cleanName}`,
-        model: 'gemini-2.5-flash',
+        model: localStorage.getItem(STORAGE_SELECTED_MODEL) || project?.model || 'gemini-2.5-flash',
         targetLang: 'Tiếng Việt (Chuẩn văn phong tiểu thuyết)',
         chunkSize: '3500',
         completed: 0,
@@ -1008,13 +1039,34 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     return true;
   };
 
+  // Helper: Sanitize glossary target translation values so they NEVER contain Chinese characters
+  const sanitizeGlossaryTargetValue = (val: string): string => {
+    if (!val) return '';
+    let cleaned = val.trim();
+
+    // 1. Khử chữ Hán nằm trong ngoặc kép hoặc ngoặc đơn kèm bản dịch, ví dụ "Lâm Thần (林辰)" -> "Lâm Thần"
+    cleaned = cleaned.replace(/\s*[\(\（\[【][\u4e00-\u9fa5\s]+[\)\］\]】]/g, '');
+
+    // 2. Chuyển đổi 100% các chữ Hán còn sót lại thành âm Hán-Việt Latin (ví dụ: "Thập Lý Bi坡" -> "Thập Lý Bi Pha")
+    if (/[\u4e00-\u9fa5]/.test(cleaned)) {
+      const { result } = transliterateLeftoverHanzi(cleaned);
+      cleaned = result;
+    }
+
+    // 3. Khử telex lỗi
+    cleaned = cleanTranslationGlitch(cleaned);
+
+    return cleaned.trim();
+  };
+
   // Helper: Purge invalid labels and non-Chinese keys from Master Glossary
   const purgeInvalidGlossaryEntries = (dict: Record<string, string>): Record<string, string> => {
     if (!dict) return {};
     const cleaned: Record<string, string> = {};
     for (const [k, v] of Object.entries(dict)) {
-      if (isValidGlossaryKey(k) && v && v.trim() && k.trim().toLowerCase() !== v.trim().toLowerCase()) {
-        cleaned[k.trim()] = v.trim();
+      const sanitizedV = sanitizeGlossaryTargetValue(v);
+      if (isValidGlossaryKey(k) && sanitizedV && k.trim().toLowerCase() !== sanitizedV.toLowerCase()) {
+        cleaned[k.trim()] = sanitizedV;
       }
     }
     return cleaned;
@@ -1064,7 +1116,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         }
 
         if (rawKey.length < 50 && val.length < 100 && rawKey.toLowerCase() !== val.toLowerCase()) {
-          parsedMap[rawKey] = cleanTranslationGlitch(val);
+          const sanitizedVal = sanitizeGlossaryTargetValue(val);
+          if (sanitizedVal && !/[\u4e00-\u9fa5]/.test(sanitizedVal)) {
+            parsedMap[rawKey] = sanitizedVal;
+          }
         }
       }
     }
@@ -1126,7 +1181,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
     for (const [key, val] of Object.entries(aiGlossary)) {
       const trimmedKey = key.trim();
-      const trimmedVal = val.trim();
+      const trimmedVal = sanitizeGlossaryTargetValue(val);
       if (!trimmedKey || !trimmedVal) continue;
 
       if (!isValidGlossaryKey(trimmedKey)) continue;
@@ -1168,6 +1223,19 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       }
     }
     return injected;
+  };
+
+  // Helper: Lọc từ điển tối ưu theo chương (Chỉ chọn thuật ngữ thực sự xuất hiện trong Raw chương hiện tại)
+  const getRelevantGlossary = (glossary: Record<string, string>, rawText: string): Record<string, string> => {
+    if (!glossary || !rawText) return {};
+    const filtered: Record<string, string> = {};
+    const sortedKeys = Object.keys(glossary).sort((a, b) => b.length - a.length);
+    for (const k of sortedKeys) {
+      if (k && rawText.includes(k) && glossary[k]) {
+        filtered[k] = glossary[k];
+      }
+    }
+    return filtered;
   };
 
   // Translation Loop Simulation & Execution (Hỗ trợ độc lập 6 Mode Dịch)
@@ -1233,8 +1301,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           const isBatchGlossaryEnabled = advancedSettings.enableBatchGlossaryAutoExtract !== false;
           const batchSize = advancedSettings.batchGlossarySize || 50;
           const batchStart = Math.floor(currentChapterIndex / batchSize) * batchSize;
+          const isGlossaryEmpty = !project.masterGlossary || Object.keys(project.masterGlossary).length === 0;
 
-          if (isBatchGlossaryEnabled && !processedBatchStarts.includes(batchStart) && project.chapters.length > 0) {
+          if (isBatchGlossaryEnabled && (!processedBatchStarts.includes(batchStart) || isGlossaryEmpty) && project.chapters.length > 0) {
             setProcessedBatchStarts(prev => [...prev, batchStart]);
             const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
             const chaptersInBatch = project.chapters.slice(batchStart, batchEnd);
@@ -1253,6 +1322,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 batchPrompt += `7. CẢNH GIỚI TU LUYỆN & PHẨM CẤP: Giai tầng võ đạo, phẩm giai pháp khí (VD: 黄阶 ➔ Hoàng giai, 玄阶 ➔ Huyền giai, 练气 ➔ Luyện Khí, 筑基 ➔ Trúc Cơ, 金丹 ➔ Kim Đan, 元婴 ➔ Nguyên Anh).\n\n`;
                 batchPrompt += `QUY TẮC BẮT BUỘC:\n`;
                 batchPrompt += `- Định dạng mỗi dòng: [TừGốcTiếngTrung] = [NghĩaHánViệtChuẩn]\n`;
+                batchPrompt += `- TUYỆT ĐỐI KHÔNG BỎ HOẶC ĐỂ CHỨA BẤT KỲ KÝ TỰ CHỮ HÁN NÀO Ở PHẦN NGHĨA DỊCH TIẾNG VIỆT (BÊN PHẢI DẤU =). PHẦN NGHĨA DỊCH PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT.\n`;
+                batchPrompt += `- VÍ DỤ CHUẨN: 十里坡 = Thập Lý Bi Pha (CẤM VIẾT: 十里坡 = Thập Lý Bi坡)\n`;
                 batchPrompt += `- TUYỆT ĐỐI KHÔNG đảo ngược thứ tự tiếng Việt = tiếng Trung.\n`;
                 batchPrompt += `- Phiên âm Hán-Việt chuẩn xác, thanh thoát, đúng quy chuẩn từ điển văn học dịch thuật.\n`;
                 batchPrompt += `- Trả về danh sách thuần túy (không kèm markdown giải thích rườm rà).\n\n`;
@@ -1331,12 +1402,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           if (isRealKey) {
             try {
               const activePromptObj = globalPrompts.find(p => p.active) || globalPrompts[0];
-              const glossaryStr = Object.entries(project.masterGlossary).map(([k, v]) => `${k} = ${v}`).join('\n');
               
+              // LỌC TỪ ĐIỂN TỐI ƯU THEO CHƯƠNG (RELEVANT GLOSSARY FILTERING - 100% CÁC MODE)
+              const relevantGlossary = getRelevantGlossary(project.masterGlossary, rawContent);
+              const relevantCount = Object.keys(relevantGlossary).length;
+              const totalMasterCount = Object.keys(project.masterGlossary).length;
+              const glossaryStr = Object.entries(relevantGlossary).map(([k, v]) => `${k} = ${v}`).join('\n');
+              
+              if (totalMasterCount > 0) {
+                addLog(`🎯 [LỌC TỪ ĐIỂN CHƯƠNG ${currentChapterIndex + 1}] Quét ${totalMasterCount} từ Master Glossary ➔ Lọc được ${relevantCount} thuật ngữ có trong chương để đính kèm AI.`);
+              }
+
               let promptSb = `Bạn là chuyên gia dịch thuật tiểu thuyết hàng đầu thế giới.\n\n`;
               promptSb += `[NGÔN NGỮ ĐÍCH]: ${advancedSettings.targetLanguage || 'Tiếng Việt'}\n\n`;
               promptSb += `[YÊU CẦU PHONG CÁCH]:\n${activePromptObj.content}\n\n`;
-              promptSb += `[BẢNG TỪ ĐIỂN GLOSSARY BẮT BUỘC TUÂN THỦ TUYỆT ĐỐI (100% ĐỒNG NHẤT XƯNG HÔ & THUẬT NGỮ)]:\n${glossaryStr || '(Chưa có từ điển)'}\n\n`;
+              promptSb += `[BẢNG TỪ ĐIỂN GLOSSARY BẮT BUỘC TUÂN THỦ TUYỆT ĐỐI (100% ĐỒNG NHẤT XƯNG HÔ & THUẬT NGỮ CHƯƠNG NÀY)]:\n${glossaryStr || '(Không có thuật ngữ trùng khớp trong chương này)'}\n\n`;
               
               if (previousSnippet) {
                 promptSb += `[NGỮ CẢNH ĐOẠN CUỐI CHƯƠNG TRƯỚC (CHỈ DÙNG ĐỂ THAM KHẢO VĂN PHONG VÀ ĐỒNG NHẤT XƯNG HÔ, TUYỆT ĐỐI KHÔNG DỊCH LẠI)]:\n${previousSnippet}\n\n`;
@@ -1563,10 +1643,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             setStatusText('🎉 Đã hoàn thành khoảng chương yêu cầu!');
             addLog(`🎉 Hoàn tất dịch từ Chương ${fromChapInput} đến ${targetEnd}!`);
             
-            // TẤT CẢ CÁC MODE ĐỀU TỰ ĐỘNG LÀM MƯỢT FINAL SAU KHI DỊCH XONG
-            setTimeout(() => {
-              handleExecuteFinalGlobalPolish();
-            }, 800);
+            if (advancedSettings.enableAutoFinalPolish !== false) {
+              addLog(`✨ Tự động kích hoạt Làm Mượt Final theo cài đặt...`);
+              setTimeout(() => {
+                handleExecuteFinalGlobalPolish();
+              }, 800);
+            } else {
+              addLog(`ℹ️ Đã hoàn tất dải chương dịch. Tự động làm mượt Final đang TẮT trong cài đặt.`);
+            }
           }
         }, (delaySecInput || 2) * 1000);
       }
@@ -2068,6 +2152,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   // Add Glossary Manually
   const handleAddGlossary = () => {
     if (!newGlossaryKey.trim() || !newGlossaryVal.trim() || !project) return;
+    const cleanK = newGlossaryKey.trim();
+    const cleanV = sanitizeGlossaryTargetValue(newGlossaryVal);
+    if (!cleanV) return;
     setProjects(prev => {
       const cur = prev[currentProjectName];
       return {
@@ -2076,14 +2163,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           ...cur,
           masterGlossary: {
             ...cur.masterGlossary,
-            [newGlossaryKey.trim()]: newGlossaryVal.trim()
+            [cleanK]: cleanV
           }
         }
       };
     });
     setNewGlossaryKey('');
     setNewGlossaryVal('');
-    addLog(`📚 Đã nạp thuật ngữ: "${newGlossaryKey.trim()}" = "${newGlossaryVal.trim()}"`);
+    addLog(`📚 Đã nạp thuật ngữ: "${cleanK}" = "${cleanV}"`);
   };
 
   // Open Edit Glossary Term Modal
@@ -2098,7 +2185,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   const handleSaveEditGlossary = () => {
     if (!editingGlossaryNewKey.trim() || !editingGlossaryNewVal.trim() || !project) return;
     const newK = editingGlossaryNewKey.trim();
-    const newV = cleanTranslationGlitch(editingGlossaryNewVal.trim());
+    const newV = sanitizeGlossaryTargetValue(editingGlossaryNewVal);
+    if (!newV) return;
 
     setProjects(prev => {
       const cur = prev[currentProjectName];
@@ -2156,8 +2244,11 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         }
 
         if (raw && vi) {
-          importedEntries[raw] = cleanTranslationGlitch(vi);
-          count++;
+          const sanitizedVi = sanitizeGlossaryTargetValue(vi);
+          if (sanitizedVi) {
+            importedEntries[raw] = sanitizedVi;
+            count++;
+          }
         }
       }
 
@@ -2205,6 +2296,97 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     a.click();
     URL.revokeObjectURL(url);
     addLog(`📤 Đã xuất ${sorted.length} thuật ngữ ra tệp ${project.name}_GLOSSARY.txt`);
+  };
+
+  // Manual Batch Glossary Extraction
+  const handleManualBatchGlossaryExtract = async () => {
+    if (!project || project.chapters.length === 0) {
+      alert('Chưa có chương truyện nào để bóc lô!');
+      return;
+    }
+    const batchSize = advancedSettings.batchGlossarySize || 50;
+    const batchStart = Math.floor(currentChapterIndex / batchSize) * batchSize;
+    const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
+    const chaptersInBatch = project.chapters.slice(batchStart, batchEnd);
+
+    addLog(`🔍 [BÓC LÔ THỦ CÔNG] Bắt đầu trích xuất Master Glossary cho Lô ${batchStart + 1} ➔ ${batchEnd}...`);
+
+    const activeKeyObj = globalApiKeys.find(k => k.state === 'ACTIVE') || globalApiKeys[0];
+    const isRealKey = activeKeyObj && activeKeyObj.key.startsWith('AIzaSy') && !activeKeyObj.key.includes('DemoSampleKey');
+
+    if (isRealKey) {
+      try {
+        let batchPrompt = `Bạn là chuyên gia trích xuất thực thể và xây dựng từ điển tiểu thuyết văn học (Glossary Architect).\n`;
+        batchPrompt += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và trích xuất TOÀN DIỆN 100% các thuật ngữ, danh từ riêng, xưng hô và danh xưng thế giới, bao gồm 7 nhóm bắt buộc:\n`;
+        batchPrompt += `1. TÊN NHÂN VẬT & BIỆT DANH\n2. XƯNG HÔ, CHỨC VỤ, VAI VẾ\n3. ĐỊA DANH & ĐỊA ĐIỂM\n4. YÊU THÚ, LINH THÚ & THẦN THÚ\n5. PHÁP BẢO, VŨ KHÍ, ĐAN DƯỢC & VẬT PHẨM\n6. CÔNG PHÁP, CHIÊU THỨC & THÂN PHÁP\n7. CẢNH GIỚI TU LUYỆN & PHẨM CẤP\n\n`;
+        batchPrompt += `QUY TẮC BẮT BUỘC:\n`;
+        batchPrompt += `- Định dạng mỗi dòng: [TừGốcTiếngTrung] = [NghĩaHánViệtChuẩn]\n`;
+        batchPrompt += `- TUYỆT ĐỐI KHÔNG BỎ HOẶC ĐỂ CHỨA BẤT KỲ KÝ TỰ CHỮ HÁN NÀO Ở PHẦN NGHĨA DỊCH TIẾNG VIỆT (BÊN PHẢI DẤU =). PHẦN NGHĨA DỊCH PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT.\n`;
+        batchPrompt += `- VÍ DỤ CHUẨN: 十里坡 = Thập Lý Bi Pha (CẤM VIẾT: 十里坡 = Thập Lý Bi坡)\n`;
+        batchPrompt += `- Trả về danh sách thuần túy (không kèm markdown giải thích rườm rà).\n\n`;
+        batchPrompt += `[CÁC CHƯƠNG THÔ]:\n` + chaptersInBatch.map((c, i) => `--- CHƯƠNG ${batchStart + i + 1} ---\n${c}`).join('\n\n');
+
+        const bResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: batchPrompt }] }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+          })
+        });
+
+        if (bResp.ok) {
+          const bData = await bResp.json();
+          const bOut = bData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const extractedGloss = parseGlossaryText(bOut);
+          const foundCount = Object.keys(extractedGloss).length;
+
+          if (foundCount > 0) {
+            setProjects(prev => {
+              const cur = prev[currentProjectName];
+              const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, extractedGloss);
+              const addedCount = Object.keys(newlyAdded).length;
+              addLog(`🎉 [BÓC LÔ THÀNH CÔNG] AI đã tìm thấy ${foundCount} thuật ngữ từ Lô ${batchStart + 1} ➔ ${batchEnd}. Đã nạp ${addedCount} từ mới sạch chữ Hán vào Master Glossary (Tổng hiện có: ${Object.keys(updatedGlossary).length} từ)!`);
+              return {
+                ...prev,
+                [currentProjectName]: {
+                  ...cur,
+                  masterGlossary: updatedGlossary
+                }
+              };
+            });
+          } else {
+            addLog(`ℹ️ [BÓC LÔ] AI không phát hiện thêm thuật ngữ mới nào trong lô chương ${batchStart + 1} ➔ ${batchEnd}.`);
+          }
+        } else {
+          addLog(`⚠️ [BÓC LÔ LỖI] API trả về HTTP ${bResp.status}`);
+        }
+      } catch (bErr: any) {
+        addLog(`⚠️ [BÓC LÔ LỖI] ${bErr.message}`);
+      }
+    } else {
+      const offlineExtracted: Record<string, string> = {};
+      for (const ch of chaptersInBatch) {
+        for (const [k, v] of Object.entries(SINO_VIET_DICT)) {
+          if (ch.includes(k) && !project.masterGlossary[k]) {
+            offlineExtracted[k] = sanitizeGlossaryTargetValue(v);
+          }
+        }
+      }
+      setProjects(prev => {
+        const cur = prev[currentProjectName];
+        const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, offlineExtracted);
+        const addedCount = Object.keys(newlyAdded).length;
+        addLog(`🎉 [BÓC LÔ (OFFLINE)] Đã nạp ${addedCount} thuật ngữ vào Master Glossary!`);
+        return {
+          ...prev,
+          [currentProjectName]: {
+            ...cur,
+            masterGlossary: updatedGlossary
+          }
+        };
+      });
+    }
   };
 
   // Copy Chapter Text
@@ -3025,8 +3207,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       setIsTranslating(false);
                       setIsPaused(false);
                       setIsGapFillingMode(false);
+                      setProcessedBatchStarts([]);
                       setStatusText('● Đã hủy tiến trình');
-                      addLog('⏹ Đã hủy tiến trình dịch');
+                      addLog('⏹ Đã hủy tiến trình dịch (Reset trạng thái bóc lô)');
                     }}
                     className="py-2.5 bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 disabled:opacity-40 rounded-xl font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
@@ -3034,6 +3217,16 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                     <span>Hủy</span>
                   </button>
                 </div>
+
+                {/* NÚT BÓC LÔ GLOSSARY THỦ CÔNG KHẨN CẤP */}
+                <button
+                  disabled={isTranslating || isPolishing}
+                  onClick={handleManualBatchGlossaryExtract}
+                  className="w-full py-2.5 bg-blue-950 hover:bg-blue-900 border border-blue-700 text-blue-300 disabled:opacity-40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-950/40 cursor-pointer transition-all"
+                >
+                  <BookMarked className="w-3.5 h-3.5 text-blue-400" />
+                  <span>⚡ Bóc Lô Glossary Lô Này Ngay (Chương {currentChapterIndex + 1} ➔ {Math.min(currentChapterIndex + (advancedSettings.batchGlossarySize || 50), project ? project.chapters.length : 1)})</span>
+                </button>
 
                 {/* NÚT DỊCH BÙ CHƯƠNG SÓT (NÉ CHƯƠNG ĐÃ DỊCH) */}
                 <button
@@ -5042,17 +5235,34 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   ) : (
                     <div className="text-center py-20 space-y-3">
                       <BookOpen className="w-12 h-12 opacity-30 mx-auto" />
-                      <p className="font-sans text-base font-semibold opacity-80">Chương này chưa có bản dịch.</p>
-                      <p className="font-sans text-xs opacity-60">Bạn có thể qua Thẻ Dịch để dịch chương này trong nền mà không làm gián đoạn vị trí đọc!</p>
-                      <button
-                        onClick={() => {
-                          setShowFullScreenReader(false);
-                          setActiveBottomTab('translate');
-                        }}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold cursor-pointer"
-                      >
-                        Chuyển sang Thẻ Dịch
-                      </button>
+                      <p className="font-sans text-base font-semibold opacity-80">Chương {readingChapterIndex + 1} chưa có bản dịch.</p>
+                      <p className="font-sans text-xs opacity-60">Nhấn nút bên dưới để dịch ngay chương này hoặc chuyển sang Thẻ 2 để dịch theo khoảng!</p>
+                      <div className="flex items-center justify-center gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            setCurrentChapterIndex(readingChapterIndex);
+                            setFromChapInput(readingChapterIndex + 1);
+                            setToChapInput(readingChapterIndex + 1);
+                            setIsTranslating(true);
+                            setIsPaused(false);
+                            setShowFullScreenReader(false);
+                            setActiveBottomTab('translate');
+                          }}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>⚡ Dịch Ngay Chương {readingChapterIndex + 1}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowFullScreenReader(false);
+                            setActiveBottomTab('translate');
+                          }}
+                          className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-bold cursor-pointer"
+                        >
+                          Chuyển sang Thẻ Dịch
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
