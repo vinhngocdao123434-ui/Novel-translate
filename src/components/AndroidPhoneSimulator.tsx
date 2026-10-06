@@ -21,6 +21,7 @@ import { HelpCircle } from 'lucide-react';
 
 interface Props {
   onOpenGodModeModal: () => void;
+  isNativeMode?: boolean;
 }
 
 const DEFAULT_PROMPTS: PromptCardItem[] = [
@@ -215,7 +216,9 @@ const STORAGE_GLOBAL_KEYS = 'droid_global_api_keys_v10';
 const STORAGE_GLOBAL_PROMPTS = 'droid_global_prompts_v10';
 const STORAGE_ADVANCED_SETTINGS = 'droid_advanced_settings_v10';
 
-export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) => {
+export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isNativeMode }) => {
+  const isDeviceNative = isNativeMode || (typeof window !== 'undefined' && (Boolean((window as any).AndroidBridge) || window.innerWidth < 768));
+
   // Navigation: 4 Bottom Tabs in EXACT requested order:
   // Tab 1: KEY & PROMPT
   // Tab 2: DỊCH & GLOSSARY
@@ -2192,36 +2195,42 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   ) : [];
 
   return (
-    <div className="flex flex-col items-center justify-center p-0 sm:p-3 w-full">
-      {/* PHONE CASING: Full screen on mobile / inside APK, Elegant Gold Casing on Desktop */}
-      <div className="w-full max-w-full sm:max-w-[440px] bg-[#03060d] border-0 sm:border-4 border-[#785a28]/80 rounded-none sm:rounded-[44px] shadow-none sm:shadow-[0_0_50px_rgba(0,0,0,0.8),0_0_20px_rgba(120,90,40,0.25)] overflow-hidden flex flex-col h-[calc(100vh-130px)] sm:h-[790px] relative text-neutral-100">
+    <div className={`flex flex-col items-center justify-center w-full ${isDeviceNative ? 'h-full p-0 m-0 overflow-hidden' : 'p-0 sm:p-3'}`}>
+      {/* PHONE CASING: Full screen edge-to-edge on mobile / inside APK, Elegant Gold Casing on Desktop */}
+      <div className={`w-full flex flex-col text-neutral-100 relative ${
+        isDeviceNative
+          ? 'h-full max-w-full rounded-none border-0 shadow-none bg-[#03060d] overflow-hidden'
+          : 'max-w-[440px] bg-[#03060d] border-4 border-[#785a28]/80 rounded-[44px] shadow-[0_0_50px_rgba(0,0,0,0.8),0_0_20px_rgba(120,90,40,0.25)] h-[790px] overflow-hidden'
+      }`}>
         
-        {/* TOP PHONE NOTCH & STATUS BAR */}
-        <div className="h-10 bg-[#091428] px-5 flex items-center justify-between text-xs text-[#a09b8c] select-none shrink-0 border-b border-[#785a28]/40">
-          <span className="font-semibold text-[#f0e6d2]">12:30</span>
-          <div className="w-24 h-4 bg-[#050c18] border border-[#785a28]/30 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 rounded-full bg-[#785a28]/60"></div>
+        {/* TOP PHONE NOTCH & STATUS BAR (ONLY DISPLAYED ON DESKTOP SIMULATOR PREVIEW, NEVER ON REAL PHONE) */}
+        {!isDeviceNative && (
+          <div className="h-10 bg-[#091428] px-5 flex items-center justify-between text-xs text-[#a09b8c] select-none shrink-0 border-b border-[#785a28]/40">
+            <span className="font-semibold text-[#f0e6d2]">12:30</span>
+            <div className="w-24 h-4 bg-[#050c18] border border-[#785a28]/30 rounded-full flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-[#785a28]/60"></div>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px]">
+              {isDeviceRooted && (
+                <span className="text-[#c8aa6e] font-bold font-mono text-[10px] bg-[#1e2328] px-1.5 py-0.5 rounded border border-[#785a28]">ROOT #</span>
+              )}
+              <span>5G</span>
+              <span>100%</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px]">
-            {isDeviceRooted && (
-              <span className="text-[#c8aa6e] font-bold font-mono text-[10px] bg-[#1e2328] px-1.5 py-0.5 rounded border border-[#785a28]">ROOT #</span>
-            )}
-            <span>5G</span>
-            <span>100%</span>
-          </div>
-        </div>
+        )}
 
         {/* FOREGROUND PERSISTENT NOTIFICATION BANNER */}
         {godModeActive && (
-          <div className="bg-[#091428] border-b border-[#785a28]/40 px-3 py-1.5 flex items-center justify-between text-[11px] text-[#f0e6d2] shrink-0">
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <div className="bg-[#091428] border-b border-[#785a28]/40 px-3.5 py-2 flex items-center justify-between text-[11px] text-[#f0e6d2] shrink-0">
+            <div className="flex items-center gap-2 truncate">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <span className="font-semibold text-[#c8aa6e]">God-Mode:</span>
               <span className="text-[#a09b8c] truncate">{statusText}</span>
             </div>
             <button 
               onClick={onOpenGodModeModal} 
-              className="text-[10px] bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] border border-[#0ac8b9]/40 px-2 py-0.5 rounded font-bold shrink-0 cursor-pointer shadow-sm"
+              className="text-[10px] bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] border border-[#0ac8b9]/40 px-2.5 py-0.5 rounded font-bold shrink-0 cursor-pointer shadow-sm"
             >
               5 Lớp
             </button>

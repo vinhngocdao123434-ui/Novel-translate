@@ -18,6 +18,8 @@ import { downloadNativeProjectZip } from './utils/zip-exporter';
 
 export default function App() {
   const isAndroidNative = typeof window !== 'undefined' && Boolean((window as any).AndroidBridge);
+  const isMobileScreen = typeof window !== 'undefined' && (window.innerWidth < 768 || isAndroidNative);
+
   const [activeTab, setActiveTab] = useState<'simulator' | 'studio' | 'split'>(() => {
     if (typeof window !== 'undefined' && (Boolean((window as any).AndroidBridge) || window.innerWidth < 1024)) {
       return 'simulator';
@@ -38,6 +40,24 @@ export default function App() {
       setIsDownloadingZip(false);
     }
   };
+
+  // NATIVE APP IMMERSIVE FULL SCREEN (When running in APK or mobile)
+  if (isAndroidNative || (isMobileScreen && activeTab === 'simulator')) {
+    return (
+      <div className="h-screen w-screen bg-[#03060d] text-neutral-100 flex flex-col font-sans overflow-hidden selection:bg-blue-600 selection:text-white">
+        <AndroidPhoneSimulator onOpenGodModeModal={() => setIsGodModeModalOpen(true)} isNativeMode={true} />
+        
+        {/* GOD MODE DEEP DIVE MODAL */}
+        <GodModeInspectorModal
+          isOpen={isGodModeModalOpen}
+          onClose={() => setIsGodModeModalOpen(false)}
+        />
+
+        {/* PWA OFFLINE CONNECTIVITY INDICATOR */}
+        <OfflineIndicator />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
