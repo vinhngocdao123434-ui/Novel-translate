@@ -1020,6 +1020,57 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     return cleaned;
   };
 
+  // Helper: Parse any raw glossary text lines (key = val, key ➔ val, etc.)
+  const parseGlossaryText = (text: string, currentChapterRawText?: string): Record<string, string> => {
+    if (!text) return {};
+    const parsedMap: Record<string, string> = {};
+    const lines = text.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) continue;
+      if (trimmed.toLowerCase().includes('không có') || trimmed.toLowerCase() === 'none') continue;
+
+      const match = trimmed.match(/^\s*[-*•\d.]*\s*([^:=➔\->\t]+)\s*[:=➔\->]\s*(.+?)\s*$/);
+      if (match) {
+        let rawKey = match[1].trim().replace(/[*_"`'\[\]【】]/g, '');
+        let val = match[2].trim().replace(/[*_"`'\[\]【】]/g, '');
+
+        // 1. CHỐNG ĐẢO NGƯỢC: Nếu val chứa chữ Hán còn rawKey không chứa chữ Hán -> Hoán đổi lại đúng vị trí!
+        const chineseInRaw = countChineseChars(rawKey);
+        const chineseInVal = countChineseChars(val);
+        if (chineseInVal > 0 && chineseInRaw === 0) {
+          const temp = rawKey;
+          rawKey = val;
+          val = temp;
+        }
+
+        // 2. LỌC ĐỘ DÀI THEO CÀI ĐẶT
+        const finalChineseCount = countChineseChars(rawKey);
+        if (finalChineseCount < (advancedSettings.minTermLength || 2)) continue;
+        if (!isValidGlossaryKey(rawKey)) continue;
+
+        // 3. ĐIỀU KIỆN TẦN SUẤT THEO CÀI ĐẶT
+        if (currentChapterRawText) {
+          const occ = countOccurrences(currentChapterRawText, rawKey);
+          if (occ < (advancedSettings.minFrequency || 2)) continue;
+        }
+
+        // 4. BỘ LỌC TỪ CẤM
+        if (advancedSettings.blacklistWords && advancedSettings.blacklistWords.length > 0) {
+          const isBlacklisted = advancedSettings.blacklistWords.some(w => 
+            val.toLowerCase().includes(w.toLowerCase()) || rawKey.toLowerCase().includes(w.toLowerCase())
+          );
+          if (isBlacklisted) continue;
+        }
+
+        if (rawKey.length < 50 && val.length < 100 && rawKey.toLowerCase() !== val.toLowerCase()) {
+          parsedMap[rawKey] = cleanTranslationGlitch(val);
+        }
+      }
+    }
+    return parsedMap;
+  };
+
   // Robust 1-Request 2-Tasks parser
   const parseDualTaskOutput = (text: string, currentChapterRawText?: string) => {
     let translation = text;
@@ -1046,63 +1097,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     } else if (mGloss !== -1) {
       translation = text.slice(0, mGloss).trim();
       newGlossaryText = text.slice(mGloss).replace(glossPattern, '').trim();
+    } else {
+      // Nếu không có header nhưng có các dòng key = val
+      if (text.includes('=') || text.includes('➔') || text.includes('->')) {
+        newGlossaryText = text;
+      }
     }
 
     // Clean codeblock delimiters
     translation = translation.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
     newGlossaryText = newGlossaryText.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
 
-    // Clean telex glitches like "Xa Đangk Khoa" -> "Xa Đăng Khoa"
+    // Clean telex glitches
     translation = cleanTranslationGlitch(translation);
 
-    // Parse lines: key = val
-    const parsedMap: Record<string, string> = {};
-    if (newGlossaryText) {
-      const lines = newGlossaryText.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) continue;
-        if (trimmed.toLowerCase().includes('không có') || trimmed.toLowerCase() === 'none') continue;
-
-        const match = trimmed.match(/^\s*[-*•]?\s*([^:=➔\->\t]+)\s*[:=➔\->]\s*(.+?)\s*$/);
-        if (match) {
-          let rawKey = match[1].trim().replace(/[*_"`'\[\]【】]/g, '');
-          let val = match[2].trim().replace(/[*_"`'\[\]【】]/g, '');
-
-          // 1. CHỐNG ĐẢO NGƯỢC: Nếu val chứa chữ Hán còn rawKey không chứa chữ Hán -> Tự động hoán đổi lại đúng vị trí!
-          const chineseInRaw = countChineseChars(rawKey);
-          const chineseInVal = countChineseChars(val);
-          if (chineseInVal > 0 && chineseInRaw === 0) {
-            const temp = rawKey;
-            rawKey = val;
-            val = temp;
-          }
-
-          // 2. LỌC ĐỘ DÀI THEO CÀI ĐẶT: Kiểm tra minTermLength (mặc định: >= 2)
-          const finalChineseCount = countChineseChars(rawKey);
-          if (finalChineseCount < (advancedSettings.minTermLength || 2)) continue;
-
-          // 3. ĐIỀU KIỆN TẦN SUẤT THEO CÀI ĐẶT: Kiểm tra minFrequency (mặc định: >= 2)
-          if (currentChapterRawText) {
-            const occ = countOccurrences(currentChapterRawText, rawKey);
-            if (occ < (advancedSettings.minFrequency || 2)) continue;
-          }
-
-          // 4. BỘ LỌC TỪ CẤM / ĐẠI TỪ NHÂN XƯNG
-          if (advancedSettings.blacklistWords && advancedSettings.blacklistWords.length > 0) {
-            const isBlacklisted = advancedSettings.blacklistWords.some(w => 
-              val.toLowerCase().includes(w.toLowerCase()) || rawKey.toLowerCase().includes(w.toLowerCase())
-            );
-            if (isBlacklisted) continue;
-          }
-
-          if (rawKey.length < 50 && val.length < 100) {
-            parsedMap[rawKey] = cleanTranslationGlitch(val);
-          }
-        }
-      }
-    }
-
+    const parsedMap = parseGlossaryText(newGlossaryText, currentChapterRawText);
     return { translation, newGlossary: parsedMap };
   };
 
@@ -1261,13 +1270,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 if (bResp.ok) {
                   const bData = await bResp.json();
                   const bOut = bData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                  const parsed = parseDualTaskOutput(bOut, chaptersInBatch.join('\n'));
-                  if (Object.keys(parsed.newGlossary).length > 0) {
+                  const extractedGloss = parseGlossaryText(bOut);
+                  const foundCount = Object.keys(extractedGloss).length;
+
+                  if (foundCount > 0) {
                     setProjects(prev => {
                       const cur = prev[currentProjectName];
-                      const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, parsed.newGlossary);
+                      const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, extractedGloss);
                       const addedCount = Object.keys(newlyAdded).length;
-                      addLog(`🎉 [BÓC LÔ HOÀN TẤT] Đã nạp ${addedCount} thuật ngữ/xưng hô mới vào Master Glossary cho lô Chương ${batchStart + 1} ➔ ${batchEnd}!`);
+                      addLog(`🎉 [BÓC LÔ HOÀN TẤT] AI đã tìm thấy ${foundCount} thuật ngữ từ Lô ${batchStart + 1} ➔ ${batchEnd}. Đã nạp ${addedCount} từ mới vào Master Glossary (Tổng hiện có: ${Object.keys(updatedGlossary).length} từ)!`);
                       return {
                         ...prev,
                         [currentProjectName]: {
@@ -1276,10 +1287,40 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                         }
                       };
                     });
+                  } else {
+                    addLog(`ℹ️ [BÓC LÔ] AI không phát hiện thêm thuật ngữ mới nào trong lô chương ${batchStart + 1} ➔ ${batchEnd}.`);
                   }
+                } else {
+                  addLog(`⚠️ [BÓC LÔ LỖI] API trả về HTTP ${bResp.status}`);
                 }
               } catch (bErr: any) {
-                addLog(`⚠️ Bóc lô glossary gặp sự cố: ${bErr.message}`);
+                addLog(`⚠️ [BÓC LÔ LỖI] ${bErr.message}`);
+              }
+            } else {
+              // Simulated / Offline Batch Extraction
+              const offlineExtracted: Record<string, string> = {};
+              for (const ch of chaptersInBatch) {
+                for (const [k, v] of Object.entries(SINO_VIET_DICT)) {
+                  if (ch.includes(k) && !project.masterGlossary[k]) {
+                    offlineExtracted[k] = v;
+                  }
+                }
+              }
+              const foundCount = Object.keys(offlineExtracted).length;
+              if (foundCount > 0) {
+                setProjects(prev => {
+                  const cur = prev[currentProjectName];
+                  const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, offlineExtracted);
+                  const addedCount = Object.keys(newlyAdded).length;
+                  addLog(`🎉 [BÓC LÔ (OFFLINE)] Đã nạp ${addedCount} thuật ngữ vào Master Glossary (Tổng hiện có: ${Object.keys(updatedGlossary).length} từ)!`);
+                  return {
+                    ...prev,
+                    [currentProjectName]: {
+                      ...cur,
+                      masterGlossary: updatedGlossary
+                    }
+                  };
+                });
               }
             }
           }
@@ -2860,52 +2901,53 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   />
                 </div>
 
-                {/* Pipeline Mode Indicator Badge */}
+                {/* Active Strategy & Pipeline Indicator Badge */}
                 <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#050505] rounded-xl border border-[#785a28]/40 text-[10.5px]">
-                  <span className="text-[#a09b8c] font-medium">Chế độ đường ống:</span>
+                  <span className="text-[#a09b8c] font-medium shrink-0">Phương án dịch:</span>
                   {(() => {
-                    const rawMode = advancedSettings.translationPipelineMode || 'MODE_2_BATCH_PURE';
-                    const mode = rawMode === 'COMBINED' ? 'MODE_1_DUAL_TASK' : (rawMode === 'BATCH_GLOSSARY' ? 'MODE_2_BATCH_PURE' : rawMode);
+                    const st = advancedSettings.translationCoreStrategy || 'STRATEGY_PURE_LITERARY';
+                    const isBatchActive = advancedSettings.enableBatchGlossaryAutoExtract !== false;
                     const bSize = advancedSettings.batchGlossarySize || 50;
 
-                    if (mode === 'MODE_1_DUAL_TASK') {
-                      return (
-                        <span className="text-[#c8aa6e] font-bold font-mono flex items-center gap-1">
-                          ⚡ Mode 1: 1 Req 2 Task (Dịch + Bóc Từ)
-                        </span>
-                      );
-                    } else if (mode === 'MODE_3_RAW_INJECT') {
-                      return (
-                        <span className="text-[#c8aa6e] font-bold font-mono flex items-center gap-1">
-                          💉 Mode 3: Ghi Đè Raw Inject ➔ Dịch
-                        </span>
-                      );
-                    } else if (mode === 'MODE_4_DUAL_PASS') {
-                      return (
-                        <span className="text-emerald-400 font-bold font-mono flex items-center gap-1">
-                          🔬 Mode 4: Dịch Kép 2-Pass Phản Biện
-                        </span>
-                      );
-                    } else if (mode === 'MODE_5_COT_THINKING') {
-                      return (
-                        <span className="text-[#0ac8b9] font-bold font-mono flex items-center gap-1">
-                          🧠 Mode 5: Suy Luận Ngữ Cảnh CoT
-                        </span>
-                      );
-                    } else if (mode === 'MODE_6_SLIDING_BILINGUAL') {
-                      return (
-                        <span className="text-[#c8aa6e] font-bold font-mono flex items-center gap-1">
-                          🔗 Mode 6: Ngữ Cảnh Trượt Song Ngữ
-                        </span>
-                      );
+                    let icon = <Sparkles className="w-3.5 h-3.5 text-[#0ac8b9]" />;
+                    let title = 'Dịch Thuần Túy';
+                    let colorClass = 'text-[#0ac8b9]';
+
+                    if (st === 'STRATEGY_COT_THINKING') {
+                      icon = <span className="text-xs">🧠</span>;
+                      title = 'Suy Luận CoT (Deep Thinking)';
+                      colorClass = 'text-[#0ac8b9]';
+                    } else if (st === 'STRATEGY_DUAL_PASS') {
+                      icon = <span className="text-xs">🔬</span>;
+                      title = 'Dịch Kép 2-Pass Phản Biện';
+                      colorClass = 'text-emerald-400';
+                    } else if (st === 'STRATEGY_PRE_INJECT_RAW') {
+                      icon = <span className="text-xs">💉</span>;
+                      title = 'Ghi Đè Raw Inject';
+                      colorClass = 'text-[#c8aa6e]';
+                    } else if (st === 'STRATEGY_DUAL_TASK') {
+                      icon = <span className="text-xs">⚡</span>;
+                      title = '1 Req 2 Task (Dịch + Bóc Từ)';
+                      colorClass = 'text-[#c8aa6e]';
                     } else {
-                      return (
-                        <span className="text-[#0ac8b9] font-bold font-mono flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-[#0ac8b9]" />
-                          Mode 2: Bóc Lô {bSize}ch ➔ Dịch Thuần
-                        </span>
-                      );
+                      icon = <Sparkles className="w-3.5 h-3.5 text-[#0ac8b9]" />;
+                      title = 'Dịch Thuần Túy Văn Học';
+                      colorClass = 'text-[#0ac8b9]';
                     }
+
+                    return (
+                      <div className="flex items-center gap-1.5 truncate text-right">
+                        {icon}
+                        <span className={`font-bold font-mono text-[11px] truncate ${colorClass}`}>
+                          {title}
+                        </span>
+                        {isBatchActive && (
+                          <span className="text-[9px] bg-[#1e2328] text-[#c8aa6e] px-1 py-0.5 rounded border border-[#785a28] font-mono shrink-0">
+                            + Bóc Lô {bSize}ch
+                          </span>
+                        )}
+                      </div>
+                    );
                   })()}
                 </div>
 
@@ -3186,25 +3228,45 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 )}
               </div>
 
-              {/* Live Console Logs (NEWEST IS AT THE TOP) */}
+              {/* Live Console Logs (NEWEST IS AT THE TOP) - Expanded & Full Text Wrapping */}
               <div className="bg-[#050505] border border-[#785a28]/40 rounded-2xl p-2.5">
-                <div className="flex items-center justify-between text-[10px] text-[#a09b8c] mb-1 font-mono">
+                <div className="flex items-center justify-between text-[10.5px] text-[#a09b8c] mb-1.5 font-mono pb-1 border-b border-[#785a28]/20">
                   <div className="flex items-center gap-1.5">
-                    <Terminal className="w-3 h-3 text-emerald-400" />
-                    <span>LIVE CONSOLE (MỚI NHẤT Ở TRÊN CÙNG):</span>
+                    <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="font-bold text-[#f0e6d2]">LIVE CONSOLE (MỚI NHẤT Ở TRÊN CÙNG):</span>
                   </div>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const fullLogText = logs.join('\n');
+                        navigator.clipboard.writeText(fullLogText);
+                        alert('Đã sao chép toàn bộ nhật ký dịch!');
+                      }}
+                      className="text-[9.5px] text-[#0ac8b9] hover:text-white bg-[#005a82]/40 hover:bg-[#005a82] px-1.5 py-0.5 rounded border border-[#0ac8b9]/30 font-mono cursor-pointer transition-all"
+                      title="Sao chép toàn bộ nội dung log"
+                    >
+                      Sao chép
+                    </button>
+                    <button
+                      onClick={() => setLogs([`[${new Date().toLocaleTimeString()}] 🚀 Console đã được làm mới`])}
+                      className="text-[9.5px] text-neutral-400 hover:text-red-300 bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-800 font-mono cursor-pointer transition-all"
+                      title="Xóa danh sách log"
+                    >
+                      Xóa
+                    </button>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  </div>
                 </div>
-                <div className="h-16 overflow-y-auto font-mono text-[10px] text-neutral-300 space-y-1 pr-1">
+                <div className="min-h-[140px] max-h-[220px] overflow-y-auto font-mono text-[10.5px] text-neutral-300 space-y-1.5 pr-1 selection:bg-blue-600">
                   {logs.map((log, i) => (
                     <div 
                       key={i} 
-                      className={`leading-tight flex items-start gap-1 ${
-                        i === 0 ? 'text-emerald-400 font-semibold bg-emerald-950/30 p-0.5 rounded' : 'text-neutral-400'
+                      className={`flex items-start gap-1.5 p-1 rounded transition-colors ${
+                        i === 0 ? 'text-emerald-300 font-medium bg-emerald-950/40 border border-emerald-800/40' : 'text-neutral-300 hover:bg-neutral-900/50'
                       }`}
                     >
-                      {i === 0 && <span className="text-[8px] bg-emerald-500 text-black px-1 rounded font-bold uppercase shrink-0">MỚI</span>}
-                      <span className="truncate">{log}</span>
+                      {i === 0 && <span className="text-[8px] bg-emerald-500 text-black px-1 py-0.2 rounded font-black uppercase shrink-0 mt-0.5">MỚI</span>}
+                      <span className="break-words leading-relaxed whitespace-pre-wrap flex-1 select-text">{log}</span>
                     </div>
                   ))}
                 </div>
