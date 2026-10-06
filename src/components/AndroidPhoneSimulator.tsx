@@ -1278,10 +1278,13 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
               else if (isCoTStrategy) {
                 promptSb += `[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI]:\n${rawContent}\n\n`;
                 promptSb += `[QUY TẮC BẮT BUỘC - SUY LUẬN SÂU COT (DEEP THINKING TRANSLATION)]:\n`;
-                promptSb += `Thực hiện 2 bước tuần tự:\n`;
-                promptSb += `BƯỚC 1: Trong khối <analysis>, phân tích ngữ cảnh, giải mã các thành ngữ 4 chữ, khẩu ngữ cổ trang khó, xác định vai vế nhân vật và văn cảnh xưng hô.\n`;
-                promptSb += `BƯỚC 2: Sau đó xuất bản dịch hoàn mỹ nhất trong khối ===TRANSLATION===.\n\n`;
-                promptSb += `ĐỊNH DẠNG ĐẦU RA:\n<analysis>\n(Phân tích ngắn gọn hàm ý, thành ngữ, xưng hô)\n</analysis>\n===TRANSLATION===\n(Toàn bộ bản dịch tiếng Việt mượt mà)`;
+                promptSb += `Thực hiện 2 bước tuần tự bắt buộc:\n`;
+                promptSb += `BƯỚC 1: Trong khối <analysis>, tiến hành 3 bước rà soát ngầm:\n`;
+                promptSb += `  a) Điểm danh 100% các từ xuất hiện trong [BẢNG TỪ ĐIỂN GLOSSARY] có mặt ở chương này để chốt cách dịch và đại từ xưng hô.\n`;
+                promptSb += `  b) Phân tích mối quan hệ nhân vật, giải mã các thành ngữ 4 chữ, khẩu ngữ khó hoặc câu chữ ẩn dụ.\n`;
+                promptSb += `  c) Định hình văn phong theo [YÊU CẦU PHONG CÁCH] (thuần Việt, mượt mà, thoát ý).\n`;
+                promptSb += `BƯỚC 2: Xuất toàn bộ bản dịch tiếng Việt hoàn mỹ nhất trong khối ===TRANSLATION===.\n\n`;
+                promptSb += `ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:\n<analysis>\n(Rà soát Glossary + Phân tích ngữ cảnh, thành ngữ, xưng hô)\n</analysis>\n===TRANSLATION===\n(Toàn bộ bản dịch tiếng Việt mượt mà hoàn chỉnh)`;
               }
               // ==================== CHIẾN LƯỢC: DỊCH THUẦN HOẶC DUAL-TASK ====================
               else {
