@@ -1323,6 +1323,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 // Xử lý loại bỏ thẻ <analysis> của CoT
                 if (isCoTStrategy) {
                   pass1Text = pass1Text.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '').trim();
+                  // Trường hợp thiếu thẻ đóng </analysis>
+                  if (pass1Text.includes('<analysis>')) {
+                    const transIdx = pass1Text.search(/===+\s*TRANSLATION\s*===+/i);
+                    if (transIdx !== -1) {
+                      pass1Text = pass1Text.slice(transIdx);
+                    } else {
+                      pass1Text = pass1Text.replace(/<analysis>[\s\S]*/gi, '');
+                    }
+                  }
                   pass1Text = pass1Text.replace(/===+\s*TRANSLATION\s*===+/gi, '').trim();
                 }
 
