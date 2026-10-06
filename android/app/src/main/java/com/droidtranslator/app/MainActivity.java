@@ -847,8 +847,14 @@ public class MainActivity extends AppCompatActivity {
     private Button btnPrevChapter;
     private Button btnNextChapter;
 
-    private String translationPipelineMode = "BATCH_GLOSSARY"; // "COMBINED" or "BATCH_GLOSSARY"
+    private String translationPipelineMode = "MODE_2_BATCH_PURE";
     private int batchGlossarySize = 50; // 20, 30, 50, 100
+    private boolean enableDualPassProofreading = false;
+    private boolean enableBatchGlossaryAutoExtract = true;
+    private boolean enablePreviousChapterContext = true;
+    private int contextSnippetLength = 350;
+    private boolean enableAutoFinalPolish = true;
+    private boolean isStrategySelectorExpanded = false;
     private final Set<Integer> processedBatchGlossaryStartIndices = new HashSet<>();
 
     private boolean rollingPolishEnabled = true;
@@ -912,6 +918,11 @@ public class MainActivity extends AppCompatActivity {
             conf.readerTheme = readerTheme;
             conf.translationPipelineMode = translationPipelineMode;
             conf.batchGlossarySize = batchGlossarySize;
+            conf.enableDualPassProofreading = enableDualPassProofreading;
+            conf.enableBatchGlossaryAutoExtract = enableBatchGlossaryAutoExtract;
+            conf.enablePreviousChapterContext = enablePreviousChapterContext;
+            conf.contextSnippetLength = contextSnippetLength;
+            conf.enableAutoFinalPolish = enableAutoFinalPolish;
             conf.rollingPolishEnabled = rollingPolishEnabled;
             conf.rollingPolishBatchSize = rollingPolishBatchSize;
 
@@ -1020,6 +1031,11 @@ public class MainActivity extends AppCompatActivity {
             readerTheme = conf.readerTheme;
             if (conf.translationPipelineMode != null) translationPipelineMode = conf.translationPipelineMode;
             if (conf.batchGlossarySize > 0) batchGlossarySize = conf.batchGlossarySize;
+            enableDualPassProofreading = conf.enableDualPassProofreading;
+            enableBatchGlossaryAutoExtract = conf.enableBatchGlossaryAutoExtract;
+            enablePreviousChapterContext = conf.enablePreviousChapterContext;
+            if (conf.contextSnippetLength > 0) contextSnippetLength = conf.contextSnippetLength;
+            enableAutoFinalPolish = conf.enableAutoFinalPolish;
             rollingPolishEnabled = conf.rollingPolishEnabled;
             if (conf.rollingPolishBatchSize > 0) rollingPolishBatchSize = conf.rollingPolishBatchSize;
 
@@ -3097,57 +3113,62 @@ public class MainActivity extends AppCompatActivity {
                     continue;
                 }
 
-                // XỬ LÝ CHẾ ĐỘ BÓC LÔ TỪ ĐIỂN TỪ TRƯỚC (BATCH_GLOSSARY MODE)
-                if ("BATCH_GLOSSARY".equals(translationPipelineMode)) {
-                    int batchStartIndex = (chapIndex / batchGlossarySize) * batchGlossarySize;
-                    if (!processedBatchGlossaryStartIndices.contains(batchStartIndex)) {
-                        int batchEndIndex = Math.min(batchStartIndex + batchGlossarySize, rawChapters.size());
-                        mainHandler.post(() -> appendLog("🔍 [BÓC LÔ GLOSSARY] Đang gom " + (batchEndIndex - batchStartIndex) + " chương thô (Chương " + (batchStartIndex + 1) + " ➔ " + batchEndIndex + ") để AI trích xuất Từ Điển Master..."));
+                // =====================================================================
+                // DÒNG 2: BƯỚC BÓC LÔ GLOSSARY TOÀN DIỆN (7 NHÓM BẮT BUỘC)
+                // =====================================================================
+                int batchStartIndex = (chapIndex / batchGlossarySize) * batchGlossarySize;
+                if (enableBatchGlossaryAutoExtract && !processedBatchGlossaryStartIndices.contains(batchStartIndex)) {
+                    int batchEndIndex = Math.min(batchStartIndex + batchGlossarySize, rawChapters.size());
+                    mainHandler.post(() -> appendLog("🔍 [BÓC LÔ GLOSSARY 7 NHÓM] Đang gom " + (batchEndIndex - batchStartIndex) + " chương thô (Chương " + (batchStartIndex + 1) + " ➔ " + batchEndIndex + ") để AI trích xuất Master Glossary toàn diện (Tên, xưng hô, chức vụ, địa danh, thú, pháp bảo, công pháp, cảnh giới)..."));
 
-                        List<String> batchRawTexts = new ArrayList<>();
-                        for (int b = batchStartIndex; b < batchEndIndex; b++) {
-                            batchRawTexts.add(rawChapters.get(b));
-                        }
+                    List<String> batchRawTexts = new ArrayList<>();
+                    for (int b = batchStartIndex; b < batchEndIndex; b++) {
+                        batchRawTexts.add(rawChapters.get(b));
+                    }
 
-                        try {
-                            Map<String, String> batchExtracted = engine.extractBatchGlossary(
-                                    batchRawTexts,
-                                    masterGlossary,
-                                    currentModel,
-                                    minTermLength,
-                                    minFrequency,
-                                    msg -> mainHandler.post(() -> appendLog(msg))
-                            );
+                    try {
+                        Map<String, String> batchExtracted = engine.extractBatchGlossary(
+                                batchRawTexts,
+                                masterGlossary,
+                                currentModel,
+                                minTermLength,
+                                minFrequency,
+                                msg -> mainHandler.post(() -> appendLog(msg))
+                        );
 
-                            int newlyAddedBatch = 0;
-                            if (batchExtracted != null) {
-                                for (Map.Entry<String, String> bEntry : batchExtracted.entrySet()) {
-                                    if (GlossaryManager.isValidGlossaryKey(bEntry.getKey(), minTermLength)) {
-                                        // Áp dụng quy tắc GIỮ CŨ BỎ MỚI (KEEP_OLD): Chỉ thêm từ mới chưa tồn tại
-                                        if (!masterGlossary.containsKey(bEntry.getKey())) {
-                                            masterGlossary.put(bEntry.getKey(), bEntry.getValue());
-                                            newlyAddedBatch++;
-                                        }
+                        int newlyAddedBatch = 0;
+                        if (batchExtracted != null) {
+                            for (Map.Entry<String, String> bEntry : batchExtracted.entrySet()) {
+                                if (GlossaryManager.isValidGlossaryKey(bEntry.getKey(), minTermLength)) {
+                                    if ("overwrite".equals(conflictPolicy) || !masterGlossary.containsKey(bEntry.getKey())) {
+                                        masterGlossary.put(bEntry.getKey(), bEntry.getValue());
+                                        newlyAddedBatch++;
                                     }
                                 }
                             }
-
-                            final int finalAddedBatch = newlyAddedBatch;
-                            saveCurrentProjectData();
-                            mainHandler.post(() -> {
-                                refreshGlossaryList();
-                                appendLog("📚 [LÔ TỪ ĐIỂN MỚI] Đã trích xuất xong! Bổ sung " + finalAddedBatch + " thuật ngữ mới vào Master Glossary.");
-                            });
-
-                            processedBatchGlossaryStartIndices.add(batchStartIndex);
-                        } catch (Exception exBatch) {
-                            mainHandler.post(() -> appendLog("⚠️ Lỗi bóc Glossary theo lô: " + exBatch.getMessage() + ". Tiếp tục với từ điển hiện có."));
-                            processedBatchGlossaryStartIndices.add(batchStartIndex); // Đánh dấu để tránh lặp vô tận
                         }
+
+                        final int finalAddedBatch = newlyAddedBatch;
+                        saveCurrentProjectData();
+                        mainHandler.post(() -> {
+                            refreshGlossaryList();
+                            appendLog("📚 [LÔ TỪ ĐIỂN MỚI] Đã trích xuất xong! Bổ sung " + finalAddedBatch + " thuật ngữ mới vào Master Glossary.");
+                        });
+
+                        processedBatchGlossaryStartIndices.add(batchStartIndex);
+                    } catch (Exception exBatch) {
+                        mainHandler.post(() -> appendLog("⚠️ Lỗi bóc Glossary theo lô: " + exBatch.getMessage() + ". Tiếp tục với từ điển hiện có."));
+                        processedBatchGlossaryStartIndices.add(batchStartIndex); // Đánh dấu để tránh lặp vô tận
                     }
                 }
 
-                appendLog("⚡ Đang gửi Chương " + (chapIndex + 1) + " đến " + currentModel + " (" + ("BATCH_GLOSSARY".equals(translationPipelineMode) ? "Dịch Thuần Túy" : "Kết Hợp Đồng Thời") + ")...");
+                String modeLabel = "Dịch Thuần Túy";
+                if ("MODE_1_DUAL_TASK".equals(translationPipelineMode) || "COMBINED".equals(translationPipelineMode)) modeLabel = "Dual-Task (Dịch + Bóc Từ)";
+                else if ("MODE_3_RAW_INJECT".equals(translationPipelineMode)) modeLabel = "Ghi Đè Raw Inject";
+                else if ("MODE_5_COT_THINKING".equals(translationPipelineMode)) modeLabel = "Suy Luận CoT";
+                if (enableDualPassProofreading || "MODE_4_DUAL_PASS".equals(translationPipelineMode)) modeLabel += " + Pass 2 Biên Tập";
+
+                appendLog("⚡ Đang gửi Chương " + (chapIndex + 1) + " đến " + currentModel + " (" + modeLabel + ")...");
 
                 try {
                     String activePrompt = "Dịch tiểu thuyết mượt mà";
@@ -3155,12 +3176,12 @@ public class MainActivity extends AppCompatActivity {
                         if (p.active) { activePrompt = p.content; break; }
                     }
 
-                    // Tự động trích xuất 300-350 ký tự cuối của bản dịch chương trước để bắt nhịp ngữ cảnh
+                    // DÒNG 3: Tự động trích xuất ngữ cảnh cuối của bản dịch chương trước để bắt nhịp
                     String prevSnippet = null;
-                    if (chapIndex > 0 && translatedChapters.containsKey(chapIndex - 1)) {
+                    if (enablePreviousChapterContext && chapIndex > 0 && translatedChapters.containsKey(chapIndex - 1)) {
                         String prevTrans = translatedChapters.get(chapIndex - 1);
                         if (prevTrans != null && !prevTrans.trim().isEmpty()) {
-                            int takeLen = Math.min(prevTrans.length(), 350);
+                            int takeLen = Math.min(prevTrans.length(), contextSnippetLength);
                             prevSnippet = "..." + prevTrans.substring(prevTrans.length() - takeLen).trim();
                         }
                     }
@@ -3175,8 +3196,11 @@ public class MainActivity extends AppCompatActivity {
                         mainHandler.post(() -> appendLog("🔍 [LỌC TỪ ĐIỂN] Chương " + (chapIndex + 1) + ": Lọc " + relCount + "/" + totalCount + " từ thực sự xuất hiện trong chương"));
                     }
 
-                    if ("BATCH_GLOSSARY".equals(translationPipelineMode)) {
-                        translatedText = engine.translateChapterPure(
+                    // =================================================================
+                    // ĐIỀU PHỐI CHIẾN LƯỢC DỊCH THUẬT LÕI & CÁC DÒNG TÙY CHỌN
+                    // =================================================================
+                    if (enableDualPassProofreading || "MODE_4_DUAL_PASS".equals(translationPipelineMode)) {
+                        translatedText = engine.translateChapterDualPass(
                                 rawChapters.get(chapIndex),
                                 prevSnippet,
                                 activePrompt,
@@ -3184,10 +3208,9 @@ public class MainActivity extends AppCompatActivity {
                                 currentModel,
                                 targetLanguage,
                                 antiHanziStrict,
-                                null,
                                 msg -> mainHandler.post(() -> appendLog(msg))
                         );
-                    } else {
+                    } else if ("MODE_1_DUAL_TASK".equals(translationPipelineMode) || "COMBINED".equals(translationPipelineMode)) {
                         String[] result = engine.translateChapter(
                                 rawChapters.get(chapIndex),
                                 prevSnippet,
@@ -3202,6 +3225,54 @@ public class MainActivity extends AppCompatActivity {
                         );
                         translatedText = result[0];
                         newGlossaryRaw = (result.length > 1) ? result[1] : "";
+                    } else if ("MODE_3_RAW_INJECT".equals(translationPipelineMode)) {
+                        String injectedRaw = GlossaryManager.injectGlossaryIntoRaw(rawChapters.get(chapIndex), masterGlossary);
+                        translatedText = engine.translateChapterInjectedRaw(
+                                injectedRaw,
+                                prevSnippet,
+                                activePrompt,
+                                chapterRelevantGlossary,
+                                currentModel,
+                                targetLanguage,
+                                antiHanziStrict,
+                                null,
+                                msg -> mainHandler.post(() -> appendLog(msg))
+                        );
+                    } else if ("MODE_5_COT_THINKING".equals(translationPipelineMode)) {
+                        translatedText = engine.translateChapterCoT(
+                                rawChapters.get(chapIndex),
+                                prevSnippet,
+                                activePrompt,
+                                chapterRelevantGlossary,
+                                currentModel,
+                                targetLanguage,
+                                antiHanziStrict,
+                                msg -> mainHandler.post(() -> appendLog(msg))
+                        );
+                    } else if ("MODE_6_SLIDING_WINDOW".equals(translationPipelineMode) || "MODE_6_SLIDING_BILINGUAL".equals(translationPipelineMode)) {
+                        translatedText = engine.translateChapterSlidingWindow(
+                                rawChapters.get(chapIndex),
+                                prevSnippet,
+                                activePrompt,
+                                chapterRelevantGlossary,
+                                currentModel,
+                                targetLanguage,
+                                antiHanziStrict,
+                                msg -> mainHandler.post(() -> appendLog(msg))
+                        );
+                    } else {
+                        // MODE_2_BATCH_PURE / BATCH_GLOSSARY (Dịch thuần túy văn học)
+                        translatedText = engine.translateChapterPure(
+                                rawChapters.get(chapIndex),
+                                prevSnippet,
+                                activePrompt,
+                                chapterRelevantGlossary,
+                                currentModel,
+                                targetLanguage,
+                                antiHanziStrict,
+                                null,
+                                msg -> mainHandler.post(() -> appendLog(msg))
+                        );
                     }
 
                     // TẦNG KIỂM ĐỊNH CHẤT LƯỢNG (Audit Engine)
@@ -3222,38 +3293,17 @@ public class MainActivity extends AppCompatActivity {
                                 + "YÊU CẦU DỊCH LẠI TOÀN BỘ: Dịch trọn vẹn chương sau sang " + targetLanguage + " đầy đủ 100%, tuyệt đối không tóm tắt, không bỏ sót câu chữ nào, không để sót chữ Hán thô trong câu văn, không lặp lại câu vô nghĩa.";
 
                         try {
-                            String rescueTranslated = "";
-                            if ("BATCH_GLOSSARY".equals(translationPipelineMode)) {
-                                rescueTranslated = engine.translateChapterPure(
-                                        rawChapters.get(chapIndex),
-                                        prevSnippet,
-                                        activePrompt,
-                                        chapterRelevantGlossary,
-                                        currentModel,
-                                        targetLanguage,
-                                        antiHanziStrict,
-                                        rescuePrompt,
-                                        msg -> mainHandler.post(() -> appendLog(msg))
-                                );
-                            } else {
-                                String[] rescueResult = engine.translateChapter(
-                                        rawChapters.get(chapIndex),
-                                        prevSnippet,
-                                        activePrompt,
-                                        chapterRelevantGlossary,
-                                        currentModel,
-                                        targetLanguage,
-                                        antiHanziStrict,
-                                        minTermLength,
-                                        minFrequency,
-                                        rescuePrompt,
-                                        msg -> mainHandler.post(() -> appendLog(msg))
-                                );
-                                rescueTranslated = rescueResult[0];
-                                if (rescueResult.length > 1 && rescueResult[1] != null && !rescueResult[1].trim().isEmpty()) {
-                                    newGlossaryRaw = rescueResult[1];
-                                }
-                            }
+                            String rescueTranslated = engine.translateChapterPure(
+                                    rawChapters.get(chapIndex),
+                                    prevSnippet,
+                                    activePrompt,
+                                    chapterRelevantGlossary,
+                                    currentModel,
+                                    targetLanguage,
+                                    antiHanziStrict,
+                                    rescuePrompt,
+                                    msg -> mainHandler.post(() -> appendLog(msg))
+                            );
 
                             ChapterAuditor.AuditResult rescueAudit = ChapterAuditor.auditChapter(
                                     rawChapters.get(chapIndex),
@@ -3309,30 +3359,6 @@ public class MainActivity extends AppCompatActivity {
 
                     currentChapterIdx++;
 
-                    // BƯỚC LÀM MƯỢT CUỐN CHIẾU (Rolling Polish) - KHÔNG BAO GIỜ BỎ SÓT CHƯƠNG!
-                    if (rollingPolishEnabled) {
-                        boolean isEndOfRange = (chapIndex >= rangeToChap - 1) || (chapIndex >= rawChapters.size() - 1);
-                        List<Integer> unpolished = getUnpolishedChapterIndices(chapIndex);
-
-                        // Kích hoạt khi tích lũy đủ số chương theo lô (VD: 15 chương) hoặc khi dịch xong chương cuối của khoảng
-                        if (unpolished.size() >= rollingPolishBatchSize || (isEndOfRange && !unpolished.isEmpty())) {
-                            while (!unpolished.isEmpty() && isTranslating) {
-                                int chunkSize = Math.min(rollingPolishBatchSize, unpolished.size());
-                                List<Integer> chunk = new ArrayList<>(unpolished.subList(0, chunkSize));
-
-                                boolean batchSuccess = performRollingPolishBatch(chunk);
-                                if (batchSuccess) {
-                                    unpolished = getUnpolishedChapterIndices(chapIndex);
-                                } else {
-                                    // Thất bại sau các lần thử lại!
-                                    // Không đánh dấu polished, dừng vòng lặp cuốn chiếu hiện tại để tiếp tục dịch
-                                    // Ở mốc tiếp theo (hoặc chương cuối), các chương này sẽ được ưu tiên làm mượt đầu tiên!
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
                     Thread.sleep(delaySec * 1000L);
                 } catch (Exception e) {
                     mainHandler.post(() -> appendLog("❌ Lỗi chương " + (chapIndex + 1) + ": " + e.getMessage()));
@@ -3348,30 +3374,12 @@ public class MainActivity extends AppCompatActivity {
                     appendLog("🎉 Đã hoàn thành khoảng chương yêu cầu!");
                     Toast.makeText(MainActivity.this, "Đã hoàn thành dịch khoảng chương!", Toast.LENGTH_LONG).show();
 
-                    // TỰ ĐỘNG LÀM MƯỢT VÉT TOÀN BỘ CÁC CHƯƠNG CHƯA LÀM MƯỢT CUỐN CHIẾU
-                    List<Integer> remainingUnpolished = getUnpolishedChapterIndices(rawChapters.size() - 1);
-                    if (rollingPolishEnabled && !remainingUnpolished.isEmpty()) {
-                        appendLog("🔄 [QUÉT VÉT CUỐN CHIẾU] Phát hiện còn " + remainingUnpolished.size() + " chương chưa được làm mượt cuốn chiếu, tự động xử lý vét...");
-                        new Thread(() -> {
-                            List<Integer> rem = getUnpolishedChapterIndices(rawChapters.size() - 1);
-                            while (!rem.isEmpty()) {
-                                int chunkSize = Math.min(rollingPolishBatchSize, rem.size());
-                                List<Integer> chunk = new ArrayList<>(rem.subList(0, chunkSize));
-                                boolean ok = performRollingPolishBatch(chunk);
-                                if (!ok) break;
-                                rem = getUnpolishedChapterIndices(rawChapters.size() - 1);
-                            }
-
-                            // TỰ ĐỘNG KÍCH HOẠT BỘ QUÉT LÀM MƯỢT FINAL SAU KHI VÉT CUỐN CHIẾU XONG
-                            mainHandler.post(() -> {
-                                appendLog("🚀 [AUTO POLISH] Đang tự động kích hoạt Bộ Quét Làm Mượt Final...");
-                                executeFinalGlobalPolish();
-                            });
-                        }).start();
-                    } else {
-                        // TỰ ĐỘNG KÍCH HOẠT BỘ QUÉT LÀM MƯỢT FINAL
-                        appendLog("🚀 [AUTO POLISH] Đang tự động kích hoạt Bộ Quét Làm Mượt Final...");
+                    // TỰ ĐỘNG LÀM MƯỢT FINAL CHO TOÀN BỘ TÁC PHẨM (NẾU ĐƯỢC BẬT)
+                    if (enableAutoFinalPolish) {
+                        appendLog("🚀 [AUTO FINAL POLISH] Đang tự động kích hoạt Bộ Quét Làm Mượt Final...");
                         executeFinalGlobalPolish();
+                    } else {
+                        appendLog("✨ Dịch hoàn tất. Bộ Làm Mượt Final đang TẮT (Bạn có thể bấm nút thủ công tại Tab Tiến Độ).");
                     }
                 }
             });
@@ -4380,63 +4388,252 @@ public class MainActivity extends AppCompatActivity {
         content.addView(cardGloss);
 
         // ---------------------------------------------------------------------
-        // 2.5 Chế Độ Đường Ống Dịch (Pipeline Mode)
+        // 3. CẤU HÌNH PHƯƠNG ÁN DỊCH THUẬT (MODULAR TRANSLATION PIPELINE - PHONG CÁCH LEAGUE OF LEGENDS)
         // ---------------------------------------------------------------------
         LinearLayout rowPipelineHead = new LinearLayout(this);
         rowPipelineHead.setOrientation(LinearLayout.HORIZONTAL);
         rowPipelineHead.setGravity(Gravity.CENTER_VERTICAL);
-        rowPipelineHead.setPadding(0, dp(12), 0, dp(4));
+        rowPipelineHead.setPadding(0, dp(14), 0, dp(6));
 
         TextView tvPipeTitle = new TextView(this);
-        tvPipeTitle.setText("3. Chế Độ Đường Ống Dịch (Pipeline Mode)");
-        tvPipeTitle.setTextColor(Color.WHITE);
+        tvPipeTitle.setText("3. Cấu Hình Phương Án Dịch Thuật");
+        tvPipeTitle.setTextColor(Color.parseColor("#F0E6D2"));
         tvPipeTitle.setTextSize(14f);
         tvPipeTitle.setTypeface(null, Typeface.BOLD);
         rowPipelineHead.addView(tvPipeTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
         rowPipelineHead.addView(createHelpButton("settings_pipeline_mode"));
         content.addView(rowPipelineHead);
 
-        LinearLayout cardPipeline = createCard();
+        LinearLayout cardPipeline = new LinearLayout(this);
+        cardPipeline.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable cpBg = new android.graphics.drawable.GradientDrawable();
+        cpBg.setColor(Color.parseColor("#091428"));
+        cpBg.setCornerRadius(dp(16));
+        cpBg.setStroke(dp(1.5f), Color.parseColor("#785A28"));
+        cardPipeline.setBackground(cpBg);
+        cardPipeline.setPadding(dp(14), dp(14), dp(14), dp(14));
+        LinearLayout.LayoutParams cplp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cplp.setMargins(0, 0, 0, dp(12));
+        cardPipeline.setLayoutParams(cplp);
 
-        boolean isBatchMode = "BATCH_GLOSSARY".equals(translationPipelineMode);
+        // Header phụ
+        TextView tvSubDesc = new TextView(this);
+        tvSubDesc.setText("Tùy biến linh hoạt - Bật/tắt từng tính năng độc lập");
+        tvSubDesc.setTextColor(Color.parseColor("#A09B8C"));
+        tvSubDesc.setTextSize(11f);
+        tvSubDesc.setPadding(0, 0, 0, dp(10));
+        cardPipeline.addView(tvSubDesc);
 
-        LinearLayout rowPipeChoice = new LinearLayout(this);
-        rowPipeChoice.setOrientation(LinearLayout.VERTICAL);
+        // PHÂN MỤC A: THẺ ẨN CHỌN PHƯƠNG ÁN LÕI (LEAGUE OF LEGENDS DROPDOWN CARD SELECTOR)
+        TextView tvStratHeader = new TextView(this);
+        tvStratHeader.setText("◆ PHƯƠNG ÁN DỊCH LÕI (CHỌN 1 TRONG 4):");
+        tvStratHeader.setTextColor(Color.parseColor("#C8AA6E"));
+        tvStratHeader.setTextSize(12f);
+        tvStratHeader.setTypeface(null, Typeface.BOLD);
+        tvStratHeader.setPadding(0, 0, 0, dp(6));
+        cardPipeline.addView(tvStratHeader);
 
-        Button btnBatchMode = createButton(isBatchMode ? "✓ 1. Bóc Lô " + batchGlossarySize + " Chương ➔ Dịch Thuần Túy (Khuyên Dùng)" : "1. Bóc Lô " + batchGlossarySize + " Chương ➔ Dịch Thuần Túy", isBatchMode ? "#064E3B" : "#151720");
-        btnBatchMode.setTextSize(11.5f);
-        btnBatchMode.setTextColor(Color.parseColor(isBatchMode ? "#34D399" : "#94A3B8"));
-        btnBatchMode.setMinHeight(dp(40));
-        btnBatchMode.setPadding(dp(10), dp(6), dp(10), dp(6));
-        btnBatchMode.setOnClickListener(v -> {
+        String curMode = (translationPipelineMode != null && !translationPipelineMode.isEmpty()) ? translationPipelineMode : "MODE_2_BATCH_PURE";
+        if ("BATCH_GLOSSARY".equals(curMode)) curMode = "MODE_2_BATCH_PURE";
+        else if ("COMBINED".equals(curMode)) curMode = "MODE_1_DUAL_TASK";
+        else if ("MODE_6_SLIDING_BILINGUAL".equals(curMode)) curMode = "MODE_6_SLIDING_WINDOW";
+
+        final String activeMode = curMode;
+
+        // Định nghĩa 4 chiến lược lõi phong cách LoL
+        String[][] coreStrategies = {
+                {"MODE_2_BATCH_PURE", "Dịch Thuần Túy Văn Học", "Dịch trực tiếp với Master Glossary đối chiếu. Văn phong mượt mà, thuần túy, sạch sẽ & tốc độ cao nhất.", "KHUYÊN DÙNG", "#10B981"},
+                {"MODE_1_DUAL_TASK", "1 Request 2 Tác Vụ (Dịch & Bóc Từ Mới)", "Đồng thời dịch và tự động phát hiện trích xuất từ mới trong cùng 1 request mỗi chương.", "TIẾT KIỆM TOKEN", "#F59E0B"},
+                {"MODE_3_RAW_INJECT", "Ghi Đè Thuật Ngữ Lên Raw Trước Khi Dịch", "Ghi đè tên riêng, chức vụ, địa danh, công pháp vào giữa bản Raw tiếng Trung trước khi gửi AI. Khóa tên 100%.", "KHÓA TÊN 100%", "#EC4899"},
+                {"MODE_5_COT_THINKING", "Dịch Suy Luận Ngữ Cảnh CoT (Deep Thinking)", "AI phân tích ngữ cảnh qua khối <analysis>, giải mã thành ngữ 4 chữ và định vị vai vế trước khi dịch.", "PHÂN TÍCH SÂU", "#8B5CF6"}
+        };
+
+        String curTitle = "Dịch Thuần Túy Văn Học";
+        String curDesc = "Dịch trực tiếp với Master Glossary đối chiếu.";
+        for (String[] cs : coreStrategies) {
+            if (cs[0].equals(activeMode)) {
+                curTitle = cs[1];
+                curDesc = cs[2];
+                break;
+            }
+        }
+
+        // THẺ ĐANG CHỌN (COLLAPSED CARD)
+        LinearLayout collapsedCard = new LinearLayout(this);
+        collapsedCard.setOrientation(LinearLayout.VERTICAL);
+        collapsedCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+        collapsedCard.setClickable(true);
+        collapsedCard.setFocusable(true);
+
+        android.graphics.drawable.GradientDrawable colBg = new android.graphics.drawable.GradientDrawable();
+        colBg.setColor(Color.parseColor("#111923"));
+        colBg.setCornerRadius(dp(12));
+        colBg.setStroke(dp(1.8f), Color.parseColor("#C8AA6E"));
+        collapsedCard.setBackground(colBg);
+
+        LinearLayout rowCardTop = new LinearLayout(this);
+        rowCardTop.setOrientation(LinearLayout.HORIZONTAL);
+        rowCardTop.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView tvCurTitle = new TextView(this);
+        tvCurTitle.setText("●  " + curTitle);
+        tvCurTitle.setTextColor(Color.parseColor("#F0E6D2"));
+        tvCurTitle.setTextSize(13f);
+        tvCurTitle.setTypeface(null, Typeface.BOLD);
+        rowCardTop.addView(tvCurTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+        TextView tvBadgeState = new TextView(this);
+        tvBadgeState.setText(isStrategySelectorExpanded ? "▲ ĐÓNG LẠI" : "▼ ĐỔI THẺ");
+        tvBadgeState.setTextColor(Color.parseColor("#C8AA6E"));
+        tvBadgeState.setTextSize(10f);
+        tvBadgeState.setTypeface(null, Typeface.BOLD);
+        tvBadgeState.setPadding(dp(8), dp(3), dp(8), dp(3));
+        android.graphics.drawable.GradientDrawable bbg = new android.graphics.drawable.GradientDrawable();
+        bbg.setColor(Color.parseColor("#1E2328"));
+        bbg.setCornerRadius(dp(6));
+        bbg.setStroke(dp(1), Color.parseColor("#785A28"));
+        tvBadgeState.setBackground(bbg);
+        rowCardTop.addView(tvBadgeState);
+
+        collapsedCard.addView(rowCardTop);
+
+        TextView tvCurDesc = new TextView(this);
+        tvCurDesc.setText(curDesc);
+        tvCurDesc.setTextColor(Color.parseColor("#A09B8C"));
+        tvCurDesc.setTextSize(10.5f);
+        tvCurDesc.setPadding(0, dp(4), 0, 0);
+        collapsedCard.addView(tvCurDesc);
+
+        collapsedCard.setOnClickListener(v -> {
             triggerHaptic();
-            translationPipelineMode = "BATCH_GLOSSARY";
-            saveAllState();
+            isStrategySelectorExpanded = !isStrategySelectorExpanded;
             refreshSettingsUI();
-            appendLog("⚙️ Đã chọn Chế độ dịch: Bóc Lô ➔ Dịch Thuần Túy (Sạch chữ Hán 100%)");
         });
-        rowPipeChoice.addView(btnBatchMode);
 
-        Button btnCombinedMode = createButton(!isBatchMode ? "✓ 2. Dịch + Bóc Từ Điển Đồng Thời (Chế Độ Cũ)" : "2. Dịch + Bóc Từ Điển Đồng Thời", !isBatchMode ? "#1E3A8A" : "#151720");
-        btnCombinedMode.setTextSize(11.5f);
-        btnCombinedMode.setTextColor(Color.parseColor(!isBatchMode ? "#38BDF8" : "#94A3B8"));
-        btnCombinedMode.setMinHeight(dp(40));
-        btnCombinedMode.setPadding(dp(10), dp(6), dp(10), dp(6));
-        LinearLayout.LayoutParams cmLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cmLp.topMargin = dp(6);
-        btnCombinedMode.setLayoutParams(cmLp);
-        btnCombinedMode.setOnClickListener(v -> {
-            triggerHaptic();
-            translationPipelineMode = "COMBINED";
-            saveAllState();
-            refreshSettingsUI();
-            appendLog("⚙️ Đã chọn Chế độ dịch: Kết Hợp Đồng Thời (Chế độ Cũ)");
-        });
-        rowPipeChoice.addView(btnCombinedMode);
+        cardPipeline.addView(collapsedCard);
 
-        cardPipeline.addView(rowPipeChoice);
+        // NẾU ĐANG MỞ RỘNG (EXPANDED CHOICES)
+        if (isStrategySelectorExpanded) {
+            LinearLayout expandedList = new LinearLayout(this);
+            expandedList.setOrientation(LinearLayout.VERTICAL);
+            expandedList.setPadding(0, dp(8), 0, 0);
 
-        if (isBatchMode) {
+            for (String[] strat : coreStrategies) {
+                final String sKey = strat[0];
+                final String sTitle = strat[1];
+                final String sDesc = strat[2];
+                final String sBadge = strat[3];
+                final String sColor = strat[4];
+                final boolean isSel = activeMode.equals(sKey);
+
+                LinearLayout itemCard = new LinearLayout(this);
+                itemCard.setOrientation(LinearLayout.VERTICAL);
+                itemCard.setPadding(dp(12), dp(10), dp(12), dp(10));
+                itemCard.setClickable(true);
+                itemCard.setFocusable(true);
+
+                android.graphics.drawable.GradientDrawable ibg = new android.graphics.drawable.GradientDrawable();
+                ibg.setColor(Color.parseColor(isSel ? "#1E2328" : "#0A1120"));
+                ibg.setCornerRadius(dp(10));
+                ibg.setStroke(dp(isSel ? 1.5f : 1.0f), Color.parseColor(isSel ? "#C8AA6E" : "#785A28"));
+                itemCard.setBackground(ibg);
+
+                LinearLayout itemTop = new LinearLayout(this);
+                itemTop.setOrientation(LinearLayout.HORIZONTAL);
+                itemTop.setGravity(Gravity.CENTER_VERTICAL);
+
+                TextView tvItemTitle = new TextView(this);
+                tvItemTitle.setText((isSel ? "✓ " : "") + sTitle);
+                tvItemTitle.setTextColor(Color.parseColor(isSel ? "#F0E6D2" : "#CBD5E1"));
+                tvItemTitle.setTextSize(12f);
+                tvItemTitle.setTypeface(null, Typeface.BOLD);
+                itemTop.addView(tvItemTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
+
+                TextView tvBadge = new TextView(this);
+                tvBadge.setText(sBadge);
+                tvBadge.setTextColor(Color.parseColor(sColor));
+                tvBadge.setTextSize(9.5f);
+                tvBadge.setTypeface(null, Typeface.BOLD);
+                tvBadge.setPadding(dp(6), dp(2), dp(6), dp(2));
+                android.graphics.drawable.GradientDrawable tbg = new android.graphics.drawable.GradientDrawable();
+                tbg.setColor(Color.parseColor("#151720"));
+                tbg.setCornerRadius(dp(4));
+                tbg.setStroke(dp(1), Color.parseColor(sColor));
+                tvBadge.setBackground(tbg);
+                itemTop.addView(tvBadge);
+
+                itemCard.addView(itemTop);
+
+                TextView tvItemDesc = new TextView(this);
+                tvItemDesc.setText(sDesc);
+                tvItemDesc.setTextColor(Color.parseColor("#94A3B8"));
+                tvItemDesc.setTextSize(10f);
+                tvItemDesc.setPadding(0, dp(4), 0, 0);
+                itemCard.addView(tvItemDesc);
+
+                itemCard.setOnClickListener(v -> {
+                    triggerHaptic();
+                    translationPipelineMode = sKey;
+                    isStrategySelectorExpanded = false;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Đã chọn Phương Án Lõi: " + sTitle);
+                    Toast.makeText(MainActivity.this, "Đã chọn: " + sTitle, Toast.LENGTH_SHORT).show();
+                });
+
+                LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                ilp.topMargin = dp(6);
+                itemCard.setLayoutParams(ilp);
+                expandedList.addView(itemCard);
+            }
+
+            cardPipeline.addView(expandedList);
+        }
+
+        // PHÂN MỤC B: CÁC DÒNG TÍNH NĂNG BẬT / TẮT ĐỘC LẬP (MODULAR TOGGLE ROWS)
+        View dividerModular = new View(this);
+        dividerModular.setBackgroundColor(Color.parseColor("#332611"));
+        LinearLayout.LayoutParams dmlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
+        dmlp.setMargins(0, dp(14), 0, dp(10));
+        cardPipeline.addView(dividerModular, dmlp);
+
+        TextView tvModHeader = new TextView(this);
+        tvModHeader.setText("◆ CÁC TÍNH NĂNG TÙY CHỈNH ĐỘC LẬP (BẬT / TẮT THEO Ý):");
+        tvModHeader.setTextColor(Color.parseColor("#C8AA6E"));
+        tvModHeader.setTextSize(12f);
+        tvModHeader.setTypeface(null, Typeface.BOLD);
+        tvModHeader.setPadding(0, 0, 0, dp(8));
+        cardPipeline.addView(tvModHeader);
+
+        // DÒNG 1: DỊCH KÉP PHẢN BIỆN 2-PASS
+        cardPipeline.addView(createSwitchRow(
+                "DÒNG 1: Dịch Kép Phản Biện 2-Pass",
+                "Pass 1 Dịch thô ➔ Pass 2 Tổng Biên Tập đối chiếu song ngữ sửa sạch lỗi ngữ nghĩa & chữ Hán sót",
+                "settings_dual_pass",
+                enableDualPassProofreading,
+                () -> {
+                    enableDualPassProofreading = !enableDualPassProofreading;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Dòng 1 (Dịch Kép 2-Pass): " + (enableDualPassProofreading ? "BẬT" : "TẮT"));
+                }
+        ));
+
+        // DÒNG 2: TỰ ĐỘNG BÓC LÔ GLOSSARY
+        cardPipeline.addView(createSwitchRow(
+                "DÒNG 2: Tự Động Bóc Lô Glossary 7 Nhóm",
+                "Tự động gom dải chương thô để trích xuất 100% Tên, xưng hô, chức vụ, địa danh, thú, pháp bảo & công pháp",
+                "settings_batch_glossary",
+                enableBatchGlossaryAutoExtract,
+                () -> {
+                    enableBatchGlossaryAutoExtract = !enableBatchGlossaryAutoExtract;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Dòng 2 (Tự Động Bóc Lô Glossary): " + (enableBatchGlossaryAutoExtract ? "BẬT" : "TẮT"));
+                }
+        ));
+
+        if (enableBatchGlossaryAutoExtract) {
             cardPipeline.addView(createStepperRow("Kích thước lô bóc từ điển (Nhấp để nhập số):", "settings_batch_glossary_size", batchGlossarySize, "chương", 10, 500, newVal -> {
                 batchGlossarySize = newVal;
                 saveAllState();
@@ -4445,79 +4642,94 @@ public class MainActivity extends AppCompatActivity {
             }));
         }
 
-        // Tùy chọn Làm Mượt Cuốn Chiếu (Semantic JSON Patch mỗi 15 chương)
+        // DÒNG 3: GỬI KÈM NGỮ CẢNH ĐOẠN CUỐI CHƯƠNG TRƯỚC
         cardPipeline.addView(createSwitchRow(
-                "Làm Mượt Cuốn Chiếu (Semantic JSON Patch)",
-                "Cứ mỗi 15 chương, AI tự động quét rà soát toàn bộ văn bản để dọn sạch chữ Hán sót và sửa typo",
-                "settings_rolling_polish",
-                rollingPolishEnabled,
+                "DÒNG 3: Gửi Kèm Ngữ Cảnh Chương Trước",
+                "Đính kèm đoạn kết chương trước vào prompt để AI bắt nhịp văn phong và giữ mạch xưng hô liền mạch",
+                "settings_context_snippet",
+                enablePreviousChapterContext,
                 () -> {
-                    rollingPolishEnabled = !rollingPolishEnabled;
+                    enablePreviousChapterContext = !enablePreviousChapterContext;
                     saveAllState();
                     refreshSettingsUI();
-                    appendLog("⚙️ Làm mượt cuốn chiếu: " + (rollingPolishEnabled ? "BẬT" : "TẮT"));
+                    appendLog("⚙️ Dòng 3 (Gửi Kèm Ngữ Cảnh Chương Trước): " + (enablePreviousChapterContext ? "BẬT" : "TẮT"));
                 }
         ));
 
-        if (rollingPolishEnabled) {
-            cardPipeline.addView(createStepperRow("Khoảng cách đợt làm mượt (Nhấp để nhập số):", "settings_rolling_polish", rollingPolishBatchSize, "chương", 5, 50, newVal -> {
-                rollingPolishBatchSize = newVal;
+        if (enablePreviousChapterContext) {
+            cardPipeline.addView(createStepperRow("Độ dài ngữ cảnh đoạn kết gửi kèm:", "settings_context_snippet_len", contextSnippetLength, "ký tự", 100, 1000, newVal -> {
+                contextSnippetLength = newVal;
                 saveAllState();
                 refreshSettingsUI();
-                appendLog("⚙️ Đã đặt khoảng cách làm mượt cuốn chiếu: " + rollingPolishBatchSize + " chương/đợt");
+                appendLog("⚙️ Đã đặt độ dài ngữ cảnh gửi kèm: " + contextSnippetLength + " ký tự");
             }));
         }
 
-        content.addView(cardPipeline);
-
-        // ---------------------------------------------------------------------
-        // 3. Dịch Thuật & Chống Lỗi (NÚT GẠT SWITCH XANH NGỌC)
-        // ---------------------------------------------------------------------
-        LinearLayout rowS3Head = new LinearLayout(this);
-        rowS3Head.setOrientation(LinearLayout.HORIZONTAL);
-        rowS3Head.setGravity(Gravity.CENTER_VERTICAL);
-        rowS3Head.setPadding(0, dp(12), 0, 0);
-
-        TextView tvTransTitle = new TextView(this);
-        tvTransTitle.setText("3. Dịch Thuật & Chống Lỗi Thông Minh");
-        tvTransTitle.setTextColor(Color.WHITE);
-        tvTransTitle.setTextSize(14f);
-        tvTransTitle.setTypeface(null, Typeface.BOLD);
-        rowS3Head.addView(tvTransTitle);
-        rowS3Head.addView(createHelpButton("settings_translation_anti_hanzi"));
-        content.addView(rowS3Head);
-
-        LinearLayout cardTrans = createCard();
-
-        // Switch 1: Bộ lọc chống chữ Hán 2 lớp
-        cardTrans.addView(createSwitchRow(
-                "Bộ Lọc 2 Lớp Chống Chữ Hán",
-                "Rà soát và chuyển sạch toàn bộ chữ Hán sót sang tiếng Việt",
+        // DÒNG 4: BỘ LỌC CHỐNG CHỮ HÁN 2 LỚP
+        cardPipeline.addView(createSwitchRow(
+                "DÒNG 4: Bộ Lọc Chống Lọt Chữ Hán & Typo",
+                "Ép AI phiên âm Hán-Việt 100%, khử sạch các chữ Hán dính nửa vời trong câu tiếng Việt",
                 "settings_anti_hanzi",
                 antiHanziStrict,
                 () -> {
                     antiHanziStrict = !antiHanziStrict;
                     saveAllState();
                     refreshSettingsUI();
-                    appendLog("⚙️ Bộ lọc chống lọt chữ Hán: " + (antiHanziStrict ? "BẬT" : "TẮT"));
+                    appendLog("⚙️ Dòng 4 (Bộ lọc chống lọt chữ Hán): " + (antiHanziStrict ? "BẬT" : "TẮT"));
                 }
         ));
 
-        // Switch 2: Tự động sửa lỗi khi mất mạng / dịch lỗi
-        cardTrans.addView(createSwitchRow(
-                "Tự Động Sửa Lỗi Khi Mất Mạng (Auto-Heal)",
-                "Tự động đổi Key khác để dịch bù ngay khi AI bị nghẽn mạng",
+        // DÒNG 5: TỰ ĐỘNG LÀM MƯỢT FINAL
+        cardPipeline.addView(createSwitchRow(
+                "DÒNG 5: Tự Động Làm Mượt Final Khi Xong",
+                "Khi hoàn thành dải chương, tự động chạy Bộ Quét Làm Mượt Final để rà soát và trau chuốt toàn bộ tác phẩm",
+                "settings_final_polish",
+                enableAutoFinalPolish,
+                () -> {
+                    enableAutoFinalPolish = !enableAutoFinalPolish;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Dòng 5 (Tự động Làm Mượt Final): " + (enableAutoFinalPolish ? "BẬT" : "TẮT"));
+                }
+        ));
+
+        // DÒNG 6: CHẾ ĐỘ DỊCH BÙ
+        cardPipeline.addView(createSwitchRow(
+                "DÒNG 6: Chế Độ Dịch Bù (Bỏ Qua Đã Dịch)",
+                "Tự động bỏ qua những chương đã có bản dịch thành công, chỉ dịch các chương bị thiếu hoặc lỗi",
+                "settings_gap_filling",
+                isGapFillingMode,
+                () -> {
+                    isGapFillingMode = !isGapFillingMode;
+                    saveAllState();
+                    refreshSettingsUI();
+                    appendLog("⚙️ Dòng 6 (Chế Độ Dịch Bù): " + (isGapFillingMode ? "BẬT" : "TẮT"));
+                }
+        ));
+
+        // DÒNG 7: TỰ ĐỘNG CỨU HỘ TRỰC TUYẾN
+        cardPipeline.addView(createSwitchRow(
+                "DÒNG 7: Tự Động Cứu Hộ Trực Tuyến (Auto-Heal)",
+                "Phát hiện AI từ chối dịch, lặp từ, kẹt đĩa để tự động nạp key khác dịch lại tức thì",
                 "settings_auto_heal",
                 autoHealOnlineEnabled,
                 () -> {
                     autoHealOnlineEnabled = !autoHealOnlineEnabled;
                     saveAllState();
                     refreshSettingsUI();
-                    appendLog("⚙️ Cơ chế Tự Động Dịch Lại & Sửa Lỗi: " + (autoHealOnlineEnabled ? "BẬT" : "TẮT"));
+                    appendLog("⚙️ Dòng 7 (Cứu Hộ Trực Tuyến): " + (autoHealOnlineEnabled ? "BẬT" : "TẮT"));
                 }
         ));
 
-        content.addView(cardTrans);
+        // DÒNG 8: BƯỚC NHẢY LÀM MƯỢT CUỐN CHIẾU THỦ CÔNG
+        cardPipeline.addView(createStepperRow("DÒNG 8: Bước nhảy làm mượt cuốn chiếu (Chỉ chạy khi ấn nút):", "settings_rolling_polish_batch", rollingPolishBatchSize, "chương", 5, 50, newVal -> {
+            rollingPolishBatchSize = newVal;
+            saveAllState();
+            refreshSettingsUI();
+            appendLog("⚙️ Đã đặt khoảng cách làm mượt: " + rollingPolishBatchSize + " chương/đợt");
+        }));
+
+        content.addView(cardPipeline);
 
         // ---------------------------------------------------------------------
         // 4. Ngôn Ngữ Đích

@@ -206,6 +206,22 @@ public class GlossaryManager {
         return sb.toString();
     }
 
+    public static String injectGlossaryIntoRaw(String rawText, Map<String, String> glossary) {
+        if (rawText == null || glossary == null || glossary.isEmpty()) return rawText;
+        List<Map.Entry<String, String>> sorted = new ArrayList<>(glossary.entrySet());
+        sorted.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+
+        String result = rawText;
+        for (Map.Entry<String, String> entry : sorted) {
+            String key = entry.getKey();
+            String val = entry.getValue();
+            if (key != null && !key.trim().isEmpty() && val != null && !val.trim().isEmpty() && result.contains(key)) {
+                result = result.replace(key, "[" + val.trim() + "]");
+            }
+        }
+        return result;
+    }
+
     // =========================================================================
     // PHÂN HỆ PATCH DICTIONARY (VIỆT - VIỆT) & LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG
     // =========================================================================

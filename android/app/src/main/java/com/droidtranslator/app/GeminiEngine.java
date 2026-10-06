@@ -253,18 +253,19 @@ public class GeminiEngine {
 
                 StringBuilder systemInstructionSb = new StringBuilder();
                 systemInstructionSb.append("Bạn là Đại Sư Bóc Tách Thuật Ngữ Văn Học Tiếng Trung chuyên nghiệp.").append(nl);
-                systemInstructionSb.append("Nhiệm vụ: Rà soát toàn bộ các chương truyện được cung cấp bên dưới, phát hiện và trích xuất TOÀN BỘ CÁC DANH TỪ RIÊNG VÀ THUẬT NGỮ CÓ GIÁ TRỊ thuộc 6 nhóm sau:").append(nl);
-                systemInstructionSb.append("1. TÊN NHÂN VẬT & TÊN XƯƠNG HÔ: (VD: 林辰 -> Lâm Thần, 韩立 -> Hàn Lập, 二愣子 -> Nhị Lăng Tử)").append(nl);
-                systemInstructionSb.append("2. ĐỊA DANH / MÔN PHÁI / BANG HỘI / THÀNH TRÌ: (VD: 青云宗 -> Thanh Vân Tông, 彩霞山 -> Thải Hà Sơn, 燕家堡 -> Yến Gia Bảo)").append(nl);
-                systemInstructionSb.append("3. PHÁP BẢO / LINH BẢO / THẦN KHÍ / TRANG BỊ: (VD: 斩仙剑 -> Trảm Tiên Kiếm, 掌天瓶 -> Chưởng Thiên Bình, 储物袋 -> Trữ Đồ Đại)").append(nl);
-                systemInstructionSb.append("4. CÔNG PHÁP / CHIÊU THỨC / THÂN PHÁP / KHẨU QUYẾT: (VD: 长春功 -> Trường Xuân Công, 罗烟步 -> La Yên Bộ, 巨剑术 -> Cự Kiếm Thuật)").append(nl);
-                systemInstructionSb.append("5. LINH THÚ / YÊU THÚ / THẦN THÚ / THỦ PHÁP: (VD: 赤眼金毛狮 -> Xích Nhãn Kim Mao Sư, 墨蛟 -> Mặc Giao)").append(nl);
-                systemInstructionSb.append("6. CẢNH GIỚI TU LUYỆN / ĐAN DƯỢC / DƯỢC LIỆU / ĐỘC DƯỢC: (VD: 筑基期 -> Trúc Cơ Kỳ, 洗髓丹 -> Tẩy Tủy Đan, 升仙丸 -> Thăng Tiên Hoàn)").append(nl).append(nl);
+                systemInstructionSb.append("Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và trích xuất TOÀN DIỆN 100% các thuật ngữ, danh từ riêng, xưng hô và danh xưng thế giới, bao gồm 7 nhóm bắt buộc:").append(nl);
+                systemInstructionSb.append("1. TÊN NHÂN VẬT & BIỆT DANH: Tên người chính/phụ, đạo hiệu, ngoại hiệu, tục danh (VD: 林辰 ➔ Lâm Thần, 赵霸天 ➔ Triệu Bá Thiên).").append(nl);
+                systemInstructionSb.append("2. XƯNG HÔ, CHỨC VỤ, VAI VẾ: Quan chức triều đình, nha môn, bang phái, thân phận, gia tộc (VD: 知县 ➔ Tri huyện, 主簿 ➔ Chủ bộ, 捕快 ➔ Bộ khoái, 县丞 ➔ Huyện thừa, 典史 ➔ Điển sử, 巡抚 ➔ Tuần phủ, 二当家 ➔ Nhị đương gia, 掌柜 ➔ Chưởng quỹ, 嬷嬷 ➔ ma ma / nhũ mẫu, 师叔 ➔ sư thúc).").append(nl);
+                systemInstructionSb.append("3. ĐỊA DANH & ĐỊA ĐIỂM: Tông môn, vương quốc, phủ, huyện, thành trì, thôn trang, sơn mạch, tửu lâu, trạch viện (VD: 大河府 ➔ Phủ Đại Hà, 河宴县 ➔ Huyện Hà Yến, 青云宗 ➔ Thanh Vân Tông, 青石村 ➔ Thôn Thanh Thạch, 运大楼 ➔ Vận Đại Lâu).").append(nl);
+                systemInstructionSb.append("4. YÊU THÚ, LINH THÚ & THẦN THÚ: Tên các loài dị thú, linh sủng, ma thú (VD: 啸月狼 ➔ Khiếu Nguyệt Lang, 吞天雀 ➔ Thôn Thiên Tước).").append(nl);
+                systemInstructionSb.append("5. PHÁP BẢO, VŨ KHÍ, ĐAN DƯỢC & VẬT PHẨM: Thần binh, phù lục, đan dược, dược thảo, quặng mỏ (VD: 斩灵剑 ➔ Trảm Linh Kiếm, 筑基丹 ➔ Trúc Cơ Đan).").append(nl);
+                systemInstructionSb.append("6. CÔNG PHÁP, CHIÊU THỨC & THÂN PHÁP: Tâm pháp, khẩu quyết, quyền pháp, kiếm quyết (VD: 梵圣真魔功 ➔ Phạn Thánh Chân Ma Công, 青云剑决 ➔ Thanh Vân Kiếm Quyết).").append(nl);
+                systemInstructionSb.append("7. CẢNH GIỚI TU LUYỆN & PHẨM CẤP: Giai tầng võ đạo, phẩm giai pháp khí (VD: 黄阶 ➔ Hoàng giai, 玄阶 ➔ Huyền giai, 练气 ➔ Luyện Khí, 筑基 ➔ Trúc Cơ, 金丹 ➔ Kim Đan, 元婴 ➔ Nguyên Anh).").append(nl).append(nl);
                 systemInstructionSb.append("QUY TẮC BẮT BUỘC:").append(nl);
                 systemInstructionSb.append("1. Chỉ trích xuất từ có độ dài chữ Hán >= ").append(minTermLength).append(" ký tự.").append(nl);
                 systemInstructionSb.append("2. BẢO TOÀN TỪ ĐIỂN CŨ: Nếu từ gốc đã tồn tại trong Danh Sách Đã Có bên dưới, TUYỆT ĐỐI KHÔNG ghi đè hay thay đổi nghĩa.").append(nl);
                 systemInstructionSb.append("3. ĐỊNH DẠNG ĐẦU RA BẮT BUỘC: Mỗi dòng đúng 1 cặp [TừGốcChữHán] = [NghĩaDịchHánViệt], không thêm bớt bất kỳ lời giải thích hay ký tự thừa nào.").append(nl);
-                systemInstructionSb.append("4. CẤM XUẤT TIÊU ĐỀ: Tuyệt đối KHÔNG xuất lại các dòng tiêu đề danh mục (như 'CÔNG PHÁP / CHIÊU THỨC / THÂN PHÁP / KHẨU QUYẾT', 'TÊN NHÂN VẬT', 'ĐỊA DANH', 'PHÁP BẢO'...).").append(nl);
+                systemInstructionSb.append("4. CẤM XUẤT TIÊU ĐỀ: Tuyệt đối KHÔNG xuất lại các dòng tiêu đề danh mục.").append(nl);
                 systemInstructionSb.append("5. CHỈ DÙNG DẤU BẰNG '=': Tuyệt đối không dùng dấu hai chấm (:) làm phân cách danh mục.").append(nl);
 
                 StringBuilder promptSb = new StringBuilder();
@@ -490,6 +491,279 @@ public class GeminiEngine {
         throw new Exception("Dịch chương thuần túy thất bại sau các lượt thử Key.");
     }
 
+    public String translateChapterInjectedRaw(String injectedRawText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, String rescueInstruction, LogCallback logger) throws Exception {
+        int maxRetries = Math.max(keys.size() * 2, 4);
+        int attempts = 0;
+
+        while (attempts < maxRetries) {
+            attempts++;
+            ApiKeyItem keyItem = getNextAvailableKey();
+            if (keyItem == null) throw new Exception("Không có API Key nào trong kho lưu trữ!");
+
+            long now = System.currentTimeMillis();
+            if (keyItem.cooldownUntil > now) {
+                long waitSec = Math.max((keyItem.cooldownUntil - now) / 1000, 1);
+                if (logger != null) logger.onLog("⏳ Key đang cooldown, chờ " + waitSec + "s...");
+                Thread.sleep(waitSec * 1000);
+            }
+
+            try {
+                keyItem.totalRequests++;
+                String nl = String.valueOf((char) 10);
+                String glossaryText = GlossaryManager.getGlossaryAsString(glossary);
+
+                StringBuilder systemInstructionSb = new StringBuilder();
+                systemInstructionSb.append("Bạn là đại sư dịch thuật tiểu thuyết chuyên nghiệp (Mode 3: Pre-Injected Raw Translation).").append(nl);
+                systemInstructionSb.append("Nhiệm vụ: Dịch văn bản gốc sang ").append(targetLanguage != null ? targetLanguage : "Tiếng Việt").append(" tự nhiên, mượt mà.").append(nl);
+                systemInstructionSb.append("QUY TẮC BẮT BUỘC:").append(nl);
+                systemInstructionSb.append("- Các danh từ riêng, tên nhân vật, địa danh, chức vụ, công pháp đã được đính sẵn trong ngoặc vuông [] hoặc dịch sẵn giữa các câu chữ tiếng Trung trong văn bản gốc.").append(nl);
+                systemInstructionSb.append("- TUYỆT ĐỐI BẢO TOÀN VÀ SỬ DỤNG ĐÚNG các thuật ngữ tiếng Việt đã được ghim này, không dịch chệch tên.").append(nl);
+                systemInstructionSb.append("- BẢO ĐẢM ZERO CHỮ HÁN: Toàn bộ câu cú sau khi dịch phải hoàn toàn thuần túy tiếng Việt, không để sót chữ Hán hay ký tự dính lẹo.").append(nl);
+                systemInstructionSb.append("- ĐẦU RA TRỰC TIẾP: Chỉ trả về nội dung bản dịch hoàn chỉnh, không kèm codeblock hay lời bình luận.").append(nl);
+
+                StringBuilder promptSb = new StringBuilder();
+                promptSb.append("[PHONG CÁCH DỊCH]: ").append(systemPrompt).append(nl).append(nl);
+                if (!glossaryText.isEmpty()) {
+                    promptSb.append("[TỪ ĐIỂN ĐỐI CHIẾU]:").append(nl).append(glossaryText).append(nl).append(nl);
+                }
+                if (previousChapterSnippet != null && !previousChapterSnippet.trim().isEmpty()) {
+                    promptSb.append("[NGỮ CẢNH CHƯƠNG TRƯỚC (CHỈ THAM KHẢO XƯNG HÔ)]:\n").append(previousChapterSnippet.trim()).append(nl).append(nl);
+                }
+                promptSb.append("[VĂN BẢN GỐC ĐÃ GHIM THUẬT NGỮ (CẦN DỊCH HOÀN THIỆN)]:").append(nl).append(injectedRawText).append(nl);
+
+                if (rescueInstruction != null && !rescueInstruction.trim().isEmpty()) {
+                    promptSb.append(nl).append("[CHỈ THỊ CỨU HỘ]: ").append(rescueInstruction.trim()).append(nl);
+                }
+
+                JsonObject root = new JsonObject();
+                JsonObject sysInstObj = new JsonObject();
+                JsonArray sysParts = new JsonArray();
+                JsonObject sysPart = new JsonObject();
+                sysPart.addProperty("text", systemInstructionSb.toString());
+                sysParts.add(sysPart);
+                sysInstObj.add("parts", sysParts);
+                root.add("systemInstruction", sysInstObj);
+
+                JsonArray contents = new JsonArray();
+                JsonObject contentObj = new JsonObject();
+                JsonArray parts = new JsonArray();
+                JsonObject partObj = new JsonObject();
+                partObj.addProperty("text", promptSb.toString());
+                parts.add(partObj);
+                contentObj.add("parts", parts);
+                contents.add(contentObj);
+                root.add("contents", contents);
+
+                JsonObject genConfig = new JsonObject();
+                genConfig.addProperty("temperature", 0.25);
+                genConfig.addProperty("maxOutputTokens", 8192);
+                root.add("generationConfig", genConfig);
+
+                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
+
+                RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
+                Request request = new Request.Builder().url(url).post(requestBody).build();
+
+                Response response = client.newCall(request).execute();
+                String respBody = response.body() != null ? response.body().string() : "";
+
+                if (response.isSuccessful()) {
+                    keyItem.successRequests++;
+                    keyItem.state = "ACTIVE";
+
+                    JsonObject respJson = gson.fromJson(respBody, JsonObject.class);
+                    JsonArray candidates = respJson.getAsJsonArray("candidates");
+                    if (candidates != null && candidates.size() > 0) {
+                        JsonObject firstCand = candidates.get(0).getAsJsonObject();
+                        JsonObject content = firstCand.getAsJsonObject("content");
+                        JsonArray outParts = content.getAsJsonArray("parts");
+                        String outText = outParts.get(0).getAsJsonObject().get("text").getAsString();
+                        return cleanTranslatedText(outText != null ? outText.trim() : "");
+                    }
+                } else {
+                    int statusCode = response.code();
+                    if (statusCode == 429 || statusCode == 503) {
+                        keyItem.state = "COOLDOWN (" + statusCode + ")";
+                        keyItem.cooldownUntil = System.currentTimeMillis() + 30000;
+                    }
+                }
+            } catch (Exception e) {
+                keyItem.state = "FAIL";
+            }
+        }
+        throw new Exception("Mode 3 (Raw Inject) dịch thất bại sau các lượt thử Key.");
+    }
+
+    public String translateChapterCoT(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, LogCallback logger) throws Exception {
+        int maxRetries = Math.max(keys.size() * 2, 4);
+        int attempts = 0;
+
+        while (attempts < maxRetries) {
+            attempts++;
+            ApiKeyItem keyItem = getNextAvailableKey();
+            if (keyItem == null) throw new Exception("Không có API Key nào trong kho lưu trữ!");
+
+            try {
+                keyItem.totalRequests++;
+                String nl = String.valueOf((char) 10);
+                String glossaryText = GlossaryManager.getGlossaryAsString(glossary);
+
+                StringBuilder promptSb = new StringBuilder();
+                promptSb.append("Bạn là chuyên gia dịch thuật và suy luận ngữ cảnh văn học cổ trang (Mode 5: Chain-of-Thought Deep Thinking).").append(nl).append(nl);
+                promptSb.append("[NGÔN NGỮ ĐÍCH]: ").append(targetLanguage != null ? targetLanguage : "Tiếng Việt").append(nl);
+                promptSb.append("[PHONG CÁCH DỊCH]: ").append(systemPrompt).append(nl).append(nl);
+                if (!glossaryText.isEmpty()) {
+                    promptSb.append("[TỪ ĐIỂN GLOSSARY BẮT BUỘC TUÂN THỦ]:").append(nl).append(glossaryText).append(nl).append(nl);
+                }
+                if (previousChapterSnippet != null && !previousChapterSnippet.trim().isEmpty()) {
+                    promptSb.append("[NGỮ CẢNH ĐOẠN CUỐI CHƯƠNG TRƯỚC]:\n").append(previousChapterSnippet.trim()).append(nl).append(nl);
+                }
+                promptSb.append("[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI]:").append(nl).append(chapterText).append(nl).append(nl);
+                promptSb.append("[QUY TRÌNH THỰC HIỆN 2 BƯỚC BẮT BUỘC]:").append(nl);
+                promptSb.append("BƯỚC 1: Trong khối <analysis>, phân tích ngữ cảnh chương, giải mã các thành ngữ 4 chữ, điển tích cổ trang phức tạp, xác định đúng vai vế và ngôi xưng hô của các nhân vật.").append(nl);
+                promptSb.append("BƯỚC 2: Trong khối ===TRANSLATION===, xuất bản dịch tiếng Việt trôi chảy, không chứa bất kỳ ký tự chữ Hán nào.").append(nl).append(nl);
+                promptSb.append("ĐỊNH DẠNG ĐẦU RA:").append(nl);
+                promptSb.append("<analysis>").append(nl);
+                promptSb.append("(Phân tích ngắn gọn hàm ý, thành ngữ, xưng hô)").append(nl);
+                promptSb.append("</analysis>").append(nl);
+                promptSb.append("===TRANSLATION===").append(nl);
+                promptSb.append("(Toàn bộ bản dịch tiếng Việt hoàn chỉnh)");
+
+                JsonObject root = new JsonObject();
+                JsonArray contents = new JsonArray();
+                JsonObject contentObj = new JsonObject();
+                JsonArray parts = new JsonArray();
+                JsonObject partObj = new JsonObject();
+                partObj.addProperty("text", promptSb.toString());
+                parts.add(partObj);
+                contentObj.add("parts", parts);
+                contents.add(contentObj);
+                root.add("contents", contents);
+
+                JsonObject genConfig = new JsonObject();
+                genConfig.addProperty("temperature", 0.25);
+                genConfig.addProperty("maxOutputTokens", 8192);
+                root.add("generationConfig", genConfig);
+
+                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
+
+                RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
+                Request request = new Request.Builder().url(url).post(requestBody).build();
+
+                Response response = client.newCall(request).execute();
+                String respBody = response.body() != null ? response.body().string() : "";
+
+                if (response.isSuccessful()) {
+                    keyItem.successRequests++;
+                    keyItem.state = "ACTIVE";
+
+                    JsonObject respJson = gson.fromJson(respBody, JsonObject.class);
+                    JsonArray candidates = respJson.getAsJsonArray("candidates");
+                    if (candidates != null && candidates.size() > 0) {
+                        JsonObject firstCand = candidates.get(0).getAsJsonObject();
+                        JsonObject content = firstCand.getAsJsonObject("content");
+                        JsonArray outParts = content.getAsJsonArray("parts");
+                        String outText = outParts.get(0).getAsJsonObject().get("text").getAsString();
+                        
+                        String[] parsed = parseOutput(outText);
+                        String trans = parsed[0];
+                        trans = trans.replaceAll("(?s)<analysis>.*?</analysis>", "").trim();
+                        return cleanTranslatedText(trans);
+                    }
+                }
+            } catch (Exception e) {
+                keyItem.state = "FAIL";
+            }
+        }
+        throw new Exception("Mode 5 (CoT Thinking) dịch thất bại.");
+    }
+
+    public String translateChapterDualPass(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, LogCallback logger) throws Exception {
+        // Pass 1: Dịch thuần túy / sát nghĩa
+        if (logger != null) logger.onLog("📝 [PASS 1] Đang dịch thô sát nghĩa có đối chiếu Glossary...");
+        String pass1Text = translateChapterPure(chapterText, previousChapterSnippet, systemPrompt, glossary, modelName, targetLanguage, antiHanziStrict, null, logger);
+
+        // Pass 2: Tổng biên tập đối chiếu song ngữ sửa sạch lỗi
+        if (pass1Text == null || pass1Text.trim().length() < 20) return pass1Text;
+
+        if (logger != null) logger.onLog("🔬 [PASS 2] Đang gửi [Gốc Tiếng Trung + Bản Dịch Pass 1] sang Pass 2 để Tổng Biên Tập đối soát & làm mượt...");
+
+        int maxRetries = Math.max(keys.size() * 2, 4);
+        int attempts = 0;
+
+        while (attempts < maxRetries) {
+            attempts++;
+            ApiKeyItem keyItem = getNextAvailableKey();
+            if (keyItem == null) break;
+
+            try {
+                keyItem.totalRequests++;
+                String nl = String.valueOf((char) 10);
+
+                StringBuilder promptSb = new StringBuilder();
+                promptSb.append("Bạn là Tổng biên tập văn học và chuyên gia hiệu đính tiểu thuyết dịch cao cấp.").append(nl).append(nl);
+                promptSb.append("Nhiệm vụ: Đối chiếu trực tiếp giữa [VĂN BẢN GỐC TIẾNG TRUNG] và [BẢN DỊCH THÔ PASS 1] dưới đây để tiến hành biên soạn, sửa chữa và xuất ra bản dịch hoàn mỹ cuối cùng:").append(nl);
+                promptSb.append("1. SỬA CHỮA DỊCH SAI NGHĨA: Đối chiếu bản gốc để sửa toàn bộ các câu dịch sai ngữ cảnh, hiểu nhầm thành ngữ hoặc từ ngữ cảnh (VD: '万分不舍' dịch nhầm thành 'không nỗ lực' -> sửa chuẩn thành 'vô cùng không nỡ / tiếc tiền'; '诚惶诚恐' -> sửa thành 'nơm nớp lo sợ / thấp thỏm lo âu').").append(nl);
+                promptSb.append("2. QUÉT SẠCH 100% CHỮ HÁN SÓT: Khử sạch các chữ Hán dính trong câu (nội院 -> nội viện, Tuần抚 -> Tuần phủ, trạch邸 -> trạch đệ, Vân羊 -> Vân Dương).").append(nl);
+                promptSb.append("3. CHUỐT LẠI VĂN PHONG TIỂU THUYẾT: Đại từ nhân xưng chuẩn mực (hắn, nàng, ta, ngươi), câu cú mượt mà, tự nhiên, đúng giọng văn kiếm hiệp/tiên hiệp.").append(nl).append(nl);
+                promptSb.append("[VĂN BẢN GỐC TIẾNG TRUNG]:").append(nl).append(chapterText).append(nl).append(nl);
+                promptSb.append("[BẢN DỊCH THÔ PASS 1]:").append(nl).append(pass1Text).append(nl).append(nl);
+                promptSb.append("[ĐẦU RA BẮT BUỘC]: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh sau khi đã biên tập hoàn mỹ (không xuất giải thích hay markdown codeblock).");
+
+                JsonObject root = new JsonObject();
+                JsonArray contents = new JsonArray();
+                JsonObject contentObj = new JsonObject();
+                JsonArray parts = new JsonArray();
+                JsonObject partObj = new JsonObject();
+                partObj.addProperty("text", promptSb.toString());
+                parts.add(partObj);
+                contentObj.add("parts", parts);
+                contents.add(contentObj);
+                root.add("contents", contents);
+
+                JsonObject genConfig = new JsonObject();
+                genConfig.addProperty("temperature", 0.15);
+                genConfig.addProperty("maxOutputTokens", 8192);
+                root.add("generationConfig", genConfig);
+
+                String actualModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + keyItem.key;
+
+                RequestBody requestBody = RequestBody.create(root.toString(), MediaType.parse("application/json"));
+                Request request = new Request.Builder().url(url).post(requestBody).build();
+
+                Response response = client.newCall(request).execute();
+                String respBody = response.body() != null ? response.body().string() : "";
+
+                if (response.isSuccessful()) {
+                    keyItem.successRequests++;
+                    keyItem.state = "ACTIVE";
+
+                    JsonObject respJson = gson.fromJson(respBody, JsonObject.class);
+                    JsonArray candidates = respJson.getAsJsonArray("candidates");
+                    if (candidates != null && candidates.size() > 0) {
+                        JsonObject firstCand = candidates.get(0).getAsJsonObject();
+                        JsonObject content = firstCand.getAsJsonObject("content");
+                        JsonArray outParts = content.getAsJsonArray("parts");
+                        String outText = outParts.get(0).getAsJsonObject().get("text").getAsString();
+                        if (outText != null && outText.trim().length() > 20) {
+                            if (logger != null) logger.onLog("✨ [PASS 2 HOÀN TẤT] Bản dịch đã được Tổng Biên Tập chuốt lại hoàn hảo!");
+                            return cleanTranslatedText(outText.trim());
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return cleanTranslatedText(pass1Text);
+    }
+
+    public String translateChapterSlidingWindow(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, String targetLanguage, boolean antiHanziStrict, LogCallback logger) throws Exception {
+        return translateChapterPure(chapterText, previousChapterSnippet, systemPrompt, glossary, modelName, targetLanguage, antiHanziStrict, null, logger);
+    }
+
     public String[] translateChapter(String chapterText, String previousChapterSnippet, String systemPrompt, Map<String, String> glossary, String modelName, LogCallback logger) throws Exception {
         return translateChapter(chapterText, previousChapterSnippet, systemPrompt, glossary, modelName, "Tiếng Việt", true, 2, 2, logger);
     }
@@ -596,7 +870,7 @@ public class GeminiEngine {
         return new String[]{translation.trim(), newGlossary.trim()};
     }
 
-    public List<GlossaryManager.PatchEntry> extractRollingPatches(List<String> translatedChapters, String modelName, LogCallback logger) throws Exception {
+    public List<GlossaryManager.PatchEntry> extractRollingPatches(List<String> rawChapters, List<String> translatedChapters, String modelName, LogCallback logger) throws Exception {
         int maxRetries = Math.max(keys.size() * 3, 6);
         int attempts = 0;
         String currentAttemptModel = (modelName != null && !modelName.trim().isEmpty()) ? modelName.trim() : "gemini-3.6-flash";
@@ -621,11 +895,12 @@ public class GeminiEngine {
 
                 StringBuilder systemInstructionSb = new StringBuilder();
                 systemInstructionSb.append("Bạn là chuyên gia biên tập và hiệu đính văn học cao cấp.").append(nl);
-                systemInstructionSb.append("Nhiệm vụ: Đọc kỹ các chương bản dịch bên dưới và trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:").append(nl);
-                systemInstructionSb.append("1. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').").append(nl);
-                systemInstructionSb.append("2. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng').").append(nl);
-                systemInstructionSb.append("3. Lỗi nhầm lẫn danh xưng hoặc tên nhân vật lặp lại (VD: 'Trưởng công tử' -> 'Trưởng công chúa').").append(nl);
-                systemInstructionSb.append("4. Các câu thô/sai ngữ pháp nghiêm trọng.").append(nl).append(nl);
+                systemInstructionSb.append("Nhiệm vụ: Đối chiếu song ngữ [VĂN BẢN GỐC TIẾNG TRUNG] và [BẢN DỊCH TIẾNG VIỆT] của các chương bên dưới để trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:").append(nl);
+                systemInstructionSb.append("1. Lỗi dịch sai nghĩa ngữ cảnh hoặc hiểu nhầm thành ngữ (VD: '万分不舍' dịch nhầm thành 'không nỗ lực' -> sửa thành 'không nỡ / tiếc tiền'; '诚惶诚恐' -> sửa thành 'nơm nớp lo sợ / thấp thỏm lo âu').").append(nl);
+                systemInstructionSb.append("2. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'nội院' -> 'nội viện', 'Tuần抚' -> 'Tuần phủ', 'trạch邸' -> 'trạch đệ', 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').").append(nl);
+                systemInstructionSb.append("3. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng', 'táo lộ' -> 'chiêu trò / bài bản').").append(nl);
+                systemInstructionSb.append("4. Lỗi nhầm lẫn danh xưng hoặc chức vị (VD: 'chủ bưu' -> 'chủ bộ', 'bổ khoái' -> 'bộ khoái', 'Trưởng công tử' -> 'Trưởng công chúa').").append(nl);
+                systemInstructionSb.append("5. Các câu thô/sai ngữ pháp nghiêm trọng.").append(nl).append(nl);
                 systemInstructionSb.append("QUY TẮC ĐẦU RA BẮT BUỘC:").append(nl);
                 systemInstructionSb.append("- TUYỆT ĐỐI KHÔNG xuất lại toàn bộ nội dung các chương.").append(nl);
                 systemInstructionSb.append("- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' (từ/câu lỗi gốc chính xác có trong bài) và 'new' (từ/câu thay thế chuẩn mực):").append(nl);
@@ -633,10 +908,15 @@ public class GeminiEngine {
                 systemInstructionSb.append("Nếu không có lỗi nào, trả về: []");
 
                 StringBuilder promptSb = new StringBuilder();
-                promptSb.append("[NỘI DUNG CÁC CHƯƠNG BẢN DỊCH CẦN RÀ SOÁT LÀM MƯỢT]:").append(nl);
+                promptSb.append("[DỮ LIỆU ĐỐI SOÁT SONG NGỮ CÁC CHƯƠNG]:").append(nl);
                 for (int i = 0; i < translatedChapters.size(); i++) {
-                    promptSb.append("--- CHƯƠNG ").append(i + 1).append(" ---").append(nl);
-                    promptSb.append(translatedChapters.get(i)).append(nl).append(nl);
+                    String raw = (rawChapters != null && i < rawChapters.size()) ? rawChapters.get(i) : "";
+                    promptSb.append("=== CHƯƠNG ").append(i + 1).append(" ===").append(nl);
+                    if (!raw.isEmpty()) {
+                        promptSb.append("[GỐC TIẾNG TRUNG]:").append(nl).append(raw).append(nl).append(nl);
+                    }
+                    promptSb.append("[BẢN DỊCH HIỆN TẠI]:").append(nl).append(translatedChapters.get(i)).append(nl).append(nl);
+                    promptSb.append("----------------------------------------").append(nl).append(nl);
                 }
 
                 JsonObject root = new JsonObject();

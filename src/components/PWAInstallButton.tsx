@@ -1,32 +1,61 @@
-import React, { useState } from 'react';
-import { usePWAInstall } from '../hooks/usePWAInstall';
-import { Download, Smartphone, Share2, PlusSquare, X, CheckCircle, Info } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Smartphone, Info, Share2, PlusSquare, X } from 'lucide-react';
 
-interface Props {
-  className?: string;
-  variant?: 'header' | 'compact' | 'card';
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
-export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'header' }) => {
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
-  const [showInfoModal, setShowInfoModal] = useState(false);
+export const PWAInstallButton: React.FC<{ className?: string }> = ({ className = '' }) => {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isIOS, setIsIOS] = useState<boolean>(false);
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [showIOSGuide, setShowIOSGuide] = useState<boolean>(false);
+  const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
 
-  // If already running in standalone PWA mode
-  if (isInstalled) {
-    if (variant === 'compact') return null;
-    return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-medium">
-        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-        <span>PWA Đã Cài Đặt</span>
-      </div>
-    );
+  useEffect(() => {
+    // Check if app is already running as installed PWA
+    const checkStandalone = () => {
+      const isStandaloneMode = 
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes('android-app://');
+      setIsStandalone(isStandaloneMode);
+    };
+
+    checkStandalone();
+
+    // Detect iOS
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isIosDevice = /iphone|ipad|ipod/.test(userAgent) && !(window as any).MSStream;
+    setIsIOS(isIosDevice);
+
+    // Capture standard PWA install prompt on Android Chrome / Desktop Chrome
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  if (isStandalone) {
+    return null;
   }
 
   const handleInstallClick = async () => {
-    if (isInstallable) {
-      const success = await install();
-      if (!success) {
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setDeferredPrompt(null);
+        }
+      } catch (err) {
         setShowInfoModal(true);
       }
     } else if (isIOS) {
@@ -40,23 +69,23 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
     <>
       <button
         onClick={handleInstallClick}
-        className={`group relative flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 transition-all duration-200 active:scale-95 border border-white/20 cursor-pointer ${className}`}
+        className={`group relative flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#005a82] via-[#0e1a30] to-[#005a82] hover:from-[#0284c7] hover:to-[#005a82] px-3.5 py-1.5 text-xs font-semibold text-[#f0e6d2] shadow-lg shadow-black/50 transition-all duration-200 active:scale-95 border border-[#c8aa6e]/60 cursor-pointer ${className}`}
         title="Cài đặt DroidTranslator trực tiếp lên màn hình chính điện thoại"
       >
-        <Smartphone className="w-4 h-4 text-cyan-200 animate-pulse" />
+        <Smartphone className="w-4 h-4 text-[#0ac8b9] animate-pulse" />
         <span>Cài Đặt App (PWA)</span>
-        <span className="hidden sm:inline-block text-[10px] px-1.5 py-0.2 bg-white/20 rounded-md font-mono">
+        <span className="hidden sm:inline-block text-[10px] px-1.5 py-0.2 bg-[#785a28]/40 text-[#c8aa6e] rounded-md font-mono border border-[#c8aa6e]/40">
           1-Chạm
         </span>
       </button>
 
       {/* iOS Safari Installation Guide Modal */}
       {showIOSGuide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl bg-neutral-900 border border-neutral-700 p-6 shadow-2xl space-y-4 text-neutral-100">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-[#091428] border-2 border-[#c8aa6e] p-6 shadow-2xl space-y-4 text-[#f0e6d2]">
+            <div className="flex items-center justify-between border-b border-[#785a28]/60 pb-3">
               <div className="flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-blue-400" />
+                <Smartphone className="w-5 h-5 text-[#c8aa6e]" />
                 <h3 className="text-base font-bold text-white">Cài đặt trên iPhone / iPad</h3>
               </div>
               <button
@@ -67,18 +96,18 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-neutral-300 leading-relaxed">
-              <div className="flex items-start gap-3 bg-neutral-950 p-3 rounded-xl border border-neutral-800">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+            <div className="space-y-3 text-xs text-[#a09b8c] leading-relaxed">
+              <div className="flex items-start gap-3 bg-[#050505] p-3 rounded-xl border border-[#785a28]/50">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#005a82] text-xs font-bold text-white">
                   1
                 </span>
                 <p>
-                  Nhấn vào nút <strong className="text-blue-400 flex items-center gap-1 inline-flex"><Share2 className="w-3.5 h-3.5 inline" /> Chia sẻ (Share)</strong> trên thanh công cụ Safari ở dưới đáy màn hình.
+                  Nhấn vào nút <strong className="text-[#0ac8b9] flex items-center gap-1 inline-flex"><Share2 className="w-3.5 h-3.5 inline" /> Chia sẻ (Share)</strong> trên thanh công cụ Safari ở dưới đáy màn hình.
                 </p>
               </div>
 
-              <div className="flex items-start gap-3 bg-neutral-950 p-3 rounded-xl border border-neutral-800">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+              <div className="flex items-start gap-3 bg-[#050505] p-3 rounded-xl border border-[#785a28]/50">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#005a82] text-xs font-bold text-white">
                   2
                 </span>
                 <p>
@@ -86,8 +115,8 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
                 </p>
               </div>
 
-              <div className="flex items-start gap-3 bg-neutral-950 p-3 rounded-xl border border-neutral-800">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+              <div className="flex items-start gap-3 bg-[#050505] p-3 rounded-xl border border-[#785a28]/50">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#005a82] text-xs font-bold text-white">
                   3
                 </span>
                 <p>
@@ -98,7 +127,7 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
 
             <button
               onClick={() => setShowIOSGuide(false)}
-              className="w-full rounded-xl bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white transition-colors"
+              className="w-full rounded-xl bg-[#c8aa6e] hover:bg-[#d8ba7e] py-2.5 text-xs font-extrabold text-black transition-colors"
             >
               Đã hiểu
             </button>
@@ -108,11 +137,11 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
 
       {/* Manual / Browser Menu Guide Modal (When browser prompt is delayed or desktop) */}
       {showInfoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl bg-neutral-900 border border-neutral-700 p-6 shadow-2xl space-y-4 text-neutral-100">
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-3xl bg-[#091428] border-2 border-[#c8aa6e] p-6 shadow-2xl space-y-4 text-[#f0e6d2]">
+            <div className="flex items-center justify-between border-b border-[#785a28]/60 pb-3">
               <div className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-400" />
+                <Info className="w-5 h-5 text-[#c8aa6e]" />
                 <h3 className="text-base font-bold text-white">Hướng Dẫn Cài Đặt PWA</h3>
               </div>
               <button
@@ -123,23 +152,23 @@ export const PWAInstallButton: React.FC<Props> = ({ className = '', variant = 'h
               </button>
             </div>
 
-            <div className="space-y-2.5 text-xs text-neutral-300 leading-relaxed">
+            <div className="space-y-2.5 text-xs text-[#a09b8c] leading-relaxed">
               <p>
                 Để cài đặt ứng dụng chạy độc lập toàn màn hình:
               </p>
-              <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 space-y-2">
-                <p className="font-semibold text-blue-300">📱 Trên Chrome / Cốc Cốc / Edge điện thoại:</p>
-                <p>Bấm vào biểu tượng <strong>3 dấu chấm (⋮)</strong> góc trên trình duyệt &rarr; Chọn <strong>"Cài đặt ứng dụng"</strong> hoặc <strong>"Thêm vào Màn hình chính"</strong>.</p>
+              <div className="bg-[#050505] p-3 rounded-xl border border-[#785a28]/50 space-y-2">
+                <p className="font-semibold text-[#0ac8b9]">📱 Trên Chrome / Cốc Cốc / Edge điện thoại:</p>
+                <p>Bấm vào biểu tượng <strong className="text-[#f0e6d2]">3 dấu chấm (⋮)</strong> góc trên trình duyệt &rarr; Chọn <strong className="text-[#f0e6d2]">"Cài đặt ứng dụng"</strong> hoặc <strong className="text-[#f0e6d2]">"Thêm vào Màn hình chính"</strong>.</p>
               </div>
-              <div className="bg-neutral-950 p-3 rounded-xl border border-neutral-800 space-y-2">
-                <p className="font-semibold text-purple-300">💻 Trên Máy tính (PC / Mac):</p>
-                <p>Nhấp vào biểu tượng <strong>Cài đặt</strong> (mũi tên hoặc màn hình nhỏ) ở góc phải thanh địa chỉ URL.</p>
+              <div className="bg-[#050505] p-3 rounded-xl border border-[#785a28]/50 space-y-2">
+                <p className="font-semibold text-[#c8aa6e]">💻 Trên Máy tính (PC / Mac):</p>
+                <p>Nhấp vào biểu tượng <strong className="text-[#f0e6d2]">Cài đặt</strong> (mũi tên hoặc màn hình nhỏ) ở góc phải thanh địa chỉ URL.</p>
               </div>
             </div>
 
             <button
               onClick={() => setShowInfoModal(false)}
-              className="w-full rounded-xl bg-blue-600 hover:bg-blue-500 py-2.5 text-xs font-bold text-white transition-colors"
+              className="w-full rounded-xl bg-[#c8aa6e] hover:bg-[#d8ba7e] py-2.5 text-xs font-extrabold text-black transition-colors"
             >
               Đóng
             </button>

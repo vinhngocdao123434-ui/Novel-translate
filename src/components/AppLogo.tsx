@@ -103,17 +103,17 @@ export const AppLogo: React.FC<AppLogoProps> = ({ size = 'md', className = '', s
       </div>
 
       {showText && (
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1.5 leading-none">
-            <span className="font-extrabold tracking-tight text-white font-sans text-sm sm:text-base">
+        <div className="flex flex-col whitespace-nowrap shrink-0">
+          <div className="flex items-center gap-1.5 leading-none whitespace-nowrap">
+            <span className="font-extrabold tracking-tight text-white font-sans text-sm whitespace-nowrap">
               Droid<span className="text-emerald-400">Translator</span>
             </span>
-            <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 font-mono font-bold tracking-wider">
+            <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 font-mono font-bold tracking-wider whitespace-nowrap">
               NATIVE
             </span>
           </div>
-          <span className="text-[10px] text-neutral-400 font-mono mt-0.5">
-            Android 16 Kernel Engine
+          <span className="text-[10px] text-neutral-400 font-mono mt-0.5 whitespace-nowrap">
+            Android 16 Kernel
           </span>
         </div>
       )}

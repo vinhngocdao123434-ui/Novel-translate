@@ -61,8 +61,13 @@ public class ProjectStorageManager {
         public int delaySec = 2;
         public int readerFontSize = 16;
         public String readerTheme = "amoled";
-        public String translationPipelineMode = "BATCH_GLOSSARY";
+        public String translationPipelineMode = "MODE_2_BATCH_PURE";
         public int batchGlossarySize = 50;
+        public boolean enableDualPassProofreading = false;
+        public boolean enableBatchGlossaryAutoExtract = true;
+        public boolean enablePreviousChapterContext = true;
+        public int contextSnippetLength = 350;
+        public boolean enableAutoFinalPolish = true;
         public boolean rollingPolishEnabled = true;
         public int rollingPolishBatchSize = 15;
         public JsonArray apiKeys = new JsonArray();

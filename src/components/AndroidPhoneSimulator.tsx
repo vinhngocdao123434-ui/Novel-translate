@@ -7,9 +7,9 @@ import {
   ChevronLeft, ChevronRight, Sliders, Type, Sun, Moon, Eye,
   CheckCircle, PlayCircle, Clock, Zap, BookMarked, Layers, FileCheck,
   AlignLeft, AlignJustify, ListOrdered, Share2, Compass, Bookmark,
-  Filter, ChevronDown, ChevronUp, Loader2
+  Filter, ChevronDown, ChevronUp, Loader2, Cpu
 } from 'lucide-react';
-import { ApiKeyItem, PromptCardItem, ProjectData, AdvancedSettings, ParsedEbook } from '../types';
+import { ApiKeyItem, PromptCardItem, ProjectData, AdvancedSettings, ParsedEbook, TranslationCoreStrategy } from '../types';
 import { parseEbookFile } from '../utils/ebook-parser';
 import { AppLogo } from './AppLogo';
 import { ChapterAuditor, AuditResult } from '../utils/chapterAuditor';
@@ -137,22 +137,73 @@ const cleanTranslationGlitch = (text: string): string => {
   return res.trim();
 };
 
+interface StrategyOption {
+  id: TranslationCoreStrategy;
+  title: string;
+  badge?: string;
+  badgeClass?: string;
+  desc: string;
+}
+
+const STRATEGY_OPTIONS: StrategyOption[] = [
+  {
+    id: 'STRATEGY_PURE_LITERARY',
+    title: 'Dịch Thuần Túy Văn Học',
+    badge: 'Khuyên Dùng',
+    badgeClass: 'bg-emerald-950 text-emerald-300 border border-emerald-700',
+    desc: 'Dịch trực tiếp với Master Glossary đối chiếu. Văn phong mượt mà, thuần túy, sạch sẽ & tốc độ cao nhất.'
+  },
+  {
+    id: 'STRATEGY_DUAL_TASK',
+    title: '1 Request 2 Tác Vụ (Dịch & Bóc Từ Mới)',
+    badge: 'Tiết Kiệm Token',
+    badgeClass: 'bg-blue-950 text-blue-300 border border-blue-700',
+    desc: 'Đồng thời dịch và tự động phát hiện trích xuất từ mới trong cùng 1 request mỗi chương.'
+  },
+  {
+    id: 'STRATEGY_PRE_INJECT_RAW',
+    title: 'Ghi Đè Thuật Ngữ Lên Raw Trước Khi Dịch',
+    badge: 'Khóa Tên 100%',
+    badgeClass: 'bg-emerald-950 text-emerald-300 border border-emerald-700',
+    desc: 'Ghi đè tên riêng, chức vụ, địa danh, công pháp vào giữa bản Raw tiếng Trung trước khi gửi AI. Tuyệt đối không chệch tên.'
+  },
+  {
+    id: 'STRATEGY_DUAL_PASS',
+    title: 'Dịch Kép Phản Biện 2-Pass (1 Dịch + 1 Biên Tập)',
+    badge: 'Chất Lượng Tối Đa',
+    badgeClass: 'bg-[#1e2328] text-[#c8aa6e] border border-[#785a28]',
+    desc: 'Chạy 2 request/chương: Pass 1 dịch thô ➔ Pass 2 Tổng Biên Tập đối chiếu trực tiếp bản raw gốc để sửa sạch câu sai nghĩa, thành ngữ hiểu nhầm và chữ Hán sót.'
+  },
+  {
+    id: 'STRATEGY_COT_THINKING',
+    title: 'Dịch Suy Luận Ngữ Cảnh CoT (Deep Thinking)',
+    badge: 'Phân Tích Sâu',
+    badgeClass: 'bg-blue-950 text-blue-300 border border-blue-700',
+    desc: 'AI phân tích ngữ cảnh qua khối <analysis>, giải mã thành ngữ 4 chữ và định vị vai vế trước khi dịch.'
+  }
+];
+
 const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
   rotationStrategy: 'round-robin',
   cooldownSeconds: 60,
   maxRetries: 3,
   requestTimeoutSeconds: 60,
-  translationPipelineMode: 'BATCH_GLOSSARY',
+  translationCoreStrategy: 'STRATEGY_PURE_LITERARY',
+  translationPipelineMode: 'MODE_2_BATCH_PURE',
+  enableDualPassProofreading: false,
+  enableBatchGlossaryAutoExtract: true,
   batchGlossarySize: 50,
-  rollingPolishEnabled: true,
+  enablePreviousChapterContext: true,
+  contextSnippetLength: 350,
+  enableAutoFinalPolish: true,
+  antiHanziStrict: true,
+  autoHealOnlineEnabled: true,
   rollingPolishBatchSize: 15,
   minTermLength: 2,
   minFrequency: 2,
   conflictPolicy: 'keep-old',
   blacklistWords: ['hắn', 'nàng', 'ta', 'ngươi', 'chúng ta', 'bọn họ', 'chính mình', 'cái này', 'cái kia', 'một cái', 'đã từng'],
   targetLanguage: 'Tiếng Việt',
-  antiHanziStrict: true,
-  contextSnippetLength: 350,
   readerFontSize: 16,
   readerLineSpacing: 1.6,
   keepScreenAwake: true
@@ -385,6 +436,70 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
   // Export 5 Ebook Formats Modal State
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
+  const [isStrategyDropdownOpen, setIsStrategyDropdownOpen] = useState<boolean>(false);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState<boolean>(false);
+  const [isRotationDropdownOpen, setIsRotationDropdownOpen] = useState<boolean>(false);
+  const [isConflictDropdownOpen, setIsConflictDropdownOpen] = useState<boolean>(false);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState<boolean>(false);
+  const [isPolishModelDropdownOpen, setIsPolishModelDropdownOpen] = useState<boolean>(false);
+
+  // Tab 4 (Settings) Accordion Dropdown States
+  const [isSection1Open, setIsSection1Open] = useState<boolean>(false);
+  const [isSection2Open, setIsSection2Open] = useState<boolean>(false);
+  const [isSection3Open, setIsSection3Open] = useState<boolean>(false);
+  const [isSection4Open, setIsSection4Open] = useState<boolean>(false);
+  const [isSection5Open, setIsSection5Open] = useState<boolean>(false);
+
+  // Tab 1 (Key & Prompt) Accordion Dropdown States
+  const [isKeyPoolOpen, setIsKeyPoolOpen] = useState<boolean>(false);
+  const [isModelSectionOpen, setIsModelSectionOpen] = useState<boolean>(false);
+  const [isPromptSectionOpen, setIsPromptSectionOpen] = useState<boolean>(false);
+
+  // Universal Quantity Editor Modal State
+  const [editQuantityModal, setEditQuantityModal] = useState<{
+    title: string;
+    description?: string;
+    value: number;
+    min: number;
+    max: number;
+    step?: number;
+    unit: string;
+    onSave: (val: number) => void;
+  } | null>(null);
+  const [tempQuantityInput, setTempQuantityInput] = useState<string>('');
+
+  const openQuantityEditor = (
+    title: string,
+    currentVal: number,
+    min: number,
+    max: number,
+    unit: string,
+    onSave: (val: number) => void,
+    description?: string,
+    step: number = 1
+  ) => {
+    setTempQuantityInput(String(currentVal));
+    setEditQuantityModal({
+      title,
+      description,
+      value: currentVal,
+      min,
+      max,
+      step,
+      unit,
+      onSave
+    });
+  };
+
+  const getStrategyTitle = (st?: string) => {
+    const found = STRATEGY_OPTIONS.find(o => o.id === st);
+    return found ? found.title : 'Dịch Thuần Túy Văn Học';
+  };
+
+  const getStrategyShortDesc = (st?: string) => {
+    const found = STRATEGY_OPTIONS.find(o => o.id === st);
+    return found ? found.desc : 'Dịch trực tiếp với Master Glossary đối chiếu.';
+  };
 
   // Translation runtime state
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
@@ -993,7 +1108,24 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
     return { updatedGlossary: updated, newlyAdded };
   };
 
-  // Translation Loop Simulation & Execution
+  // Helper: Ghi đè thuật ngữ tiếng Việt trực tiếp lên bản Raw (Mode 3 Hybrid Raw Injection)
+  const injectTermsIntoRaw = (raw: string, glossary: Record<string, string>): string => {
+    if (!raw || !glossary || Object.keys(glossary).length === 0) return raw;
+    let injected = raw;
+    // Sắp xếp các từ khóa theo độ dài giảm dần để tránh nuốt từ con
+    const sortedKeys = Object.keys(glossary).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+      const val = glossary[key];
+      if (key && val && key.trim() && val.trim() && key.length >= 2) {
+        if (injected.includes(key)) {
+          injected = injected.split(key).join(` ${val.trim()} `);
+        }
+      }
+    }
+    return injected;
+  };
+
+  // Translation Loop Simulation & Execution (Hỗ trợ độc lập 6 Mode Dịch)
   useEffect(() => {
     let timer: any;
     if (isTranslating && !isPaused && project && project.chapters.length > 0) {
@@ -1006,7 +1138,20 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           return;
         }
 
-        setStatusText(`⚡ Đang dịch chương ${currentChapterIndex + 1}/${targetEnd}...`);
+        const strategy = advancedSettings.translationCoreStrategy || 'STRATEGY_PURE_LITERARY';
+        const rawMode = advancedSettings.translationPipelineMode || 'MODE_2_BATCH_PURE';
+        const isDualTaskStrategy = strategy === 'STRATEGY_DUAL_TASK' || rawMode === 'MODE_1_DUAL_TASK' || rawMode === 'COMBINED';
+        const isPreInjectStrategy = strategy === 'STRATEGY_PRE_INJECT_RAW' || rawMode === 'MODE_3_RAW_INJECT';
+        const isCoTStrategy = strategy === 'STRATEGY_COT_THINKING' || rawMode === 'MODE_5_COT_THINKING';
+        const isDualPassEnabled = advancedSettings.enableDualPassProofreading || rawMode === 'MODE_4_DUAL_PASS';
+
+        let strategyLabel = 'Dịch Thuần Túy';
+        if (isDualTaskStrategy) strategyLabel = 'Dual-Task (Dịch + Bóc Từ)';
+        else if (isPreInjectStrategy) strategyLabel = 'Ghi Đè Raw Inject';
+        else if (isCoTStrategy) strategyLabel = 'Suy Luận CoT';
+        if (isDualPassEnabled) strategyLabel += ' + Pass 2 Biên Tập';
+
+        setStatusText(`⚡ [${strategyLabel}] Đang dịch chương ${currentChapterIndex + 1}/${targetEnd}...`);
         
         const rawContent = project.chapters[currentChapterIndex];
         const titleLine = rawContent.split('\n')[0] || `Chương ${currentChapterIndex + 1}`;
@@ -1014,7 +1159,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
         // 1. EXTRACT PREVIOUS CHAPTER'S LAST N CHARACTERS FOR CONTEXT ROLLING WINDOW
         let previousSnippet = '';
         const snippetLimit = advancedSettings.contextSnippetLength || 350;
-        if (currentChapterIndex > 0 && project.translatedChapters[currentChapterIndex - 1]) {
+        const isContextEnabled = advancedSettings.enablePreviousChapterContext !== false;
+        if (isContextEnabled && currentChapterIndex > 0 && project.translatedChapters[currentChapterIndex - 1]) {
           const prevFull = project.translatedChapters[currentChapterIndex - 1];
           const sliceLen = Math.min(prevFull.length, snippetLimit);
           previousSnippet = '...' + prevFull.slice(prevFull.length - sliceLen).trim();
@@ -1023,7 +1169,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           setLastAttachedSnippet('');
         }
 
-        setLiveStreamText(`Đang xử lý: ${titleLine} (${project.model})${previousSnippet ? ` [🔗 Kèm ${snippetLimit} ký tự ngữ cảnh]` : ''}...`);
+        setLiveStreamText(`[${strategyLabel}] Đang xử lý: ${titleLine} (${project.model})${previousSnippet ? ` [🔗 Kèm ${snippetLimit} ký tự ngữ cảnh]` : ''}...`);
 
         timer = setTimeout(async () => {
           let translatedText = '';
@@ -1036,68 +1182,181 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           const isTargetVietnamese = (advancedSettings.targetLanguage || 'Tiếng Việt').toLowerCase().includes('việt');
           const isTargetJapanese = (advancedSettings.targetLanguage || '').toLowerCase().includes('nhật') || (advancedSettings.targetLanguage || '').toLowerCase().includes('japan');
 
+          // =========================================================================
+          // DÒNG 2: BƯỚC BÓC LÔ GLOSSARY TOÀN DIỆN (7 NHÓM BẮT BUỘC)
+          // =========================================================================
+          const isBatchGlossaryEnabled = advancedSettings.enableBatchGlossaryAutoExtract !== false;
+          const batchSize = advancedSettings.batchGlossarySize || 50;
+          const batchStart = Math.floor(currentChapterIndex / batchSize) * batchSize;
+
+          if (isBatchGlossaryEnabled && !processedBatchStarts.includes(batchStart) && project.chapters.length > 0) {
+            setProcessedBatchStarts(prev => [...prev, batchStart]);
+            const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
+            const chaptersInBatch = project.chapters.slice(batchStart, batchEnd);
+            addLog(`🔍 [BÓC LÔ GLOSSARY 7 NHÓM] Đang gom ${chaptersInBatch.length} chương thô (Chương ${batchStart + 1} ➔ ${batchEnd}) để AI trích xuất Master Glossary toàn diện (Tên, xưng hô, chức vụ, địa danh, thú, pháp bảo, công pháp, cảnh giới)...`);
+
+            if (isRealKey) {
+              try {
+                let batchPrompt = `Bạn là chuyên gia trích xuất thực thể và xây dựng từ điển tiểu thuyết văn học (Glossary Architect).\n`;
+                batchPrompt += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và trích xuất TOÀN DIỆN 100% các thuật ngữ, danh từ riêng, xưng hô và danh xưng thế giới, bao gồm 7 nhóm bắt buộc:\n`;
+                batchPrompt += `1. TÊN NHÂN VẬT & BIỆT DANH: Tên người chính/phụ, đạo hiệu, ngoại hiệu, tục danh (VD: 林辰 ➔ Lâm Thần, 赵霸天 ➔ Triệu Bá Thiên).\n`;
+                batchPrompt += `2. XƯNG HÔ, CHỨC VỤ, VAI VẾ: Quan chức triều đình, nha môn, bang phái, thân phận, gia tộc (VD: 知县 ➔ Tri huyện, 主簿 ➔ Chủ bộ, 捕快 ➔ Bộ khoái, 县丞 ➔ Huyện thừa, 典史 ➔ Điển sử, 巡抚 ➔ Tuần phủ, 二当家 ➔ Nhị đương gia, 掌柜 ➔ Chưởng quỹ, 嬷嬷 ➔ ma ma / nhũ mẫu, 师叔 ➔ sư thúc).\n`;
+                batchPrompt += `3. ĐỊA DANH & ĐỊA ĐIỂM: Tông môn, vương quốc, phủ, huyện, thành trì, thôn trang, sơn mạch, tửu lâu, trạch viện (VD: 大河府 ➔ Phủ Đại Hà, 河宴县 ➔ Huyện Hà Yến, 青云宗 ➔ Thanh Vân Tông, 青石村 ➔ Thôn Thanh Thạch, 运大楼 ➔ Vận Đại Lâu).\n`;
+                batchPrompt += `4. YÊU THÚ, LINH THÚ & THẦN THÚ: Tên các loài dị thú, linh sủng, ma thú (VD: 啸月狼 ➔ Khiếu Nguyệt Lang, 吞天雀 ➔ Thôn Thiên Tước).\n`;
+                batchPrompt += `5. PHÁP BẢO, VŨ KHÍ, ĐAN DƯỢC & VẬT PHẨM: Thần binh, phù lục, đan dược, dược thảo, quặng mỏ (VD: 斩灵剑 ➔ Trảm Linh Kiếm, 筑基丹 ➔ Trúc Cơ Đan).\n`;
+                batchPrompt += `6. CÔNG PHÁP, CHIÊU THỨC & THÂN PHÁP: Tâm pháp, khẩu quyết, quyền pháp, kiếm quyết (VD: 梵圣真魔功 ➔ Phạn Thánh Chân Ma Công, 青云剑决 ➔ Thanh Vân Kiếm Quyết).\n`;
+                batchPrompt += `7. CẢNH GIỚI TU LUYỆN & PHẨM CẤP: Giai tầng võ đạo, phẩm giai pháp khí (VD: 黄阶 ➔ Hoàng giai, 玄阶 ➔ Huyền giai, 练气 ➔ Luyện Khí, 筑基 ➔ Trúc Cơ, 金丹 ➔ Kim Đan, 元婴 ➔ Nguyên Anh).\n\n`;
+                batchPrompt += `QUY TẮC BẮT BUỘC:\n`;
+                batchPrompt += `- Định dạng mỗi dòng: [TừGốcTiếngTrung] = [NghĩaHánViệtChuẩn]\n`;
+                batchPrompt += `- TUYỆT ĐỐI KHÔNG đảo ngược thứ tự tiếng Việt = tiếng Trung.\n`;
+                batchPrompt += `- Phiên âm Hán-Việt chuẩn xác, thanh thoát, đúng quy chuẩn từ điển văn học dịch thuật.\n`;
+                batchPrompt += `- Trả về danh sách thuần túy (không kèm markdown giải thích rườm rà).\n\n`;
+                batchPrompt += `[CÁC CHƯƠNG THÔ]:\n` + chaptersInBatch.map((c, i) => `--- CHƯƠNG ${batchStart + i + 1} ---\n${c}`).join('\n\n');
+
+                const bResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: batchPrompt }] }],
+                    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+                  })
+                });
+
+                if (bResp.ok) {
+                  const bData = await bResp.json();
+                  const bOut = bData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                  const parsed = parseDualTaskOutput(bOut, chaptersInBatch.join('\n'));
+                  if (Object.keys(parsed.newGlossary).length > 0) {
+                    setProjects(prev => {
+                      const cur = prev[currentProjectName];
+                      const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, parsed.newGlossary);
+                      const addedCount = Object.keys(newlyAdded).length;
+                      addLog(`🎉 [BÓC LÔ HOÀN TẤT] Đã nạp ${addedCount} thuật ngữ/xưng hô mới vào Master Glossary cho lô Chương ${batchStart + 1} ➔ ${batchEnd}!`);
+                      return {
+                        ...prev,
+                        [currentProjectName]: {
+                          ...cur,
+                          masterGlossary: updatedGlossary
+                        }
+                      };
+                    });
+                  }
+                }
+              } catch (bErr: any) {
+                addLog(`⚠️ Bóc lô glossary gặp sự cố: ${bErr.message}`);
+              }
+            }
+          }
+
+          // =========================================================================
+          // THỰC THI CHIẾN LƯỢC DỊCH THUẬT LÕI
+          // =========================================================================
           if (isRealKey) {
             try {
-              // Lấy Prompt từ GLOBAL PROMPTS (Vĩnh Cửu)
               const activePromptObj = globalPrompts.find(p => p.active) || globalPrompts[0];
-              const isBatchMode = (advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY';
-              const batchSize = advancedSettings.batchGlossarySize || 50;
-              const batchStart = Math.floor(currentChapterIndex / batchSize) * batchSize;
-
-              // 1. Nếu ở chế độ Bóc Lô và lô này chưa bóc từ điển:
-              if (isBatchMode && !processedBatchStarts.includes(batchStart)) {
-                const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
-                addLog(`🔍 [BÓC LÔ GLOSSARY] Đang gom ${batchEnd - batchStart} chương thô (Chương ${batchStart + 1} ➔ ${batchEnd}) để AI trích xuất Master Glossary...`);
-                setProcessedBatchStarts(prev => [...prev, batchStart]);
-              }
-
               const glossaryStr = Object.entries(project.masterGlossary).map(([k, v]) => `${k} = ${v}`).join('\n');
               
               let promptSb = `Bạn là chuyên gia dịch thuật tiểu thuyết hàng đầu thế giới.\n\n`;
               promptSb += `[NGÔN NGỮ ĐÍCH]: ${advancedSettings.targetLanguage || 'Tiếng Việt'}\n\n`;
               promptSb += `[YÊU CẦU PHONG CÁCH]:\n${activePromptObj.content}\n\n`;
-              promptSb += `[BẢNG TỪ ĐIỂN GLOSSARY BẮT BUỘC TUÂN THỦ]:\n${glossaryStr || '(Chưa có từ điển)'}\n\n`;
+              promptSb += `[BẢNG TỪ ĐIỂN GLOSSARY BẮT BUỘC TUÂN THỦ TUYỆT ĐỐI (100% ĐỒNG NHẤT XƯNG HÔ & THUẬT NGỮ)]:\n${glossaryStr || '(Chưa có từ điển)'}\n\n`;
               
               if (previousSnippet) {
                 promptSb += `[NGỮ CẢNH ĐOẠN CUỐI CHƯƠNG TRƯỚC (CHỈ DÙNG ĐỂ THAM KHẢO VĂN PHONG VÀ ĐỒNG NHẤT XƯNG HÔ, TUYỆT ĐỐI KHÔNG DỊCH LẠI)]:\n${previousSnippet}\n\n`;
               }
-              
-              promptSb += `[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI (CHỈ DỊCH VÀ BÓC TÁCH TỪ ĐÂY)]:\n${rawContent}\n\n`;
-              
-              // LỚP 1: BỘ LỌC CHỐNG LỌT CHỮ HÁN THÍCH ỨNG THEO NGÔN NGỮ ĐÍCH
-              if (isTargetVietnamese && advancedSettings.antiHanziStrict) {
-                promptSb += `[QUY TẮC BẮT BUỘC - CHỐNG LỌT CHỮ HÁN CHO TIẾNG VIỆT]:\n`;
-                promptSb += `- TUYỆT ĐỐI KHÔNG để sót bất kỳ ký tự chữ Hán (Hanzi) nào trong phần [TRANSLATION] tiếng Việt. 100% tên nhân vật, địa danh, môn phái, chiêu thức, chức vị bắt buộc phải phiên âm Hán-Việt hoặc dịch nghĩa tiếng Việt thuần túy.\n`;
-                promptSb += `- TUYỆT ĐỐI KHÔNG trộn lẫn nửa chữ Hán nửa tiếng Việt (ví dụ: '林辰' phải dịch hẳn là 'Lâm Thần', không được viết '林 Thần').\n`;
-              } else if (isTargetJapanese) {
-                promptSb += `[TARGET JAPANESE]: Translate fluently into Japanese, naturally integrating Kanji, Hiragana, and Katakana.\n`;
+
+              // ==================== CHIẾN LƯỢC: TIỀN XỬ LÝ GHI ĐÈ RAW INJECTION ====================
+              if (isPreInjectStrategy) {
+                const injectedRaw = injectTermsIntoRaw(rawContent, project.masterGlossary);
+                promptSb += `[VĂN BẢN GỐC ĐÃ GHIM CỐ ĐỊNH DANH TỪ RIÊNG, XƯNG HÔ, CHỨC VỤ, ĐỊA DANH, CÔNG PHÁP]:\n${injectedRaw}\n\n`;
+                promptSb += `[QUY TẮC BẮT BUỘC - HYBRID RAW INJECTION]:\n`;
+                promptSb += `1. Dịch toàn bộ các câu chữ tiếng Trung còn lại sang tiếng Việt mượt mà, thuần túy, tự nhiên.\n`;
+                promptSb += `2. TUYỆT ĐỐI GIỮ NGUYÊN các danh từ riêng tiếng Việt đã được ghim sẵn trong văn bản trên (không tự ý đổi lại hay dịch khác đi).\n`;
+                promptSb += `3. ĐẦU RA: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh.`;
+              } 
+              // ==================== CHIẾN LƯỢC: DỊCH SUY LUẬN NGỮ CẢNH COT (DEEP THINKING) ====================
+              else if (isCoTStrategy) {
+                promptSb += `[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI]:\n${rawContent}\n\n`;
+                promptSb += `[QUY TẮC BẮT BUỘC - SUY LUẬN SÂU COT (DEEP THINKING TRANSLATION)]:\n`;
+                promptSb += `Thực hiện 2 bước tuần tự:\n`;
+                promptSb += `BƯỚC 1: Trong khối <analysis>, phân tích ngữ cảnh, giải mã các thành ngữ 4 chữ, khẩu ngữ cổ trang khó, xác định vai vế nhân vật và văn cảnh xưng hô.\n`;
+                promptSb += `BƯỚC 2: Sau đó xuất bản dịch hoàn mỹ nhất trong khối ===TRANSLATION===.\n\n`;
+                promptSb += `ĐỊNH DẠNG ĐẦU RA:\n<analysis>\n(Phân tích ngắn gọn hàm ý, thành ngữ, xưng hô)\n</analysis>\n===TRANSLATION===\n(Toàn bộ bản dịch tiếng Việt mượt mà)`;
+              }
+              // ==================== CHIẾN LƯỢC: DỊCH THUẦN HOẶC DUAL-TASK ====================
+              else {
+                promptSb += `[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI]:\n${rawContent}\n\n`;
+
+                if (isTargetVietnamese && advancedSettings.antiHanziStrict) {
+                  promptSb += `[QUY TẮC BẮT BUỘC - CHỐNG LỌT CHỮ HÁN CHO TIẾNG VIỆT]:\n`;
+                  promptSb += `- TUYỆT ĐỐI KHÔNG để sót bất kỳ ký tự chữ Hán (Hanzi) nào trong bản dịch tiếng Việt. 100% tên nhân vật, địa danh, môn phái, chiêu thức, chức vị bắt buộc phải phiên âm Hán-Việt hoặc dịch nghĩa tiếng Việt thuần túy.\n`;
+                  promptSb += `- TUYỆT ĐỐI KHÔNG trộn lẫn nửa chữ Hán nửa tiếng Việt (ví dụ: '林辰' phải dịch hẳn là 'Lâm Thần', không được viết '林 Thần').\n`;
+                }
+
+                if (isDualTaskStrategy) {
+                  promptSb += `[QUY TẮC ĐẦU RA - 1 REQUEST 2 TÁC VỤ]:\n===TRANSLATION===\n(Toàn bộ bản dịch trôi chảy)\n===NEW_GLOSSARY===\n(Trích xuất các danh từ riêng, chức vụ, xưng hô MỚI xuất hiện trong chương hiện tại chưa có trong Glossary trên:\n[TừGốc] = [NghĩaDịch])`;
+                } else {
+                  promptSb += `[QUY TẮC ĐẦU RA BẮT BUỘC]:\n===TRANSLATION===\n(Toàn bộ bản dịch tiếng Việt trôi chảy hoàn chỉnh)`;
+                }
               }
 
-              if (isBatchMode) {
-                promptSb += `[QUY TẮC ĐẦU RA - DỊCH THUẦN TÚY 100%]:\n===TRANSLATION===\n(Chỉ trả về toàn bộ bản dịch tiếng Việt trôi chảy hoàn chỉnh, KHÔNG xuất glossary rườm rà)`;
-              } else {
-                promptSb += `[QUY TẮC ĐẦU RA BẮT BUỘC]:\n===TRANSLATION===\n(Toàn bộ bản dịch trôi chảy)\n===NEW_GLOSSARY===\n(Chỉ trích xuất các DANH TỪ RIÊNG [tên nhân vật, tông môn, địa danh, công pháp, bảo vật] MỚI xuất hiện trong chương hiện tại CHƯA CÓ trong Glossary gửi kèm.\n`;
-                promptSb += `QUY TẮC:\n`;
-                promptSb += `1. ĐỘ DÀI: Bắt buộc từ ${advancedSettings.minTermLength || 2} ký tự chữ Hán trở lên. TUYỆT ĐỐI KHÔNG thêm từ vựng thông dụng hay đại từ xưng hô.\n`;
-                promptSb += `2. TẦN SUẤT: Phải xuất hiện từ ${advancedSettings.minFrequency || 2} lần trở lên trong chương này.\n`;
-                promptSb += `3. ĐỊNH DẠNG: Mỗi dòng định dạng chuẩn: [TừGốc] = [NghĩaDịch]. TUYỆT ĐỐI KHÔNG ĐẢO NGƯỢC THỨ TỰ)`;
-              }
-
+              // Gửi Request Pass 1
               const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptSb }] }],
-                  generationConfig: { temperature: 0.3 }
+                  generationConfig: { temperature: 0.25 }
                 })
               });
 
               if (resp.ok) {
                 const data = await resp.json();
                 const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                const parsed = parseDualTaskOutput(outText, rawContent);
-                translatedText = parsed.translation;
-                aiExtractedGlossary = isBatchMode ? {} : parsed.newGlossary;
+                
+                let pass1Parsed = parseDualTaskOutput(outText, rawContent);
+                let pass1Text = pass1Parsed.translation;
+
+                // Xử lý loại bỏ thẻ <analysis> của CoT
+                if (isCoTStrategy) {
+                  pass1Text = pass1Text.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '').trim();
+                  pass1Text = pass1Text.replace(/===+\s*TRANSLATION\s*===+/gi, '').trim();
+                }
+
+                // ==================== DÒNG 1: DỊCH KÉP 2-PASS PHẢN BIỆN ĐỐI SOÁT ====================
+                if (isDualPassEnabled && pass1Text.trim().length > 30) {
+                  addLog(`🔬 [DÒNG 1 - PASS 2 BIÊN TẬP] Đang gửi [Raw Gốc + Pass 1] sang Pass 2 để Tổng Biên Tập đối soát phản biện...`);
+                  
+                  let pass2Prompt = `Bạn là Tổng biên tập văn học và chuyên gia hiệu đính tiểu thuyết dịch cao cấp.\n\n`;
+                  pass2Prompt += `Nhiệm vụ: Đối chiếu trực tiếp giữa [VĂN BẢN GỐC TIẾNG TRUNG] và [BẢN DỊCH THÔ PASS 1] dưới đây để tiến hành biên soạn, sửa chữa và xuất ra bản dịch hoàn mỹ cuối cùng:\n`;
+                  pass2Prompt += `1. SỬA CHỮA DỊCH SAI NGHĨA: Đối chiếu bản gốc để sửa toàn bộ các câu dịch sai ngữ cảnh, hiểu nhầm thành ngữ hoặc từ ngữ cảnh (VD: '万分不舍' dịch nhầm thành 'không nỗ lực' -> sửa chuẩn thành 'vô cùng không nỡ / tiếc tiền'; '诚惶诚恐' -> sửa thành 'nơm nớp lo sợ / thấp thỏm lo âu').\n`;
+                  pass2Prompt += `2. QUÉT SẠCH 100% CHỮ HÁN SÓT: Khử sạch các chữ Hán dính trong câu (nội院 -> nội viện, Tuần抚 -> Tuần phủ, trạch邸 -> trạch đệ).\n`;
+                  pass2Prompt += `3. CHUỐT LẠI VĂN PHONG TIỂU THUYẾT: Đại từ nhân xưng chuẩn mực (hắn, nàng, ta, ngươi), câu cú mượt mà, tự nhiên.\n\n`;
+                  pass2Prompt += `[VĂN BẢN GỐC TIẾNG TRUNG]:\n${rawContent}\n\n`;
+                  pass2Prompt += `[BẢN DỊCH THÔ PASS 1]:\n${pass1Text}\n\n`;
+                  pass2Prompt += `[ĐẦU RA BẮT BUỘC]: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh sau khi đã biên tập hoàn mỹ (không xuất giải thích hay markdown codeblock).`;
+
+                  const respPass2 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: pass2Prompt }] }],
+                      generationConfig: { temperature: 0.15 }
+                    })
+                  });
+
+                  if (respPass2.ok) {
+                    const dataPass2 = await respPass2.json();
+                    const outPass2 = dataPass2?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    if (outPass2.trim().length > 30) {
+                      pass1Text = outPass2.trim();
+                      addLog(`✨ [PASS 2 BIÊN TẬP HOÀN TẤT] Bản dịch Pass 2 đã được trau chuốt hoàn hảo không còn lỗi ngữ nghĩa!`);
+                    }
+                  }
+                }
+
+                translatedText = pass1Text;
+                aiExtractedGlossary = isDualTaskStrategy ? pass1Parsed.newGlossary : {};
               } else {
                 throw new Error(`HTTP ${resp.status}`);
               }
@@ -1151,7 +1410,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             addLog(`⚠️ [Bác sĩ Auditor]: Phát hiện lỗi rất nặng (${criticalMsgs}). Đang gửi online lên AI dịch lại (Auto-Heal Online)...`);
 
             try {
-              // Tìm Key khả dụng tiếp theo trong pool để vượt rào
               const nextKeyObj = globalApiKeys.find(k => k.state === 'ACTIVE' && k.key !== activeKeyObj.key) || activeKeyObj;
               const rescuePrompt = `[CHỈ THỊ CỨU HỘ KHẨN CẤP - BẮT BUỘC TUÂN THỦ]:\n` +
                 `1. Dịch trực tiếp toàn bộ văn bản sau sang tiếng Việt chuẩn, tự nhiên, đúng sắc thái tiểu thuyết.\n` +
@@ -1207,30 +1465,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           });
 
           addLog(`✅ Đã xong Chương ${currentChapterIndex + 1}${previousSnippet ? ' (Đã nối ngữ cảnh chương trước)' : ''}`);
-          
-          // BƯỚC LÀM MƯỢT CUỐN CHIẾU (Rolling Polish) - KHÔNG BAO GIỜ BỎ SÓT CHƯƠNG!
-          const isRollingEnabled = advancedSettings.rollingPolishEnabled ?? true;
-          const rollingInterval = advancedSettings.rollingPolishBatchSize || 15;
-          const isEndOfRange = (currentChapterIndex + 1 >= targetEnd);
-
-          if (isRollingEnabled) {
-            // Quét các chương đã dịch nhưng chưa được làm mượt cuốn chiếu
-            const curPolished = project.polishedChapterIndices || [];
-            const unpolished: number[] = [];
-            for (let i = 0; i <= currentChapterIndex; i++) {
-              if ((project.translatedChapters[i] || i === currentChapterIndex) && !curPolished.includes(i)) {
-                unpolished.push(i);
-              }
-            }
-
-            if (unpolished.length >= rollingInterval || (isEndOfRange && unpolished.length > 0)) {
-              // Lấy lô các chương chưa làm mượt sớm nhất (đảm bảo không bao giờ bỏ sót chương 1..15!)
-              const batchToPolish = unpolished.slice(0, rollingInterval);
-              setTimeout(() => {
-                performRollingPolishBatch(batchToPolish);
-              }, 300);
-            }
-          }
 
           if (currentChapterIndex + 1 < targetEnd) {
             setCurrentChapterIndex(prev => prev + 1);
@@ -1240,24 +1474,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             setStatusText('🎉 Đã hoàn thành khoảng chương yêu cầu!');
             addLog(`🎉 Hoàn tất dịch từ Chương ${fromChapInput} đến ${targetEnd}!`);
             
-            // TỰ ĐỘNG LÀM MƯỢT VÉT CÁC CHƯƠNG CHƯA XỬ LÝ VÀ KÍCH HOẠT LÀM MƯỢT FINAL
-            setTimeout(async () => {
-              const curProj = projects[currentProjectName];
-              if (curProj && (advancedSettings.rollingPolishEnabled ?? true)) {
-                const curPolished = curProj.polishedChapterIndices || [];
-                const remUnpolished = Object.keys(curProj.translatedChapters)
-                  .map(Number)
-                  .filter(idx => !curPolished.includes(idx))
-                  .sort((a, b) => a - b);
-
-                if (remUnpolished.length > 0) {
-                  addLog(`🔄 [QUÉT VÉT CUỐN CHIẾU] Còn ${remUnpolished.length} chương chưa làm mượt, tự động xử lý vét...`);
-                  for (let i = 0; i < remUnpolished.length; i += rollingInterval) {
-                    const chunk = remUnpolished.slice(i, i + rollingInterval);
-                    await performRollingPolishBatch(chunk);
-                  }
-                }
-              }
+            // TẤT CẢ CÁC MODE ĐỀU TỰ ĐỘNG LÀM MƯỢT FINAL SAU KHI DỊCH XONG
+            setTimeout(() => {
               handleExecuteFinalGlobalPolish();
             }, 800);
           }
@@ -1265,7 +1483,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       }
     }
     return () => clearTimeout(timer);
-  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, advancedSettings.rollingPolishEnabled, advancedSettings.rollingPolishBatchSize]);
+  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, advancedSettings.translationPipelineMode, advancedSettings.batchGlossarySize]);
 
   // Hàm thực hiện Làm Mượt Cuốn Chiếu (Semantic JSON Patch) với cơ chế Thử Lại Nhiều Lần & Không Bỏ Rơi
   const performRollingPolishBatch = async (indices: number[]): Promise<boolean> => {
@@ -1300,16 +1518,20 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       if (isRealKey) {
         try {
           let promptSb = `Bạn là chuyên gia biên tập và hiệu đính văn học cao cấp.\n`;
-          promptSb += `Nhiệm vụ: Đọc kỹ các chương bản dịch bên dưới và trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:\n`;
-          promptSb += `1. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').\n`;
-          promptSb += `2. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng').\n`;
-          promptSb += `3. Lỗi nhầm lẫn danh xưng hoặc tên nhân vật lặp lại (VD: 'Trưởng công tử' -> 'Trưởng công chúa').\n`;
-          promptSb += `4. Các câu thô/sai ngữ pháp nghiêm trọng.\n\n`;
+          promptSb += `Nhiệm vụ: Đối chiếu song ngữ [VĂN BẢN GỐC TIẾNG TRUNG] và [BẢN DỊCH TIẾNG VIỆT] của các chương bên dưới để trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:\n`;
+          promptSb += `1. Lỗi dịch sai nghĩa ngữ cảnh hoặc hiểu nhầm thành ngữ (VD: '万分不舍' dịch nhầm thành 'không nỗ lực' -> sửa thành 'không nỡ/tiếc tiền'; '诚惶诚恐' dịch nhầm thành 'thành hoàng thành thạch' -> sửa thành 'nơm nớp lo sợ / thấp thỏm lo âu').\n`;
+          promptSb += `2. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'nội院' -> 'nội viện', 'Tuần抚' -> 'Tuần phủ', 'trạch邸' -> 'trạch đệ', 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').\n`;
+          promptSb += `3. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng', 'táo lộ' -> 'chiêu trò / bài bản').\n`;
+          promptSb += `4. Lỗi nhầm lẫn danh xưng, chức vị hoặc xưng hô không khớp (VD: 'chủ bưu' -> 'chủ bộ', 'bổ khoái' -> 'bộ khoái', 'Trưởng công tử' -> 'Trưởng công chúa').\n\n`;
           promptSb += `QUY TẮC ĐẦU RA BẮT BUỘC:\n`;
           promptSb += `- TUYỆT ĐỐI KHÔNG xuất lại toàn bộ nội dung các chương.\n`;
-          promptSb += `- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' và 'new':\n`;
+          promptSb += `- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' (từ/cụm lỗi chính xác trong bản dịch) và 'new' (từ/cụm sửa chuẩn):\n`;
           promptSb += `[{"old": "chuỗi_lỗi_gốc", "new": "chuỗi_thay_thế_chuẩn"}]\nNếu không có lỗi nào, trả về: []\n\n`;
-          promptSb += `[CÁC CHƯƠNG BẢN DỊCH]:\n` + chaptersToPolish.map((c, i) => `--- CHƯƠNG ${validIndices[i] + 1} ---\n${c}`).join('\n\n');
+          promptSb += `[DỮ LIỆU ĐỐI SOÁT SONG NGỮ CÁC CHƯƠNG]:\n` + validIndices.map(idx => {
+            const rawCh = project.chapters[idx] || '';
+            const transCh = project.translatedChapters[idx] || '';
+            return `=== CHƯƠNG ${idx + 1} ===\n[GỐC TIẾNG TRUNG]:\n${rawCh}\n\n[BẢN DỊCH HIỆN TẠI]:\n${transCh}`;
+          }).join('\n\n----------------------------------------\n\n');
 
           const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${activeKeyObj.key}`, {
             method: 'POST',
@@ -1927,17 +2149,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   return (
     <div className="flex flex-col items-center justify-center p-2 sm:p-4">
       {/* PHONE CASING */}
-      <div className="w-full max-w-[430px] bg-neutral-950 border-4 border-neutral-800 rounded-[44px] shadow-2xl overflow-hidden flex flex-col h-[790px] relative text-neutral-100">
+      <div className="w-full max-w-[430px] bg-[#03060d] border-4 border-[#785a28]/80 rounded-[44px] shadow-[0_0_50px_rgba(0,0,0,0.8),0_0_20px_rgba(120,90,40,0.25)] overflow-hidden flex flex-col h-[790px] relative text-neutral-100">
         
         {/* TOP PHONE NOTCH & STATUS BAR */}
-        <div className="h-10 bg-neutral-900 px-5 flex items-center justify-between text-xs text-neutral-400 select-none shrink-0 border-b border-neutral-800">
-          <span className="font-semibold text-neutral-200">12:30</span>
-          <div className="w-24 h-4 bg-neutral-950 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 rounded-full bg-neutral-800"></div>
+        <div className="h-10 bg-[#091428] px-5 flex items-center justify-between text-xs text-[#a09b8c] select-none shrink-0 border-b border-[#785a28]/40">
+          <span className="font-semibold text-[#f0e6d2]">12:30</span>
+          <div className="w-24 h-4 bg-[#050c18] border border-[#785a28]/30 rounded-full flex items-center justify-center">
+            <div className="w-2 h-2 rounded-full bg-[#785a28]/60"></div>
           </div>
           <div className="flex items-center gap-1.5 text-[11px]">
             {isDeviceRooted && (
-              <span className="text-amber-400 font-bold font-mono text-[10px] bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-800">ROOT #</span>
+              <span className="text-[#c8aa6e] font-bold font-mono text-[10px] bg-[#1e2328] px-1.5 py-0.5 rounded border border-[#785a28]">ROOT #</span>
             )}
             <span>5G</span>
             <span>100%</span>
@@ -1946,15 +2168,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
         {/* FOREGROUND PERSISTENT NOTIFICATION BANNER */}
         {godModeActive && (
-          <div className="bg-gradient-to-r from-neutral-900 via-blue-950/40 to-neutral-900 border-b border-blue-900/40 px-3 py-1.5 flex items-center justify-between text-[11px] text-blue-300 shrink-0">
+          <div className="bg-[#091428] border-b border-[#785a28]/40 px-3 py-1.5 flex items-center justify-between text-[11px] text-[#f0e6d2] shrink-0">
             <div className="flex items-center gap-1.5 truncate">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-semibold text-neutral-200">God-Mode:</span>
-              <span className="text-neutral-400 truncate">{statusText}</span>
+              <span className="font-semibold text-[#c8aa6e]">God-Mode:</span>
+              <span className="text-[#a09b8c] truncate">{statusText}</span>
             </div>
             <button 
               onClick={onOpenGodModeModal} 
-              className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded font-medium shrink-0 cursor-pointer"
+              className="text-[10px] bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] border border-[#0ac8b9]/40 px-2 py-0.5 rounded font-bold shrink-0 cursor-pointer shadow-sm"
             >
               5 Lớp
             </button>
@@ -1962,20 +2184,20 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
         )}
 
         {/* NATIVE APP BRANDING HEADER WITH OFFICIAL APP LOGO */}
-        <div className="bg-neutral-900/95 px-3 py-2 flex items-center justify-between border-b border-neutral-800 shrink-0">
+        <div className="bg-[#091428] px-3 py-2 flex items-center justify-between border-b border-[#785a28]/40 shrink-0">
           <AppLogo size="sm" showText={true} />
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowHowToUseModal(true)}
-              className="px-2 py-0.5 rounded-lg bg-blue-950/90 text-blue-300 border border-blue-500/40 text-[10px] font-bold flex items-center gap-1 hover:bg-blue-900/60 cursor-pointer shadow-sm"
+              className="px-2 py-0.5 rounded-lg bg-[#005a82] text-[#f0e6d2] border border-[#0ac8b9]/40 text-[10px] font-bold flex items-center gap-1 hover:bg-[#0284c7] cursor-pointer shadow-sm transition-all"
               title="Cẩm nang hướng dẫn sử dụng từ A đến Z"
             >
-              <HelpCircle className="w-3 h-3 text-blue-400" />
+              <HelpCircle className="w-3 h-3 text-[#0ac8b9]" />
               <span>Hướng Dẫn</span>
             </button>
             <button
               onClick={onOpenGodModeModal}
-              className="px-2 py-0.5 rounded-lg bg-emerald-950/90 text-emerald-300 border border-emerald-600/40 text-[10px] font-bold flex items-center gap-1 hover:bg-emerald-900/60 cursor-pointer"
+              className="px-2 py-0.5 rounded-lg bg-emerald-950/90 text-emerald-300 border border-emerald-600/40 text-[10px] font-bold flex items-center gap-1 hover:bg-emerald-900/60 cursor-pointer transition-all"
             >
               <ShieldCheck className="w-3 h-3 text-emerald-400" />
               <span>OOM -1000</span>
@@ -1984,17 +2206,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
         </div>
 
         {/* PROJECT SWITCHER DRAWER BANNER */}
-        <div className="bg-neutral-900/90 border-b border-neutral-800 px-3 py-1.5 flex items-center justify-between text-xs shrink-0">
+        <div className="bg-[#050c18] border-b border-[#785a28]/40 px-3 py-1.5 flex items-center justify-between text-xs shrink-0">
           <div className="flex items-center gap-1.5 truncate">
-            <Bookmark className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="text-neutral-400 text-[11px]">Tiến trình:</span>
+            <Bookmark className="w-3.5 h-3.5 text-[#c8aa6e] shrink-0" />
+            <span className="text-[#a09b8c] text-[11px]">Tiến trình:</span>
             <select
               value={currentProjectName}
               onChange={(e) => {
                 setCurrentProjectName(e.target.value);
                 setChapterListPage(0);
               }}
-              className="bg-neutral-950 border border-neutral-800 rounded px-2 py-0.5 text-xs text-blue-300 font-bold focus:outline-none max-w-[140px] truncate"
+              className="bg-[#091428] border border-[#785a28]/60 rounded px-2 py-0.5 text-xs text-[#c8aa6e] font-bold focus:outline-none max-w-[140px] truncate"
             >
               {Object.keys(projects).map(name => (
                 <option key={name} value={name}>{name.replace(/_/g, ' ')}</option>
@@ -2004,7 +2226,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowNewProjModal(true)}
-              className="text-[10px] px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold flex items-center gap-1 cursor-pointer"
+              className="text-[10px] px-2 py-0.5 rounded bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] border border-[#0ac8b9]/40 font-bold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
               title="Tạo tiến trình dịch mới cho truyện khác"
             >
               <Plus className="w-2.5 h-2.5" />
@@ -2026,258 +2248,382 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           
           {/* ======================================================== */}
-          {/* THẺ 1: KEY & PROMPT */}
+          {/* THẺ 1: KEY & PROMPT (LO-L DROPDOWN ACCORDIONS) */}
           {/* ======================================================== */}
           {activeBottomTab === 'keys' && (
             <div className="space-y-3">
               {/* BIG HOW TO USE ONBOARDING BANNER */}
               <div 
                 onClick={() => setShowHowToUseModal(true)}
-                className="bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-blue-900/60 border border-blue-600/40 rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:border-blue-400 transition-all shadow-lg shadow-blue-950/40 group"
+                className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:border-[#c8aa6e] transition-all group"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300 group-hover:scale-105 transition-transform shrink-0">
-                    <HelpCircle className="w-4.5 h-4.5 text-blue-300" />
+                  <div className="w-8 h-8 rounded-xl bg-[#c8aa6e]/20 border border-[#c8aa6e]/60 flex items-center justify-center text-[#c8aa6e] group-hover:scale-105 transition-transform shrink-0">
+                    <HelpCircle className="w-4.5 h-4.5 text-[#c8aa6e]" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <div className="text-xs font-bold text-[#f0e6d2] flex items-center gap-1.5">
                       <span>Cẩm Nang Hướng Dẫn Sử Dụng</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30 font-mono">Từ A-Z</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono">Từ A-Z</span>
                     </div>
-                    <p className="text-[10px] text-blue-200/70">Nhấn để xem cách lấy key, chọn model, dịch bù và xuất file</p>
+                    <p className="text-[10px] text-[#a09b8c]">Nhấn để xem cách lấy key, chọn model, dịch bù và xuất file</p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-blue-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                <ChevronRight className="w-4 h-4 text-[#c8aa6e] group-hover:translate-x-0.5 transition-transform shrink-0" />
               </div>
 
-              {/* Multi-Key Pool Card */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Key className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-bold text-neutral-100">Multi-Key Gemini Pool</span>
-                    <HelpBtn onClick={() => openHelp('key_pool')} />
-                  </div>
-                  <button
-                    onClick={handleTestAllKeys}
-                    className="text-[10px] px-2 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 cursor-pointer font-semibold"
-                  >
-                    <PlayCircle className="w-3 h-3" />
-                    <span>Test tất cả key</span>
-                  </button>
-                </div>
-
-                {/* Add Key Input */}
-                <div className="space-y-1.5">
-                  <textarea
-                    rows={2}
-                    value={newKeyInput}
-                    onChange={(e) => setNewKeyInput(e.target.value)}
-                    placeholder="Dán Gemini API Key (Mỗi dòng 1 key)..."
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-2 text-xs text-neutral-200 font-mono focus:outline-none focus:border-amber-500"
-                  />
-                  <button
-                    onClick={handleAddGlobalKey}
-                    className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-600/20 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Thêm API Key Vào Pool</span>
-                  </button>
-                </div>
-
-                {/* Key Pool List with Ping and Test Button */}
-                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-                  {globalApiKeys.map((k, idx) => {
-                    const ping = keyPingResults[idx];
-                    const isTesting = testingKeyIndex === idx;
-
-                    return (
-                      <div 
-                        key={idx}
-                        className="p-2 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <span className="w-4 h-4 rounded bg-neutral-800 text-[10px] flex items-center justify-center font-mono shrink-0">
-                            {idx + 1}
-                          </span>
-                          <span className="font-mono text-neutral-300 truncate">...{k.key.slice(-8)}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {ping ? (
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-blue-950 text-blue-300 font-mono">
-                              {ping.latency}ms
-                            </span>
-                          ) : null}
-
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                            k.state === 'ACTIVE' 
-                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' 
-                              : 'bg-red-950 text-red-400 border border-red-800'
-                          }`}>
-                            {k.state}
-                          </span>
-
-                          <button
-                            disabled={isTesting}
-                            onClick={() => handleTestKey(idx, k.key)}
-                            title="Kiểm tra kết nối và quota của Key này"
-                            className="px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[10px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                          >
-                            <RefreshCw className={`w-2.5 h-2.5 ${isTesting ? 'animate-spin text-amber-400' : ''}`} />
-                            <span>{isTesting ? '...' : 'Test'}</span>
-                          </button>
-
-                          <button
-                            onClick={() => handleDeleteGlobalKey(idx)}
-                            className="text-neutral-500 hover:text-red-400 p-1 cursor-pointer"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
+              {/* ============================================== */}
+              {/* MỤC 1: CÀI ĐẶT KEY API POOL & QUOTA */}
+              {/* ============================================== */}
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsKeyPoolOpen(!isKeyPoolOpen)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <Key className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>1. Cài Đặt Key API & Quota</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono font-bold">
+                          {globalApiKeys.length} Keys
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Model Selector Card */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-neutral-100">Chọn Dòng Model Gemini</span>
-                    <HelpBtn onClick={() => openHelp('model_selection')} />
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isKeyPoolOpen ? 'thu gọn' : 'mở rộng quản lý API Key Pool & test quota'}</div>
+                    </div>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 font-mono border border-blue-800">
-                    {project?.model}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('key_pool'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isKeyPoolOpen ? 'rotate-180' : ''}`} />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2">
-                  {PRESET_MODELS.map(m => {
-                    const isSelected = project?.model === m.id;
-                    return (
-                      <div
-                        key={m.id}
-                        onClick={() => handleSelectModel(m.id)}
-                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
-                          isSelected 
-                            ? 'bg-blue-950/60 border-blue-500 text-blue-100 shadow-sm' 
-                            : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700 text-neutral-300'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold">{m.name}</span>
-                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-400">
-                              {m.badge}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-neutral-400 mt-0.5">{m.desc}</p>
-                        </div>
-                        {isSelected && <CheckCircle className="w-4 h-4 text-blue-400 shrink-0" />}
+                {isKeyPoolOpen && (
+                  <div className="p-3 pt-0 border-t border-[#785a28]/30 space-y-3 animate-fadeIn">
+                    <div className="pt-2.5 space-y-2.5 text-xs">
+                      {/* Sub-header inside */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#c8aa6e]">◆ KHO API KEY POOL:</span>
+                        <button
+                          onClick={handleTestAllKeys}
+                          className="text-[10px] px-2 py-0.5 rounded-lg bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] border border-[#0ac8b9]/40 flex items-center gap-1 cursor-pointer font-semibold shadow-sm"
+                        >
+                          <PlayCircle className="w-3 h-3" />
+                          <span>Test tất cả key</span>
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
 
-                {/* Custom Model Input */}
-                <div className="pt-2 border-t border-neutral-800 flex gap-1.5">
-                  <input
-                    type="text"
-                    value={customModelInput}
-                    onChange={(e) => setCustomModelInput(e.target.value)}
-                    placeholder="Nhập Model ID tùy chỉnh..."
-                    className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 py-1.5 text-xs text-neutral-200 font-mono focus:outline-none focus:border-blue-500"
-                  />
-                  <button
-                    onClick={handleApplyCustomModel}
-                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold cursor-pointer shrink-0"
-                  >
-                    Nạp Model
-                  </button>
-                </div>
+                      {/* Add Key Input */}
+                      <div className="space-y-1.5">
+                        <textarea
+                          rows={2}
+                          value={newKeyInput}
+                          onChange={(e) => setNewKeyInput(e.target.value)}
+                          placeholder="Dán Gemini API Key (Mỗi dòng 1 key)..."
+                          className="w-full bg-[#050505] border border-[#785a28]/40 rounded-xl p-2 text-xs text-[#f0e6d2] font-mono focus:outline-none focus:border-[#c8aa6e]"
+                        />
+                        <button
+                          onClick={handleAddGlobalKey}
+                          className="w-full py-2 bg-[#c8aa6e] hover:bg-[#d8ba7e] text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-black/40 cursor-pointer transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Thêm API Key Vào Pool</span>
+                        </button>
+                      </div>
+
+                      {/* Key Pool List with Ping and Test Button */}
+                      <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                        {globalApiKeys.map((k, idx) => {
+                          const ping = keyPingResults[idx];
+                          const isTesting = testingKeyIndex === idx;
+
+                          return (
+                            <div 
+                              key={idx}
+                              className="p-2 bg-[#050505] border border-[#785a28]/40 rounded-xl flex items-center justify-between text-xs"
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="w-4 h-4 rounded bg-[#1e2328] text-[10px] flex items-center justify-center font-mono text-[#c8aa6e] border border-[#785a28]/40 shrink-0">
+                                  {idx + 1}
+                                </span>
+                                <span className="font-mono text-[#f0e6d2] truncate">...{k.key.slice(-8)}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {ping ? (
+                                  <span className="text-[9px] px-1 py-0.5 rounded bg-[#091428] text-[#0ac8b9] font-mono border border-[#0ac8b9]/30">
+                                    {ping.latency}ms
+                                  </span>
+                                ) : null}
+
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                                  k.state === 'ACTIVE' 
+                                    ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' 
+                                    : 'bg-red-950 text-red-400 border border-red-800'
+                                }`}>
+                                  {k.state}
+                                </span>
+
+                                <button
+                                  disabled={isTesting}
+                                  onClick={() => handleTestKey(idx, k.key)}
+                                  title="Kiểm tra kết nối và quota của Key này"
+                                  className="px-2 py-0.5 rounded bg-[#1e2328] hover:bg-[#2e3338] text-[#f0e6d2] text-[10px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50 border border-[#785a28]/40"
+                                >
+                                  <RefreshCw className={`w-2.5 h-2.5 ${isTesting ? 'animate-spin text-[#c8aa6e]' : ''}`} />
+                                  <span>{isTesting ? '...' : 'Test'}</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleDeleteGlobalKey(idx)}
+                                  className="text-neutral-500 hover:text-red-400 p-1 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* System Prompts Presets Card (Add / Edit / Delete supported!) */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Sliders className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-neutral-100">Thẻ Phong Cách Dịch Thuật</span>
-                    <HelpBtn onClick={() => openHelp('prompt_cards')} />
+              {/* ============================================== */}
+              {/* MỤC 2: CHỌN DÒNG MODEL GEMINI DỊCH THUẬT */}
+              {/* ============================================== */}
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsModelSectionOpen(!isModelSectionOpen)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <Cpu className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>2. Chọn Dòng Model Gemini</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono font-bold">
+                          {PRESET_MODELS.find(m => m.id === project?.model)?.name || 'Flash'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isModelSectionOpen ? 'thu gọn' : 'mở rộng chọn model tối ưu'}</div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={handleRestoreDefaultPrompts}
-                      className="text-[10px] px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-400 cursor-pointer"
-                      title="Khôi phục prompt mặc định"
-                    >
-                      Mặc định
-                    </button>
-                    <button
-                      onClick={handleOpenAddPrompt}
-                      className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 cursor-pointer font-semibold"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Thêm Prompt</span>
-                    </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('key_pool'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isModelSectionOpen ? 'rotate-180' : ''}`} />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  {globalPrompts.map(p => {
-                    return (
+                {isModelSectionOpen && (
+                  <div className="p-3 pt-0 border-t border-[#785a28]/30 space-y-3 animate-fadeIn">
+                    <div className="pt-2.5 space-y-2.5 text-xs">
+                      {/* Collapsed model card */}
                       <div
-                        key={p.id}
-                        onClick={() => {
-                          setGlobalPrompts(prev => prev.map(item => ({ ...item, active: item.id === p.id })));
-                          addLog(`Đã kích hoạt phong cách: "${p.title}"`);
-                        }}
-                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                          p.active 
-                            ? 'bg-emerald-950/60 border-emerald-500 text-emerald-100 shadow-sm' 
-                            : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700 text-neutral-300'
-                        }`}
+                        onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                        className="bg-gradient-to-r from-[#111923] via-[#0f1d30] to-[#111923] border border-[#c8aa6e] shadow-[0_0_15px_rgba(200,170,110,0.25)] rounded-xl p-3 cursor-pointer transition-all hover:border-[#f0e6d2] group"
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold">{p.title}</span>
-                            {p.active && (
-                              <span className="text-[9px] bg-emerald-900/90 text-emerald-300 px-1.5 py-0.2 rounded font-semibold">
-                                Đang dùng
-                              </span>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#c8aa6e] animate-pulse shrink-0"></span>
+                            <span className="text-xs font-bold text-[#f0e6d2] group-hover:text-amber-200">
+                              {PRESET_MODELS.find(m => m.id === project?.model)?.name || project?.model || '2.5 Flash'}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-neutral-800 text-[#a09b8c]">
+                              {PRESET_MODELS.find(m => m.id === project?.model)?.badge || 'Tùy chỉnh'}
+                            </span>
                           </div>
-                          
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold bg-[#785a28]/40 text-[#c8aa6e] px-2 py-0.5 rounded border border-[#c8aa6e]/60">
+                              ĐANG DÙNG
+                            </span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isModelDropdownOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-[#a09b8c] mt-1.5 leading-relaxed pl-4 border-l-2 border-[#c8aa6e]/40">
+                          {PRESET_MODELS.find(m => m.id === project?.model)?.desc || 'Model Gemini tùy chỉnh người dùng nạp.'}
+                        </div>
+                      </div>
+
+                      {/* Expanded model list */}
+                      {isModelDropdownOpen && (
+                        <div className="space-y-2 pt-1 animate-fadeIn">
+                          {PRESET_MODELS.map(m => {
+                            const isSelected = project?.model === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => {
+                                  handleSelectModel(m.id);
+                                  setIsModelDropdownOpen(false);
+                                }}
+                                className={`w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'bg-[#1e2328] border-[#c8aa6e] shadow-[0_0_10px_rgba(200,170,110,0.3)] text-white'
+                                    : 'bg-[#050505] border-[#785a28]/40 text-neutral-400 hover:text-[#f0e6d2] hover:border-[#c8aa6e]/80 hover:bg-[#111923]'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between font-bold text-xs">
+                                  <span className="flex items-center gap-2">
+                                    <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
+                                      isSelected ? 'border-[#c8aa6e] bg-[#c8aa6e] text-black font-extrabold' : 'border-neutral-600'
+                                    }`}>
+                                      {isSelected ? '✓' : ''}
+                                    </span>
+                                    <span className={isSelected ? 'text-[#f0e6d2]' : 'text-neutral-300'}>{m.name}</span>
+                                  </span>
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300 font-mono">
+                                    {m.badge}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-[#a09b8c] mt-1 pl-6 leading-relaxed">
+                                  {m.desc}
+                                </div>
+                              </button>
+                            );
+                          })}
+
+                          {/* Custom Model Input */}
+                          <div className="pt-2 border-t border-[#785a28]/30 flex gap-1.5">
+                            <input
+                              type="text"
+                              value={customModelInput}
+                              onChange={(e) => setCustomModelInput(e.target.value)}
+                              placeholder="Nhập Model ID tùy chỉnh (VD: gemini-2.5-pro)..."
+                              className="flex-1 bg-[#050505] border border-[#785a28]/50 rounded-xl px-2.5 py-1.5 text-xs text-[#f0e6d2] font-mono focus:outline-none focus:border-[#c8aa6e]"
+                            />
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenEditPrompt(p);
+                              onClick={() => {
+                                handleApplyCustomModel();
+                                setIsModelDropdownOpen(false);
                               }}
-                              className="p-1 text-neutral-400 hover:text-emerald-400 cursor-pointer"
-                              title="Chỉnh sửa prompt này"
+                              className="px-3 py-1.5 bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] rounded-xl text-xs font-bold cursor-pointer shrink-0 transition-colors border border-[#0ac8b9]/40"
                             >
-                              <Edit3 className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={(e) => handleDeletePrompt(p.id, e)}
-                              className="p-1 text-neutral-400 hover:text-red-400 cursor-pointer"
-                              title="Xóa prompt này"
-                            >
-                              <Trash2 className="w-3 h-3" />
+                              Nạp Model
                             </button>
                           </div>
                         </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-                        <p className="text-[11px] text-neutral-400 mt-1 line-clamp-2 leading-relaxed">
-                          {p.content}
-                        </p>
+              {/* ============================================== */}
+              {/* MỤC 3: PROMPT & PHONG CÁCH DỊCH THUẬT */}
+              {/* ============================================== */}
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsPromptSectionOpen(!isPromptSectionOpen)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <Sliders className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>3. Prompt & Phong Cách Dịch</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#005a82]/30 text-[#0ac8b9] border border-[#0ac8b9]/40 font-mono font-bold">
+                          {globalPrompts.find(p => p.active)?.title || 'Văn Học Chuẩn'}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isPromptSectionOpen ? 'thu gọn' : 'mở rộng chọn phong cách văn học & chỉnh prompt'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('prompt_cards'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isPromptSectionOpen ? 'rotate-180' : ''}`} />
+                  </div>
                 </div>
+
+                {isPromptSectionOpen && (
+                  <div className="p-3 pt-0 border-t border-[#785a28]/30 space-y-3 animate-fadeIn">
+                    <div className="pt-2.5 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#c8aa6e]">◆ CÁC PHONG CÁCH VĂN HỌC CÓ SẴN:</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={handleRestoreDefaultPrompts}
+                            className="text-[10px] px-2 py-0.5 rounded-lg bg-[#1e2328] hover:bg-neutral-800 text-[#a09b8c] hover:text-white border border-[#785a28]/40 cursor-pointer transition-colors"
+                            title="Khôi phục prompt mặc định"
+                          >
+                            Mặc định
+                          </button>
+                          <button
+                            onClick={handleOpenAddPrompt}
+                            className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Thêm</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {globalPrompts.map(p => {
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => {
+                                setGlobalPrompts(prev => prev.map(item => ({ ...item, active: item.id === p.id })));
+                                addLog(`Đã kích hoạt phong cách: "${p.title}"`);
+                              }}
+                              className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                                p.active 
+                                  ? 'bg-[#111923] border-[#c8aa6e] shadow-[0_0_10px_rgba(200,170,110,0.25)] text-white' 
+                                  : 'bg-[#050505] border-[#785a28]/30 hover:border-[#c8aa6e]/60 text-neutral-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5 truncate pr-2">
+                                  <span className="font-bold text-[#f0e6d2] truncate">{p.title}</span>
+                                  {p.active && (
+                                    <span className="text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-600 px-1.5 py-0.2 rounded font-semibold shrink-0">
+                                      Đang dùng
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-black/60 text-[#a09b8c] font-mono border border-[#785a28]/30">
+                                    ~{p.content.length} ký tự
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditPrompt(p);
+                                    }}
+                                    className="p-1 text-neutral-400 hover:text-emerald-400 cursor-pointer transition-colors"
+                                    title="Chỉnh sửa prompt này"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => handleDeletePrompt(p.id, e)}
+                                    className="p-1 text-neutral-400 hover:text-red-400 cursor-pointer transition-colors"
+                                    title="Xóa prompt này"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* COMPACT CLAMPED PREVIEW TO PREVENT OVERLY TALL CARDS */}
+                              <p className="text-[10px] text-[#a09b8c] mt-1 line-clamp-2 leading-relaxed">
+                                {p.content}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -2290,45 +2636,53 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
               {/* BIG HOW TO USE ONBOARDING BANNER */}
               <div 
                 onClick={() => setShowHowToUseModal(true)}
-                className="bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-blue-900/60 border border-blue-600/40 rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:border-blue-400 transition-all shadow-lg shadow-blue-950/40 group"
+                className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl p-3 flex items-center justify-between cursor-pointer hover:border-[#c8aa6e] transition-all group"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-blue-600/30 border border-blue-400/40 flex items-center justify-center text-blue-300 group-hover:scale-105 transition-transform shrink-0">
-                    <HelpCircle className="w-4.5 h-4.5 text-blue-300" />
+                  <div className="w-8 h-8 rounded-xl bg-[#c8aa6e]/20 border border-[#c8aa6e]/60 flex items-center justify-center text-[#c8aa6e] group-hover:scale-105 transition-transform shrink-0">
+                    <HelpCircle className="w-4.5 h-4.5 text-[#c8aa6e]" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <div className="text-xs font-bold text-[#f0e6d2] flex items-center gap-1.5">
                       <span>Cẩm Nang Hướng Dẫn Sử Dụng</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 border border-blue-400/30 font-mono">Từ A-Z</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono">Từ A-Z</span>
                     </div>
-                    <p className="text-[10px] text-blue-200/70">Nhấn để xem cách lấy key, chọn model, dịch bù và xuất file</p>
+                    <p className="text-[10px] text-[#a09b8c]">Nhấn để xem cách lấy key, chọn model, dịch bù và xuất file</p>
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-blue-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                <ChevronRight className="w-4 h-4 text-[#c8aa6e] group-hover:translate-x-0.5 transition-transform shrink-0" />
               </div>
 
               {/* ======================================================== */}
               {/* MỤC 1: NHẬP & BÓC TÁCH FILE TRUYỆN GỐC */}
               {/* ======================================================== */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-2.5">
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <BookOpen className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-neutral-100">1. Nhập & Bóc Tách File Truyện Gốc</span>
-                    <HelpBtn onClick={() => openHelp('novel_raw_input')} />
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide">1. Nhập & Bóc Tách File Truyện Gốc</div>
+                      <div className="text-[10px] text-[#a09b8c]">Hỗ trợ file .epub, .mobi, .txt, .azw3</div>
+                    </div>
                   </div>
-                  
-                  {/* Chế độ tách chương */}
-                  <div className="flex items-center gap-1 bg-neutral-950 p-0.5 rounded-lg border border-neutral-800 text-[10px]">
+                  <HelpBtn onClick={() => openHelp('novel_raw_input')} />
+                </div>
+
+                {/* Chế độ tách chương */}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-[#a09b8c]">Phương thức tách:</span>
+                  <div className="flex items-center gap-1 bg-[#050505] p-0.5 rounded-lg border border-[#785a28]/40 text-[10px]">
                     <button
                       onClick={() => setSplitMode('regex')}
-                      className={`px-2 py-0.5 rounded cursor-pointer transition-all ${splitMode === 'regex' ? 'bg-blue-600 text-white font-bold' : 'text-neutral-400 hover:text-white'}`}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition-all ${splitMode === 'regex' ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm' : 'text-[#a09b8c] hover:text-[#f0e6d2]'}`}
                     >
                       Theo Tác Giả
                     </button>
                     <button
                       onClick={() => setSplitMode('chunk')}
-                      className={`px-2 py-0.5 rounded cursor-pointer transition-all ${splitMode === 'chunk' ? 'bg-blue-600 text-white font-bold' : 'text-neutral-400 hover:text-white'}`}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition-all ${splitMode === 'chunk' ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm' : 'text-[#a09b8c] hover:text-[#f0e6d2]'}`}
                     >
                       Tùy Ký Tự
                     </button>
@@ -2337,16 +2691,16 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
                 {/* Custom Chunk Size Selector with quick presets */}
                 {splitMode === 'chunk' && (
-                  <div className="bg-neutral-950 p-2 rounded-xl border border-neutral-800 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                  <div className="bg-[#050505] p-2 rounded-xl border border-[#785a28]/40 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-[#a09b8c]">
                       <span>Số ký tự mỗi chương:</span>
                       <div className="flex items-center gap-1">
                         {[2000, 3000, 3500, 5000].map(sz => (
                           <button
                             key={sz}
                             onClick={() => setChunkSizeInput(String(sz))}
-                            className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer ${
-                              chunkSizeInput === String(sz) ? 'bg-blue-600 text-white font-bold' : 'bg-neutral-800 text-neutral-400 hover:text-white'
+                            className={`px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-all ${
+                              chunkSizeInput === String(sz) ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm' : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                             }`}
                           >
                             {sz}
@@ -2359,18 +2713,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       value={chunkSizeInput}
                       onChange={(e) => setChunkSizeInput(e.target.value)}
                       placeholder="Nhập số ký tự tùy ý (VD: 2500, 4000...)"
-                      className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                      className="w-full bg-[#091428] border border-[#785a28]/50 rounded-lg px-2.5 py-1 text-xs text-[#f0e6d2] font-mono focus:outline-none focus:border-[#c8aa6e]"
                     />
                   </div>
                 )}
 
                 {/* File summary badge if loaded */}
                 {fileSummary && (
-                  <div className="p-2 bg-blue-950/40 border border-blue-800/60 rounded-xl flex items-center justify-between text-[11px] text-blue-300">
+                  <div className="p-2 bg-[#050505] border border-[#785a28]/40 rounded-xl flex items-center justify-between text-[11px] text-[#f0e6d2]">
                     <div className="flex items-center gap-1.5 truncate">
                       <FileCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       <span className="font-semibold text-white truncate">{fileSummary.name}</span>
-                      <span className="text-neutral-400">({fileSummary.size} - {fileSummary.length.toLocaleString()} ký tự)</span>
+                      <span className="text-[#a09b8c]">({fileSummary.size} - {fileSummary.length.toLocaleString()} ký tự)</span>
                     </div>
                     <span className="text-emerald-400 font-mono text-[10px]">ĐÃ NẠP</span>
                   </div>
@@ -2384,20 +2738,20 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     fullRawTextRef.current = e.target.value;
                   }}
                   placeholder="Dán văn bản truyện gốc hoặc bấm chọn file..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-2 text-xs text-neutral-200 font-mono focus:outline-none focus:border-blue-500 resize-none"
+                  className="w-full bg-[#050505] border border-[#785a28]/40 rounded-xl p-2 text-xs text-[#f0e6d2] font-mono focus:outline-none focus:border-[#c8aa6e] resize-none"
                 />
 
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleSplitChapters}
-                    className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
+                    className="flex-1 py-2 bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-[#785a28] cursor-pointer transition-all shadow-sm"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <Sparkles className="w-3.5 h-3.5 text-[#c8aa6e]" />
                     <span>Tách chương ({splitMode === 'regex' ? 'Theo tác giả' : `${chunkSizeInput} ký tự`})</span>
                   </button>
                   
                   {/* Multi-Format Ebook File Picker (EPUB, MOBI, AZW3, TXT) */}
-                  <label className="px-3 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-blue-500/40 cursor-pointer">
+                  <label className="px-3 py-2 bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-[#0ac8b9]/40 cursor-pointer transition-all shadow-sm">
                     {isFileLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                     <span>{isFileLoading ? 'Đang đọc...' : 'Nạp Ebook'}</span>
                     <input 
@@ -2417,31 +2771,35 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
               {/* ======================================================== */}
               {/* MỤC 2: TIẾN ĐỘ DỊCH THUẬT & ĐIỀU KHIỂN */}
               {/* ======================================================== */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs font-bold text-neutral-100">2. Tiến Độ Dịch Thuật & Điều Khiển</span>
-                    <HelpBtn onClick={() => openHelp('range_progress')} />
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <Zap className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide">2. Tiến Độ Dịch Thuật & Điều Khiển</div>
+                      <div className="text-[10px] text-[#a09b8c]">
+                        {project ? Object.keys(project.translatedChapters).length : 0} / {project ? project.chapters.length : 0} chương đã dịch
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-[11px] font-mono text-blue-400 font-semibold">
-                      {project ? Object.keys(project.translatedChapters).length : 0} / {project ? project.chapters.length : 0} chương
-                    </span>
+                  <div className="flex items-center gap-2 shrink-0">
                     {project && Object.keys(project.translatedChapters).length > 0 && (
-                      <span className={`text-[9.5px] font-mono font-medium ${(project.polishedChapterIndices?.length || 0) < Object.keys(project.translatedChapters).length ? 'text-amber-400' : 'text-purple-400'}`}>
+                      <span className="text-[9.5px] font-mono font-medium text-[#c8aa6e]">
                         {(project.polishedChapterIndices?.length || 0) < Object.keys(project.translatedChapters).length
                           ? `⚠️ Còn ${Object.keys(project.translatedChapters).length - (project.polishedChapterIndices?.length || 0)} ch. chưa mượt`
                           : `✨ Đã mượt ${project.polishedChapterIndices?.length || 0} ch.`}
                       </span>
                     )}
+                    <HelpBtn onClick={() => openHelp('range_progress')} />
                   </div>
                 </div>
 
                 {/* Progress bar */}
-                <div className="w-full h-2.5 bg-neutral-950 rounded-full overflow-hidden border border-neutral-800">
+                <div className="w-full h-2.5 bg-[#050505] rounded-full overflow-hidden border border-[#785a28]/40">
                   <div 
-                    className="h-full bg-gradient-to-r from-blue-600 to-emerald-500 transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-[#005a82] to-emerald-500 transition-all duration-500"
                     style={{
                       width: `${project && project.chapters.length > 0 ? (Object.keys(project.translatedChapters).length / project.chapters.length) * 100 : 0}%`
                     }}
@@ -2449,42 +2807,76 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 </div>
 
                 {/* Pipeline Mode Indicator Badge */}
-                <div className="flex items-center justify-between px-2.5 py-1.5 bg-neutral-950 rounded-xl border border-neutral-800/80 text-[10.5px]">
-                  <span className="text-neutral-400 font-medium">Chế độ đường ống:</span>
-                  {(advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY' ? (
-                    <span className="text-cyan-300 font-bold font-mono flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-cyan-400" />
-                      Bóc Lô {advancedSettings.batchGlossarySize || 50} Chương ➔ Dịch Thuần
-                    </span>
-                  ) : (
-                    <span className="text-amber-300 font-bold font-mono">
-                      🔄 Dịch & Bóc Đồng Thời
-                    </span>
-                  )}
+                <div className="flex items-center justify-between px-2.5 py-1.5 bg-[#050505] rounded-xl border border-[#785a28]/40 text-[10.5px]">
+                  <span className="text-[#a09b8c] font-medium">Chế độ đường ống:</span>
+                  {(() => {
+                    const rawMode = advancedSettings.translationPipelineMode || 'MODE_2_BATCH_PURE';
+                    const mode = rawMode === 'COMBINED' ? 'MODE_1_DUAL_TASK' : (rawMode === 'BATCH_GLOSSARY' ? 'MODE_2_BATCH_PURE' : rawMode);
+                    const bSize = advancedSettings.batchGlossarySize || 50;
+
+                    if (mode === 'MODE_1_DUAL_TASK') {
+                      return (
+                        <span className="text-[#c8aa6e] font-bold font-mono flex items-center gap-1">
+                          ⚡ Mode 1: 1 Req 2 Task (Dịch + Bóc Từ)
+                        </span>
+                      );
+                    } else if (mode === 'MODE_3_RAW_INJECT') {
+                      return (
+                        <span className="text-[#c8aa6e] font-bold font-mono flex items-center gap-1">
+                          💉 Mode 3: Ghi Đè Raw Inject ➔ Dịch
+                        </span>
+                      );
+                    } else if (mode === 'MODE_4_DUAL_PASS') {
+                      return (
+                        <span className="text-emerald-400 font-bold font-mono flex items-center gap-1">
+                          🔬 Mode 4: Dịch Kép 2-Pass Phản Biện
+                        </span>
+                      );
+                    } else if (mode === 'MODE_5_COT_THINKING') {
+                      return (
+                        <span className="text-[#0ac8b9] font-bold font-mono flex items-center gap-1">
+                          🧠 Mode 5: Suy Luận Ngữ Cảnh CoT
+                        </span>
+                      );
+                    } else if (mode === 'MODE_6_SLIDING_BILINGUAL') {
+                      return (
+                        <span className="text-[#c8aa6e] font-bold font-mono flex items-center gap-1">
+                          🔗 Mode 6: Ngữ Cảnh Trượt Song Ngữ
+                        </span>
+                      );
+                    } else {
+                      return (
+                        <span className="text-[#0ac8b9] font-bold font-mono flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-[#0ac8b9]" />
+                          Mode 2: Bóc Lô {bSize}ch ➔ Dịch Thuần
+                        </span>
+                      );
+                    }
+                  })()}
                 </div>
 
                 {/* Range inputs: Từ chương -> Đến chương */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="flex items-center bg-neutral-950 p-2 rounded-xl border border-neutral-800">
-                    <span className="text-[11px] text-neutral-400 shrink-0 mr-1.5">Từ chương:</span>
+                  <div className="flex items-center bg-[#050505] p-2 rounded-xl border border-[#785a28]/40">
+                    <span className="text-[11px] text-[#a09b8c] shrink-0 mr-1.5">Từ chương:</span>
                     <input
                       type="number"
                       min={1}
                       max={project ? project.chapters.length : 1}
                       value={fromChapInput}
                       onChange={(e) => setFromChapInput(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full bg-transparent text-xs text-white font-bold font-mono focus:outline-none"
+                      className="w-full bg-transparent text-xs text-[#f0e6d2] font-bold font-mono focus:outline-none"
                     />
                   </div>
-                  <div className="flex items-center bg-neutral-950 p-2 rounded-xl border border-neutral-800">
-                    <span className="text-[11px] text-neutral-400 shrink-0 mr-1.5">Đến chương:</span>
+                  <div className="flex items-center bg-[#050505] p-2 rounded-xl border border-[#785a28]/40">
+                    <span className="text-[11px] text-[#a09b8c] shrink-0 mr-1.5">Đến chương:</span>
                     <input
                       type="number"
                       min={1}
                       max={project ? project.chapters.length : 1}
                       value={toChapInput}
                       onChange={(e) => setToChapInput(parseInt(e.target.value) || 1)}
-                      className="w-full bg-transparent text-xs text-white font-bold font-mono focus:outline-none"
+                      className="w-full bg-transparent text-xs text-[#f0e6d2] font-bold font-mono focus:outline-none"
                     />
                   </div>
                 </div>
@@ -2504,7 +2896,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       setIsPaused(false);
                       addLog(`▶ Bắt đầu dịch Range từ Chương ${fromChapInput} đến ${toChapInput}...`);
                     }}
-                    className="py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-md shadow-blue-600/20 cursor-pointer"
+                    className="py-2.5 bg-[#005a82] hover:bg-[#0284c7] disabled:opacity-40 text-[#f0e6d2] border border-[#0ac8b9]/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-md shadow-black/40 cursor-pointer transition-all"
                   >
                     <Play className="w-3.5 h-3.5" />
                     <span>Dịch Range</span>
@@ -2524,7 +2916,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       }
                     }}
                     className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all ${
-                      isPaused ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-amber-600 hover:bg-amber-500 text-white'
+                      isPaused ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28]'
                     } disabled:opacity-40`}
                   >
                     {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
@@ -2582,9 +2974,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 <button
                   disabled={isPolishing || isTranslating}
                   onClick={handleExecuteFinalGlobalPolish}
-                  className="w-full py-2.5 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-700/20 cursor-pointer transition-all"
+                  className="w-full py-2.5 bg-[#005a82] hover:bg-[#0284c7] disabled:opacity-40 text-[#f0e6d2] border border-[#0ac8b9]/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-black/40 cursor-pointer transition-all"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5 text-[#0ac8b9]" />
                   <span>✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)</span>
                 </button>
 
@@ -2592,9 +2984,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 <button
                   disabled={isPolishing || isTranslating}
                   onClick={handleRepolishUnpolishedChapters}
-                  className="w-full py-2.5 bg-gradient-to-r from-pink-600 to-fuchsia-600 hover:from-pink-500 hover:to-fuchsia-500 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-pink-600/20 cursor-pointer transition-all"
+                  className="w-full py-2.5 bg-[#1e2328] hover:bg-[#2e3338] disabled:opacity-40 text-[#c8aa6e] border border-[#785a28] rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-black/40 cursor-pointer transition-all"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5 text-[#c8aa6e]" />
                   <span>
                     🪄 Làm Mượt Lại Các Chương Chưa Xử Lý
                     {project && Object.keys(project.translatedChapters).length > (project.polishedChapterIndices?.length || 0)
@@ -2603,11 +2995,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                   </span>
                 </button>
 
+                {/* NÚT XUẤT TOÀN BỘ TÁC PHẨM (5 ĐỊNH DẠNG EBOOK) */}
+                <button
+                  disabled={!project || Object.keys(project.translatedChapters).length === 0}
+                  onClick={handleExportFullNovel}
+                  className="w-full py-2.5 bg-[#c8aa6e] hover:bg-[#d8ba7e] disabled:opacity-40 text-black font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-black/40 cursor-pointer transition-all"
+                >
+                  <Download className="w-3.5 h-3.5 text-black" />
+                  <span>📚 Xuất Toàn Bộ Tác Phẩm (5 Định Dạng: EPUB, MOBI, AZW3, TXT, HTML)</span>
+                </button>
+
                 {/* Rolling Context Banner */}
                 {lastAttachedSnippet && (
-                  <div className="p-2 bg-blue-950/40 border border-blue-900/60 rounded-xl text-[10px] text-blue-300 flex items-center gap-1.5 truncate">
-                    <span className="font-bold text-white shrink-0">🔗 Ngữ cảnh 300 từ:</span>
-                    <span className="truncate italic text-neutral-300">{lastAttachedSnippet}</span>
+                  <div className="p-2 bg-[#050505] border border-[#785a28]/40 rounded-xl text-[10px] text-[#f0e6d2] flex items-center gap-1.5 truncate">
+                    <span className="font-bold text-[#c8aa6e] shrink-0">🔗 Ngữ cảnh 300 từ:</span>
+                    <span className="truncate italic text-[#a09b8c]">{lastAttachedSnippet}</span>
                   </div>
                 )}
               </div>
@@ -2615,16 +3017,20 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
               {/* ======================================================== */}
               {/* MỤC 3: KHO THUẬT NGỮ MASTER GLOSSARY */}
               {/* ======================================================== */}
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <BookMarked className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-neutral-100">3. Kho Thuật Ngữ Master Glossary</span>
-                    <HelpBtn onClick={() => openHelp('master_glossary')} />
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <BookMarked className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide">3. Kho Thuật Ngữ Master Glossary</div>
+                      <div className="text-[10px] text-[#a09b8c]">
+                        {project ? Object.keys(project.masterGlossary).length : 0} thuật ngữ lưu trong bộ nhớ
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800">
-                    {project ? Object.keys(project.masterGlossary).length : 0} Thuật ngữ
-                  </span>
+                  <HelpBtn onClick={() => openHelp('master_glossary')} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -2633,27 +3039,27 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                     value={newGlossaryKey}
                     onChange={(e) => setNewGlossaryKey(e.target.value)}
                     placeholder="Từ gốc (VD: 林辰)"
-                    className="bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 py-1.5 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500"
+                    className="bg-[#050c18] border border-[#785a28]/40 rounded-xl px-2.5 py-1.5 text-xs text-[#f0e6d2] focus:outline-none focus:border-[#c8aa6e]"
                   />
                   <input
                     type="text"
                     value={newGlossaryVal}
                     onChange={(e) => setNewGlossaryVal(e.target.value)}
                     placeholder="Nghĩa dịch (VD: Lâm Thần)"
-                    className="bg-neutral-950 border border-neutral-800 rounded-xl px-2.5 py-1.5 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500"
+                    className="bg-[#050c18] border border-[#785a28]/40 rounded-xl px-2.5 py-1.5 text-xs text-[#f0e6d2] focus:outline-none focus:border-[#c8aa6e]"
                   />
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={handleAddGlossary}
-                    className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1 shadow-md shadow-emerald-600/20 cursor-pointer"
+                    className="flex-1 py-1.5 bg-[#c8aa6e] hover:bg-[#d8ba7e] text-black rounded-xl text-xs font-extrabold flex items-center justify-center gap-1 shadow-md shadow-black/40 cursor-pointer transition-all"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>+ Thêm Từ</span>
                   </button>
 
-                  <label className="py-1.5 px-2.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer">
+                  <label className="py-1.5 px-2.5 bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] border border-[#0ac8b9]/40 rounded-xl text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all shadow-sm">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Nạp .txt</span>
                     <input
@@ -2670,7 +3076,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
                   <button
                     onClick={handleExportGlossaryFile}
-                    className="py-1.5 px-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer"
+                    className="py-1.5 px-2.5 bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] rounded-xl text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all shadow-sm"
                     title="Xuất từ điển ra file .txt định dạng raw=vi"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -2681,12 +3087,12 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 {/* Compact Glossary Preview (Top 5 terms only to prevent lag) */}
                 <div className="space-y-1">
                   {project && Object.entries(project.masterGlossary).slice(-5).reverse().map(([k, v], idx) => (
-                    <div key={idx} className="p-1.5 bg-neutral-950 rounded-lg flex items-center justify-between text-[11px] border border-neutral-800/80">
-                      <span className="text-blue-300 font-medium truncate">{k} ➔ <span className="text-emerald-400 font-semibold">{v}</span></span>
+                    <div key={idx} className="p-1.5 bg-[#050c18] rounded-lg flex items-center justify-between text-[11px] border border-[#785a28]/30">
+                      <span className="text-[#0ac8b9] font-medium truncate">{k} ➔ <span className="text-[#c8aa6e] font-semibold">{v}</span></span>
                       <div className="flex items-center gap-1 shrink-0 ml-1">
                         <button
                           onClick={() => handleOpenEditGlossary(k, v)}
-                          className="text-neutral-400 hover:text-blue-400 p-0.5 cursor-pointer"
+                          className="text-neutral-400 hover:text-[#c8aa6e] p-0.5 cursor-pointer"
                           title="Chỉnh sửa từ này"
                         >
                           <Edit3 className="w-3 h-3" />
@@ -2718,17 +3124,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       setGlossarySearchQuery('');
                       setShowFullGlossaryModal(true);
                     }}
-                    className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
+                    className="w-full py-2 bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-[#785a28] cursor-pointer transition-all shadow-sm"
                   >
-                    <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+                    <BookOpen className="w-3.5 h-3.5 text-[#c8aa6e]" />
                     <span>Mở Kho Từ Điển Đầy Đủ ({Object.keys(project.masterGlossary).length} từ) ▾</span>
                   </button>
                 )}
               </div>
 
               {/* Live Console Logs (NEWEST IS AT THE TOP) */}
-              <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-2.5">
-                <div className="flex items-center justify-between text-[10px] text-neutral-400 mb-1 font-mono">
+              <div className="bg-[#050505] border border-[#785a28]/40 rounded-2xl p-2.5">
+                <div className="flex items-center justify-between text-[10px] text-[#a09b8c] mb-1 font-mono">
                   <div className="flex items-center gap-1.5">
                     <Terminal className="w-3 h-3 text-emerald-400" />
                     <span>LIVE CONSOLE (MỚI NHẤT Ở TRÊN CÙNG):</span>
@@ -2757,86 +3163,47 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           {/* ======================================================== */}
           {activeBottomTab === 'chapters' && (
             <div className="space-y-3">
-              <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <BookOpen className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-neutral-100">Danh Sách Chương</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide">Danh Sách Chương & Trình Đọc</div>
+                      <div className="text-[10px] text-[#a09b8c]">
+                        Đã dịch {project ? Object.keys(project.translatedChapters).length : 0} / {totalChapters} chương
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[#c8aa6e] font-mono font-bold bg-[#1e2328] px-2 py-0.5 rounded-full border border-[#785a28]">
+                      {project ? Object.keys(project.translatedChapters).length : 0}/{totalChapters}
+                    </span>
                     <HelpBtn onClick={() => openHelp('chapter_auditor')} />
                   </div>
-                  <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                    Đã dịch {project ? Object.keys(project.translatedChapters).length : 0}/{totalChapters}
-                  </span>
                 </div>
-
-                {/* Export Full Novel Button directly accessible in Tab 3 */}
-                <button
-                  onClick={handleExportFullNovel}
-                  disabled={!project || Object.keys(project.translatedChapters).length === 0}
-                  className="w-full py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>📥 Xuất Tác Phẩm (TXT, EPUB, HTML, MOBI, AZW3)</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (!project || project.chapters.length === 0) {
-                      alert('Chưa có chương nào!');
-                      return;
-                    }
-                    const missing = [];
-                    for (let i = 0; i < project.chapters.length; i++) {
-                      if (!project.translatedChapters[i]) missing.push(i + 1);
-                    }
-                    if (missing.length === 0) {
-                      alert('🎉 Toàn bộ chương đều đã được dịch đầy đủ 100%!');
-                      return;
-                    }
-                    setIsGapFillingMode(true);
-                    setFromChapInput(1);
-                    setToChapInput(project.chapters.length);
-                    setCurrentChapterIndex(0);
-                    setIsTranslating(true);
-                    setIsPaused(false);
-                    setActiveBottomTab('translate');
-                    addLog(`⚡ [DỊCH BÙ TOÀN BỘ] Phát hiện ${missing.length} chương chưa dịch. Đang tự động dịch bù và né 100% các chương đã xong!`);
-                  }}
-                  className="w-full py-2 bg-teal-700 hover:bg-teal-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>⚡ Dịch Bù Toàn Bộ Chương Còn Thiếu (Né Đã Dịch)</span>
-                </button>
-
-                <button
-                  disabled={isPolishing || isTranslating}
-                  onClick={handleExecuteFinalGlobalPolish}
-                  className="w-full py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>✨ Làm Mượt Toàn Văn Bản Dịch (Quét Sạch Chữ Hán)</span>
-                </button>
 
                 {/* Chapter Pagination Bar to Prevent Scroll Lag */}
                 {totalChapters > CHAPTERS_PER_PAGE && (
-                  <div className="flex items-center justify-between bg-neutral-950 p-1.5 rounded-xl border border-neutral-800 text-xs">
+                  <div className="flex items-center justify-between bg-[#050c18] p-1.5 rounded-xl border border-[#785a28]/40 text-xs">
                     <button
                       disabled={chapterListPage <= 0}
                       onClick={() => setChapterListPage(prev => Math.max(0, prev - 1))}
-                      className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 text-white font-medium flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-[#1e2328] hover:bg-[#2e3338] disabled:opacity-30 text-[#c8aa6e] font-medium flex items-center gap-1 cursor-pointer border border-[#785a28]/30 transition-all"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
                       <span>Trước</span>
                     </button>
                     
-                    <span className="text-[11px] font-mono text-neutral-300 font-bold">
+                    <span className="text-[11px] font-mono text-[#f0e6d2] font-bold">
                       Trang {chapterListPage + 1} / {totalChapterPages}
                     </span>
 
                     <button
                       disabled={chapterListPage >= totalChapterPages - 1}
                       onClick={() => setChapterListPage(prev => Math.min(totalChapterPages - 1, prev + 1))}
-                      className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 text-white font-medium flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-[#1e2328] hover:bg-[#2e3338] disabled:opacity-30 text-[#c8aa6e] font-medium flex items-center gap-1 cursor-pointer border border-[#785a28]/30 transition-all"
                     >
                       <span>Sau</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -2862,12 +3229,12 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                           }}
                           className={`p-2.5 rounded-xl flex items-center justify-between text-xs cursor-pointer border transition-all ${
                             isCurrent 
-                              ? 'bg-blue-950/60 border-blue-600 text-blue-200 shadow-sm' 
-                              : (isDone ? 'bg-neutral-950 border-emerald-900/40 hover:border-emerald-600' : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700')
+                              ? 'bg-[#005a82]/20 border-[#0ac8b9] text-[#0ac8b9] shadow-[0_0_10px_rgba(10,200,185,0.2)]' 
+                              : (isDone ? 'bg-[#050c18] border-emerald-900/40 hover:border-emerald-600/80 text-[#f0e6d2]' : 'bg-[#050c18] border-[#785a28]/30 hover:border-[#c8aa6e]/60 text-neutral-300')
                           }`}
                         >
                           <div className="flex items-center gap-2 truncate">
-                            <span className="w-5 h-5 rounded-full bg-neutral-800 text-[10px] flex items-center justify-center font-mono shrink-0">
+                            <span className="w-5 h-5 rounded-full bg-[#1e2328] text-[10px] flex items-center justify-center font-mono text-[#c8aa6e] border border-[#785a28]/40 shrink-0">
                               {absoluteIdx + 1}
                             </span>
                             <span className="truncate font-medium">{titleLine}</span>
@@ -2878,21 +3245,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                 <Check className="w-2.5 h-2.5" /> Đã dịch
                               </span>
                             ) : isCurrent ? (
-                              <span className="text-[10px] text-blue-300 bg-blue-900 px-2 py-0.5 rounded-full animate-pulse font-semibold flex items-center gap-1">
+                              <span className="text-[10px] text-[#0ac8b9] bg-[#005a82]/40 px-2 py-0.5 rounded-full animate-pulse font-semibold flex items-center gap-1 border border-[#0ac8b9]/40">
                                 <Zap className="w-2.5 h-2.5" /> Đang dịch
                               </span>
                             ) : (
-                              <span className="text-[10px] text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] text-neutral-400 bg-[#1e2328] px-2 py-0.5 rounded-full border border-neutral-700/50">
                                 Chờ dịch
                               </span>
                             )}
-                            <Eye className="w-3.5 h-3.5 text-neutral-400 hover:text-white" />
+                            <Eye className="w-3.5 h-3.5 text-[#a09b8c] hover:text-[#c8aa6e]" />
                           </div>
                         </div>
                       );
                     })
                   ) : (
-                    <div className="text-center py-16 text-xs text-neutral-500">
+                    <div className="text-center py-16 text-xs text-[#a09b8c]">
                       Chưa có chương nào. Hãy nạp file ở Thẻ 2 (Dịch & Glossary)!
                     </div>
                   )}
@@ -2906,99 +3273,110 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           {/* ======================================================== */}
           {activeBottomTab === 'settings' && (
             <div className="space-y-3">
-              {/* Tab 4 Sub-Navigation Bar */}
-              <div className="flex items-center gap-1 bg-neutral-900 p-1 rounded-2xl border border-neutral-800 text-[11px]">
-                <button
-                  onClick={() => setSettingsSubTab('advanced')}
-                  className={`flex-1 py-1.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    settingsSubTab === 'advanced'
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                      : 'text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  <Sliders className="w-3.5 h-3.5" />
-                  <span>Cài Đặt Chuyên Sâu</span>
-                </button>
-
-                <button
-                  onClick={() => setSettingsSubTab('projects')}
-                  className={`flex-1 py-1.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    settingsSubTab === 'projects'
-                      ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
-                      : 'text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  <BookMarked className="w-3.5 h-3.5" />
-                  <span>Quản Lý Dự Án</span>
-                </button>
-
-                <button
-                  onClick={() => setSettingsSubTab('godmode')}
-                  className={`flex-1 py-1.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    settingsSubTab === 'godmode'
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                      : 'text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>God-Mode & Xuất</span>
-                </button>
-              </div>
-
               {/* ============================================== */}
-              {/* PHÂN HỆ 1: TRUNG TÂM CÀI ĐẶT CHUYÊN SÂU */}
+              {/* MỤC 1: CÀI ĐẶT KEY API & XOAY TUA QUOTA */}
               {/* ============================================== */}
-              {settingsSubTab === 'advanced' && (
-                <div className="space-y-3">
-                  {/* Phân hệ 1.1: Key API & Cơ Chế Xoay Tua */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <Key className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-neutral-100">1. Cài Đặt Key API & Động Cơ Xoay Tua</span>
-                      <HelpBtn onClick={() => openHelp('settings_api_rotation')} />
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsSection1Open(!isSection1Open)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <Key className="w-3.5 h-3.5" />
                     </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>1. Cài Đặt Key API & Xoay Tua</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono font-bold">
+                          {advancedSettings.rotationStrategy === 'healthiest' ? 'Khỏe Nhất' : 'Round-Robin'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isSection1Open ? 'thu gọn' : 'mở rộng thiết lập key & quota'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('settings_api_rotation'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isSection1Open ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
 
-                    <div className="space-y-2.5 text-xs">
-                      {/* Chiến lược xoay key */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-1.5">
+                {isSection1Open && (
+                  <div className="p-3.5 pt-0 border-t border-[#785a28]/30 space-y-3 animate-fadeIn">
+                    <div className="pt-2.5 space-y-2.5 text-xs">
+                      {/* Chiến lược xoay key (LoL Dropdown Card) */}
+                      <div className="space-y-1.5 bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40">
                         <div className="flex items-center justify-between text-neutral-300">
-                          <span>Chiến lược xoay key (Rotation Strategy):</span>
+                          <span className="font-bold text-[#f0e6d2]">Chiến Lược Xoay Key (Rotation Strategy):</span>
+                          <span className="text-[9px] text-[#c8aa6e] font-mono">CHỌN 1 TRONG 2</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            onClick={() => {
-                              setAdvancedSettings(prev => ({ ...prev, rotationStrategy: 'round-robin' }));
-                              addLog('⚙️ Đã chọn chiến lược: Round-Robin tuần tự');
-                            }}
-                            className={`py-1.5 px-2 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 cursor-pointer ${
-                              advancedSettings.rotationStrategy === 'round-robin'
-                                ? 'bg-amber-600 text-white'
-                                : 'bg-neutral-900 text-neutral-400 hover:text-white'
-                            }`}
-                          >
-                            <span>Round-Robin Tuần Tự</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setAdvancedSettings(prev => ({ ...prev, rotationStrategy: 'healthiest' }));
-                              addLog('⚙️ Đã chọn chiến lược: Ưu tiên Key khỏe nhất');
-                            }}
-                            className={`py-1.5 px-2 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 cursor-pointer ${
-                              advancedSettings.rotationStrategy === 'healthiest'
-                                ? 'bg-amber-600 text-white'
-                                : 'bg-neutral-900 text-neutral-400 hover:text-white'
-                            }`}
-                          >
-                            <span>Ưu Tiên Key Khỏe Nhất</span>
-                          </button>
+                        
+                        <div
+                          onClick={() => setIsRotationDropdownOpen(!isRotationDropdownOpen)}
+                          className="bg-gradient-to-r from-[#111923] via-[#0f1d30] to-[#111923] border border-[#c8aa6e] rounded-xl p-2.5 cursor-pointer flex items-center justify-between hover:border-[#f0e6d2] transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#c8aa6e] animate-pulse"></span>
+                            <span className="font-bold text-[#f0e6d2] text-xs">
+                              {advancedSettings.rotationStrategy === 'healthiest'
+                                ? 'Ưu Tiên Key Khỏe Nhất (Healthiest First)'
+                                : 'Round-Robin Tuần Tự (Vòng Tròn Đều Đặn)'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold bg-[#785a28]/40 text-[#c8aa6e] px-1.5 py-0.5 rounded border border-[#c8aa6e]/60">
+                              ĐANG DÙNG
+                            </span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isRotationDropdownOpen ? 'rotate-180' : ''}`} />
+                          </div>
                         </div>
+
+                        {isRotationDropdownOpen && (
+                          <div className="space-y-1.5 pt-1 animate-fadeIn">
+                            {[
+                              {
+                                id: 'round-robin',
+                                title: 'Round-Robin Tuần Tự',
+                                desc: 'Xoay tròn đều đặn qua từng key theo thứ tự 1, 2, 3... Phân bổ tải công bằng.'
+                              },
+                              {
+                                id: 'healthiest',
+                                title: 'Ưu Tiên Key Khỏe Nhất',
+                                desc: 'Ưu tiên gọi key có tỷ lệ thành công cao nhất và thời gian phản hồi nhanh nhất.'
+                              }
+                            ].map((item) => {
+                              const isSel = (advancedSettings.rotationStrategy || 'round-robin') === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    setAdvancedSettings(prev => ({ ...prev, rotationStrategy: item.id as any }));
+                                    setIsRotationDropdownOpen(false);
+                                    addLog(`⚙️ Đã chọn chiến lược xoay key: ${item.title}`);
+                                  }}
+                                  className={`w-full p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                                    isSel
+                                      ? 'bg-[#1e2328] border-[#c8aa6e] text-white shadow-sm'
+                                      : 'bg-[#091428] border-[#785a28]/40 text-neutral-400 hover:text-white hover:border-[#c8aa6e]/70'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between text-xs font-bold">
+                                    <span className={isSel ? 'text-[#f0e6d2]' : 'text-neutral-300'}>{item.title}</span>
+                                    {isSel && <span className="text-[10px] text-[#c8aa6e]">✓</span>}
+                                  </div>
+                                  <div className="text-[10px] text-[#a09b8c] mt-0.5">{item.desc}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Cooldown khi gặp 429 */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 flex items-center justify-between">
                         <div>
-                          <div className="text-neutral-200 font-medium">Thời gian nghỉ khi dính 429:</div>
-                          <div className="text-[10px] text-neutral-400">Cách ly key tạm thời trước khi dùng lại</div>
+                          <div className="text-[#f0e6d2] font-semibold">Thời gian nghỉ khi dính 429:</div>
+                          <div className="text-[10px] text-[#a09b8c]">Hiện tại: <strong className="text-[#c8aa6e] font-mono">{advancedSettings.cooldownSeconds || 60}s</strong></div>
                         </div>
                         <div className="flex items-center gap-1">
                           {[30, 60, 120, 180].map(s => (
@@ -3008,23 +3386,41 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                 setAdvancedSettings(prev => ({ ...prev, cooldownSeconds: s }));
                                 addLog(`⚙️ Đã đặt Cooldown 429: ${s} giây`);
                               }}
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-all ${
                                 (advancedSettings.cooldownSeconds || 60) === s
-                                  ? 'bg-amber-600 text-white font-bold'
-                                  : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                  ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm'
+                                  : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                               }`}
                             >
                               {s}s
                             </button>
                           ))}
+                          <button
+                            onClick={() => openQuantityEditor(
+                              'Thời Gian Cooldown Khi Dính 429',
+                              advancedSettings.cooldownSeconds || 60,
+                              5,
+                              600,
+                              'giây',
+                              (val: number) => {
+                                setAdvancedSettings(prev => ({ ...prev, cooldownSeconds: val }));
+                                addLog(`⚙️ Đã đặt Cooldown 429 tùy chỉnh: ${val}s`);
+                              },
+                              undefined,
+                              5
+                            )}
+                            className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold"
+                          >
+                            ✏️ Sửa
+                          </button>
                         </div>
                       </div>
 
                       {/* Số lần thử lại tối đa */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 flex items-center justify-between">
                         <div>
-                          <div className="text-neutral-200 font-medium">Số lần thử lại tối đa (Max Retries):</div>
-                          <div className="text-[10px] text-neutral-400">Thử lại với key khác trước khi báo lỗi</div>
+                          <div className="text-[#f0e6d2] font-semibold">Số lần thử lại tối đa (Max Retries):</div>
+                          <div className="text-[10px] text-[#a09b8c]">Hiện tại: <strong className="text-[#c8aa6e] font-mono">{advancedSettings.maxRetries || 3} lần</strong></div>
                         </div>
                         <div className="flex items-center gap-1">
                           {[1, 2, 3, 5].map(r => (
@@ -3034,53 +3430,118 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                 setAdvancedSettings(prev => ({ ...prev, maxRetries: r }));
                                 addLog(`⚙️ Đã đặt Max Retries: ${r} lần`);
                               }}
-                              className={`w-6 h-6 rounded text-[10px] font-mono flex items-center justify-center cursor-pointer ${
+                              className={`w-6 h-6 rounded text-[10px] font-mono flex items-center justify-center cursor-pointer transition-all ${
                                 (advancedSettings.maxRetries || 3) === r
-                                  ? 'bg-amber-600 text-white font-bold'
-                                  : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                  ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm'
+                                  : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                               }`}
                             >
                               {r}
                             </button>
                           ))}
+                          <button
+                            onClick={() => openQuantityEditor(
+                              'Số Lần Thử Lại Tối Đa (Max Retries)',
+                              advancedSettings.maxRetries || 3,
+                              1,
+                              20,
+                              'lần',
+                              (val: number) => {
+                                setAdvancedSettings(prev => ({ ...prev, maxRetries: val }));
+                                addLog(`⚙️ Đã đặt Max Retries tùy chỉnh: ${val} lần`);
+                              }
+                            )}
+                            className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold ml-0.5"
+                          >
+                            ✏️ Sửa
+                          </button>
                         </div>
                       </div>
 
                       {/* Độ trễ an toàn giữa các chương */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 flex items-center justify-between">
                         <div>
-                          <div className="text-neutral-200 font-medium">Độ trễ nghỉ giữa các chương:</div>
-                          <div className="text-[10px] text-neutral-400">Giảm tỷ lệ dính RPM rate-limit</div>
+                          <div className="text-[#f0e6d2] font-semibold">Độ trễ nghỉ giữa các chương:</div>
+                          <div className="text-[10px] text-[#a09b8c]">Hiện tại: <strong className="text-[#c8aa6e] font-mono">{delaySecInput}s</strong></div>
                         </div>
                         <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            value={delaySecInput}
-                            onChange={(e) => setDelaySecInput(parseFloat(e.target.value) || 2)}
-                            className="w-14 bg-neutral-900 border border-neutral-700 rounded px-1.5 py-0.5 text-right font-mono text-white text-xs"
-                          />
-                          <span className="text-neutral-400 text-[11px]">giây</span>
+                          {[0.5, 1, 2, 3].map(d => (
+                            <button
+                              key={d}
+                              onClick={() => {
+                                setDelaySecInput(d);
+                                addLog(`⚙️ Đã đặt độ trễ: ${d}s`);
+                              }}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-all ${
+                                delaySecInput === d
+                                  ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm'
+                                  : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
+                              }`}
+                            >
+                              {d}s
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => openQuantityEditor(
+                              'Độ Trễ Nghỉ Giữa Các Chương',
+                              delaySecInput,
+                              0,
+                              60,
+                              'giây',
+                              (val: number) => {
+                                setDelaySecInput(val);
+                                addLog(`⚙️ Đã đặt độ trễ tùy chỉnh: ${val}s`);
+                              },
+                              undefined,
+                              0.5
+                            )}
+                            className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold ml-0.5"
+                          >
+                            ✏️ Sửa
+                          </button>
                         </div>
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  {/* Phân hệ 1.2: Tinh Chỉnh Glossary (AI Auto-Learning) */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-bold text-neutral-100">2. Tinh Chỉnh Thuật Ngữ Glossary (AI Auto-Learning)</span>
-                      <HelpBtn onClick={() => openHelp('settings_glossary_learning')} />
+              {/* ============================================== */}
+              {/* MỤC 2: TINH CHỈNH THUẬT NGỮ GLOSSARY (DROPDOWN ACCORDION) */}
+              {/* ============================================== */}
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsSection2Open(!isSection2Open)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <Sparkles className="w-3.5 h-3.5" />
                     </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>2. Tinh Chỉnh Thuật Ngữ Glossary</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono font-bold">
+                          {advancedSettings.autoLearnGlossary ? 'AI Tự Học' : 'Thủ Công'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isSection2Open ? 'thu gọn' : 'mở rộng thiết lập AI tự học & danh sách từ cấm'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('settings_glossary_learning'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isSection2Open ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
 
-                    <div className="space-y-2.5 text-xs">
+                {isSection2Open && (
+                  <div className="p-3 pt-0 border-t border-[#785a28]/30 space-y-3 animate-fadeIn">
+                    <div className="pt-2.5 space-y-2.5 text-xs">
                       {/* minTermLength */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-1.5">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-200 font-medium">Độ dài ký tự tối thiểu của từ gốc:</span>
-                          <span className="text-emerald-400 font-mono font-bold">{advancedSettings.minTermLength || 2} ký tự</span>
+                          <span className="text-[#f0e6d2] font-semibold">Độ dài ký tự tối thiểu của từ gốc:</span>
+                          <span className="text-[#c8aa6e] font-mono font-bold">{advancedSettings.minTermLength || 2} ký tự</span>
                         </div>
                         <div className="flex items-center gap-1">
                           {[1, 2, 3, 4, 5, 6].map(len => (
@@ -3090,42 +3551,39 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                 setAdvancedSettings(prev => ({ ...prev, minTermLength: len }));
                                 addLog(`⚙️ Đã đặt Độ dài tối thiểu Glossary: >= ${len} ký tự`);
                               }}
-                              className={`flex-1 py-1 rounded text-[10px] font-mono font-bold cursor-pointer ${
+                              className={`flex-1 py-1 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${
                                 (advancedSettings.minTermLength || 2) === len
-                                  ? 'bg-emerald-600 text-white'
-                                  : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                  ? 'bg-[#c8aa6e] text-black shadow-sm'
+                                  : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                               }`}
                             >
                               {len} kt
                             </button>
                           ))}
+                          <button
+                            onClick={() => openQuantityEditor(
+                              'Độ Dài Ký Tự Tối Thiểu Glossary',
+                              advancedSettings.minTermLength || 2,
+                              1,
+                              50,
+                              'ký tự',
+                              (val: number) => {
+                                setAdvancedSettings(prev => ({ ...prev, minTermLength: val }));
+                                addLog(`⚙️ Đã đặt Độ dài tối thiểu tùy chỉnh: >= ${val} ký tự`);
+                              }
+                            )}
+                            className="px-2 py-1 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold"
+                          >
+                            ✏️ Sửa
+                          </button>
                         </div>
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <span className="text-[10px] text-neutral-400">Hoặc nhập số tùy ý:</span>
-                          <input
-                            type="number"
-                            min="1"
-                            max="50"
-                            value={advancedSettings.minTermLength || 2}
-                            onChange={(e) => {
-                              const val = Math.max(1, parseInt(e.target.value) || 1);
-                              setAdvancedSettings(prev => ({ ...prev, minTermLength: val }));
-                              addLog(`⚙️ Đã đặt Độ dài tối thiểu Glossary: >= ${val} ký tự`);
-                            }}
-                            className="w-16 bg-neutral-900 border border-neutral-700 rounded px-2 py-0.5 text-center font-mono text-white text-xs font-bold focus:outline-none focus:border-emerald-500"
-                          />
-                          <span className="text-[10px] text-emerald-400">ký tự</span>
-                        </div>
-                        <p className="text-[10px] text-neutral-400 italic">
-                          💡 Ngăn Gemini tự ý thêm từ đơn 1 ký tự vô nghĩa vào Master Glossary. Khuyên dùng: 2 ký tự trở lên.
-                        </p>
                       </div>
 
                       {/* minFrequency */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-1.5">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-200 font-medium">Tần suất xuất hiện tối thiểu trong chương:</span>
-                          <span className="text-emerald-400 font-mono font-bold">≥ {advancedSettings.minFrequency || 2} lần</span>
+                          <span className="text-[#f0e6d2] font-semibold">Tần suất xuất hiện tối thiểu trong chương:</span>
+                          <span className="text-[#c8aa6e] font-mono font-bold">≥ {advancedSettings.minFrequency || 2} lần</span>
                         </div>
                         <div className="flex items-center gap-1">
                           {[1, 2, 3, 4, 5].map(freq => (
@@ -3135,81 +3593,111 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                 setAdvancedSettings(prev => ({ ...prev, minFrequency: freq }));
                                 addLog(`⚙️ Đã đặt Tần suất tối thiểu Glossary: >= ${freq} lần/chương`);
                               }}
-                              className={`flex-1 py-1 rounded text-[10px] font-mono font-bold cursor-pointer ${
+                              className={`flex-1 py-1 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${
                                 (advancedSettings.minFrequency || 2) === freq
-                                  ? 'bg-emerald-600 text-white'
-                                  : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                  ? 'bg-[#c8aa6e] text-black shadow-sm'
+                                  : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                               }`}
                             >
-                              ≥ {freq} lần
+                              ≥ {freq}
                             </button>
                           ))}
+                          <button
+                            onClick={() => openQuantityEditor(
+                              'Tần Suất Xuất Hiện Tối Thiểu Trong Chương',
+                              advancedSettings.minFrequency || 2,
+                              1,
+                              50,
+                              'lần lặp',
+                              (val: number) => {
+                                setAdvancedSettings(prev => ({ ...prev, minFrequency: val }));
+                                addLog(`⚙️ Đã đặt Tần suất tối thiểu tùy chỉnh: >= ${val} lần`);
+                              }
+                            )}
+                            className="px-2 py-1 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold"
+                          >
+                            ✏️ Sửa
+                          </button>
                         </div>
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <span className="text-[10px] text-neutral-400">Hoặc nhập số tùy ý:</span>
-                          <input
-                            type="number"
-                            min="1"
-                            max="50"
-                            value={advancedSettings.minFrequency || 2}
-                            onChange={(e) => {
-                              const val = Math.max(1, parseInt(e.target.value) || 1);
-                              setAdvancedSettings(prev => ({ ...prev, minFrequency: val }));
-                              addLog(`⚙️ Đã đặt Tần suất tối thiểu Glossary: >= ${val} lần`);
-                            }}
-                            className="w-16 bg-neutral-900 border border-neutral-700 rounded px-2 py-0.5 text-center font-mono text-white text-xs font-bold focus:outline-none focus:border-emerald-500"
-                          />
-                          <span className="text-[10px] text-emerald-400">lần lặp</span>
-                        </div>
-                        <p className="text-[10px] text-neutral-400 italic">
-                          💡 Chỉ các danh từ riêng lặp lại từ {advancedSettings.minFrequency || 2} lần trở lên trong chương mới được nạp vào từ điển output.
-                        </p>
                       </div>
 
-                      {/* conflictPolicy */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-1.5">
-                        <span className="text-neutral-200 font-medium block">Cơ chế xung đột nghĩa từ điển (Conflict Policy):</span>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          <button
-                            onClick={() => {
-                              setAdvancedSettings(prev => ({ ...prev, conflictPolicy: 'keep-old' }));
-                              addLog('⚙️ Đã đặt Chính sách từ điển: Giữ cũ - Bỏ mới');
-                            }}
-                            className={`p-2 rounded-xl text-left border cursor-pointer ${
-                              advancedSettings.conflictPolicy === 'keep-old'
-                                ? 'bg-emerald-950/80 border-emerald-500 text-emerald-100'
-                                : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
-                            }`}
-                          >
-                            <div className="font-bold text-[11px]">Giữ Cũ - Bỏ Mới (Khuyên dùng)</div>
-                            <div className="text-[9px] text-neutral-400 mt-0.5">Bảo toàn tên nhân vật ban đầu, tránh đổi tên giữa chừng</div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setAdvancedSettings(prev => ({ ...prev, conflictPolicy: 'overwrite' }));
-                              addLog('⚙️ Đã đặt Chính sách từ điển: Ghi đè bằng nghĩa mới');
-                            }}
-                            className={`p-2 rounded-xl text-left border cursor-pointer ${
-                              advancedSettings.conflictPolicy === 'overwrite'
-                                ? 'bg-emerald-950/80 border-emerald-500 text-emerald-100'
-                                : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200'
-                            }`}
-                          >
-                            <div className="font-bold text-[11px]">Ghi Đè Bằng Nghĩa Mới</div>
-                            <div className="text-[9px] text-neutral-400 mt-0.5">Luôn cập nhật theo ngữ cảnh dịch mới nhất</div>
-                          </button>
+                      {/* conflictPolicy (LoL Dropdown Card) */}
+                      <div className="space-y-1.5 bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40">
+                        <div className="flex items-center justify-between text-neutral-300">
+                          <span className="font-bold text-[#f0e6d2]">Cơ Chế Xung Đột Từ Điển (Conflict Policy):</span>
+                          <span className="text-[9px] text-[#c8aa6e] font-mono">CHỌN 1 TRONG 2</span>
                         </div>
+
+                        <div
+                          onClick={() => setIsConflictDropdownOpen(!isConflictDropdownOpen)}
+                          className="bg-gradient-to-r from-[#111923] via-[#0f1d30] to-[#111923] border border-[#c8aa6e] rounded-xl p-2.5 cursor-pointer flex items-center justify-between hover:border-[#f0e6d2] transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#c8aa6e] animate-pulse"></span>
+                            <span className="font-bold text-[#f0e6d2] text-xs">
+                              {advancedSettings.conflictPolicy === 'overwrite'
+                                ? 'Ghi Đè Bằng Nghĩa Mới (Overwrite Policy)'
+                                : 'Giữ Cũ - Bỏ Mới (Keep-Old First - Khuyên Dùng)'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold bg-[#785a28]/40 text-[#c8aa6e] px-1.5 py-0.5 rounded border border-[#c8aa6e]/60">
+                              ĐANG DÙNG
+                            </span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isConflictDropdownOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+
+                        {isConflictDropdownOpen && (
+                          <div className="space-y-1.5 pt-1 animate-fadeIn">
+                            {[
+                              {
+                                id: 'keep-old',
+                                title: 'Giữ Cũ - Bỏ Mới (Khuyên dùng)',
+                                desc: 'Bảo toàn tên nhân vật ban đầu, tránh đổi tên giữa chừng trong toàn bộ tác phẩm.'
+                              },
+                              {
+                                id: 'overwrite',
+                                title: 'Ghi Đè Bằng Nghĩa Mới',
+                                desc: 'Luôn cập nhật theo ngữ cảnh dịch mới nhất của các chương phía sau.'
+                              }
+                            ].map((item) => {
+                              const isSel = (advancedSettings.conflictPolicy || 'keep-old') === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    setAdvancedSettings(prev => ({ ...prev, conflictPolicy: item.id as any }));
+                                    setIsConflictDropdownOpen(false);
+                                    addLog(`⚙️ Đã đặt Chính sách từ điển: ${item.title}`);
+                                  }}
+                                  className={`w-full p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                                    isSel
+                                      ? 'bg-[#1e2328] border-[#c8aa6e] text-white shadow-sm'
+                                      : 'bg-[#091428] border-[#785a28]/40 text-neutral-400 hover:text-white hover:border-[#c8aa6e]/70'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between text-xs font-bold">
+                                    <span className={isSel ? 'text-[#f0e6d2]' : 'text-neutral-300'}>{item.title}</span>
+                                    {isSel && <span className="text-[10px] text-[#c8aa6e]">✓</span>}
+                                  </div>
+                                  <div className="text-[10px] text-[#a09b8c] mt-0.5">{item.desc}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Blacklist Words */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-2">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-neutral-200 font-medium">Bộ lọc từ cấm / Đại từ xưng hô:</span>
-                          <span className="text-[10px] text-neutral-400">({advancedSettings.blacklistWords?.length || 0} từ)</span>
+                          <span className="text-[#f0e6d2] font-semibold">Bộ lọc từ cấm / Đại từ xưng hô:</span>
+                          <span className="text-[10px] text-[#c8aa6e] font-mono font-bold">({advancedSettings.blacklistWords?.length || 0} từ)</span>
                         </div>
                         <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
                           {advancedSettings.blacklistWords?.map((word, idx) => (
-                            <span key={idx} className="bg-neutral-900 border border-neutral-800 px-2 py-0.5 rounded-full text-[10px] text-neutral-300 flex items-center gap-1">
+                            <span key={idx} className="bg-[#1e2328] border border-[#785a28]/60 px-2 py-0.5 rounded-full text-[10px] text-[#f0e6d2] flex items-center gap-1">
                               <span>{word}</span>
                               <button
                                 onClick={() => {
@@ -3218,7 +3706,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                     blacklistWords: prev.blacklistWords.filter((_, i) => i !== idx)
                                   }));
                                 }}
-                                className="text-neutral-500 hover:text-red-400 cursor-pointer"
+                                className="text-neutral-400 hover:text-red-400 cursor-pointer"
                               >
                                 ×
                               </button>
@@ -3231,7 +3719,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                             value={newBlacklistWordInput}
                             onChange={(e) => setNewBlacklistWordInput(e.target.value)}
                             placeholder="Thêm từ cấm (VD: hắn, nàng, cái này...)"
-                            className="flex-1 bg-neutral-900 border border-neutral-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500"
+                            className="flex-1 bg-[#111923] border border-[#785a28]/50 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#c8aa6e]"
                           />
                           <button
                             onClick={() => {
@@ -3246,7 +3734,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                               }
                               setNewBlacklistWordInput('');
                             }}
-                            className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-semibold cursor-pointer shrink-0"
+                            className="px-2.5 py-1 bg-[#c8aa6e] hover:bg-[#d8ba7e] text-black font-extrabold rounded-lg text-xs cursor-pointer shrink-0 shadow-sm"
                           >
                             + Thêm
                           </button>
@@ -3254,200 +3742,528 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  {/* Phân hệ 1.2: Chế Độ Đường Ống Dịch (Pipeline Mode) */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-cyan-400" />
-                      <span className="text-xs font-bold text-neutral-100">2. Chế Độ Đường Ống Dịch (Pipeline Mode)</span>
-                      <HelpBtn onClick={() => openHelp('settings_pipeline_mode')} />
+              {/* ============================================== */}
+              {/* MỤC 3: CẤU HÌNH PHƯƠNG ÁN DỊCH THUẬT (DROPDOWN ACCORDION) */}
+              {/* ============================================== */}
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsSection3Open(!isSection3Open)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <Sparkles className="w-3.5 h-3.5" />
                     </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>3. Cấu Hình Phương Án Dịch Thuật</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono font-bold">
+                          {getStrategyTitle(advancedSettings.translationCoreStrategy || 'STRATEGY_PURE_LITERARY').split(' (')[0]}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isSection3Open ? 'thu gọn' : 'mở rộng 5 phương án lõi & các nút gạt pipeline'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('settings_pipeline_mode'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isSection3Open ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
 
-                    <div className="space-y-2 text-xs">
-                      {/* Chế độ 1: Bóc lô 50 chương */}
-                      <button
-                        onClick={() => {
-                          setAdvancedSettings(prev => ({ ...prev, translationPipelineMode: 'BATCH_GLOSSARY' }));
-                          addLog('⚙️ Đã chọn Chế độ: Bóc Lô 50 Chương ➔ Dịch Thuần Túy (Khuyên Dùng)');
-                        }}
-                        className={`w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
-                          (advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY'
-                            ? 'bg-blue-950/60 border-blue-500 shadow-sm text-white'
-                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
-                        }`}
+                {isSection3Open && (
+                  <div className="p-3 pt-0 border-t border-[#785a28]/30 space-y-4 animate-fadeIn">
+                    <div className="pt-2.5">
+
+                    {/* MỤC A: THẺ ẨN CHỌN PHƯƠNG ÁN LÕI (LEAGUE OF LEGENDS DROPDOWN CARD SELECTOR) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#c8aa6e] flex items-center gap-1.5">
+                          <span>◆</span> PHƯƠNG ÁN DỊCH LÕI (CHỌN 1 TRONG 5):
+                        </span>
+                        <span className="text-[9px] bg-[#1e2328] text-[#c8aa6e] px-2 py-0.5 rounded border border-[#785a28]">
+                          {isStrategyDropdownOpen ? 'ĐANG CHỌN' : 'NHẤN ĐỂ ĐỔI THẺ'}
+                        </span>
+                      </div>
+
+                      {/* THẺ ĐANG ĐƯỢC CHỌN (COLLAPSED CARD) */}
+                      <div
+                        onClick={() => setIsStrategyDropdownOpen(!isStrategyDropdownOpen)}
+                        className="bg-gradient-to-r from-[#111923] via-[#0f1d30] to-[#111923] border-2 border-[#c8aa6e] shadow-[0_0_15px_rgba(200,170,110,0.25)] rounded-xl p-3 cursor-pointer transition-all hover:border-[#f0e6d2] group"
                       >
-                        <div className="flex items-center justify-between font-bold text-xs">
-                          <span className="flex items-center gap-1.5">
-                            {(advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY' ? '✓ ' : ''}
-                            Bóc Lô 50 Chương ➔ Dịch Thuần Túy
-                          </span>
-                          <span className="text-[9px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-800">
-                            KHUYÊN DÙNG
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-neutral-400 mt-1 leading-relaxed">
-                          Gom trước 50 chương để AI trích xuất Master Glossary đầy đủ, sau đó dịch thuần túy 100%. Câu văn mượt mà, không dính chữ Hán.
-                        </div>
-                      </button>
-
-                      {/* Chế độ 2: Kết hợp đồng thời */}
-                      <button
-                        onClick={() => {
-                          setAdvancedSettings(prev => ({ ...prev, translationPipelineMode: 'COMBINED' }));
-                          addLog('⚙️ Đã chọn Chế độ: Kết Hợp Đồng Thời (Dịch & Bóc Từng Chương)');
-                        }}
-                        className={`w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
-                          advancedSettings.translationPipelineMode === 'COMBINED'
-                            ? 'bg-blue-950/60 border-blue-500 shadow-sm text-white'
-                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
-                        }`}
-                      >
-                        <div className="font-bold text-xs">
-                          {advancedSettings.translationPipelineMode === 'COMBINED' ? '✓ ' : ''}
-                          Kết Hợp Đồng Thời (Dịch & Bóc Từng Chương)
-                        </div>
-                        <div className="text-[10px] text-neutral-400 mt-1 leading-relaxed">
-                          Dịch và bóc tách thuật ngữ mới cùng lúc trong từng chương (chế độ truyền thống).
-                        </div>
-                      </button>
-
-                      {/* Kích thước lô bóc từ điển */}
-                      {(advancedSettings.translationPipelineMode || 'BATCH_GLOSSARY') === 'BATCH_GLOSSARY' && (
-                        <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between pt-2">
-                          <div>
-                            <div className="text-neutral-200 font-medium">Kích thước lô bóc từ điển:</div>
-                            <div className="text-[10px] text-neutral-400">Số chương gom lại trong 1 đợt bóc</div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#c8aa6e] animate-pulse"></span>
+                            <span className="text-xs font-bold text-[#f0e6d2] group-hover:text-amber-200">
+                              {getStrategyTitle(advancedSettings.translationCoreStrategy || 'STRATEGY_PURE_LITERARY')}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            {[20, 50, 100].map(sz => (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] font-bold bg-[#785a28]/40 text-[#c8aa6e] px-2 py-0.5 rounded border border-[#c8aa6e]/60">
+                              ĐANG KÍCH HOẠT
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-[#c8aa6e] transition-transform duration-300 ${isStrategyDropdownOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-[#a09b8c] mt-1.5 leading-relaxed pl-4 border-l-2 border-[#c8aa6e]/40">
+                          {getStrategyShortDesc(advancedSettings.translationCoreStrategy || 'STRATEGY_PURE_LITERARY')}
+                        </div>
+                      </div>
+
+                      {/* DANH SÁCH THẺ MỞ RỘNG (EXPANDED SELECTABLE CARDS) */}
+                      {isStrategyDropdownOpen && (
+                        <div className="space-y-2 pt-1 animate-fadeIn">
+                          {STRATEGY_OPTIONS.map((opt) => {
+                            const isSelected = (advancedSettings.translationCoreStrategy || 'STRATEGY_PURE_LITERARY') === opt.id;
+                            return (
                               <button
-                                key={sz}
+                                key={opt.id}
                                 onClick={() => {
-                                  setAdvancedSettings(prev => ({ ...prev, batchGlossarySize: sz }));
-                                  addLog(`⚙️ Đã đặt kích thước lô bóc từ điển: ${sz} chương/đợt`);
+                                  setAdvancedSettings(prev => ({
+                                    ...prev,
+                                    translationCoreStrategy: opt.id,
+                                    translationPipelineMode: opt.id as any
+                                  }));
+                                  setIsStrategyDropdownOpen(false);
+                                  addLog(`⚙️ Đã chọn Phương Án Lõi: ${opt.title}`);
                                 }}
-                                className={`px-2 py-1 rounded text-[10px] font-mono font-bold cursor-pointer ${
-                                  (advancedSettings.batchGlossarySize || 50) === sz
-                                    ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'bg-neutral-900 text-neutral-400 hover:text-white'
-                                  }`}
+                                className={`w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                                  isSelected
+                                    ? 'bg-[#1e2328] border-[#c8aa6e] shadow-[0_0_10px_rgba(200,170,110,0.3)] text-white'
+                                    : 'bg-[#0a1120] border-[#785a28]/40 text-neutral-400 hover:text-[#f0e6d2] hover:border-[#c8aa6e]/80 hover:bg-[#111923]'
+                                }`}
                               >
-                                {sz} ch
+                                <div className="flex items-center justify-between font-bold text-xs">
+                                  <span className="flex items-center gap-2">
+                                    <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[10px] ${
+                                      isSelected ? 'border-[#c8aa6e] bg-[#c8aa6e] text-black font-extrabold' : 'border-neutral-600'
+                                    }`}>
+                                      {isSelected ? '✓' : ''}
+                                    </span>
+                                    <span className={isSelected ? 'text-[#f0e6d2]' : 'text-neutral-300'}>{opt.title}</span>
+                                  </span>
+                                  {opt.badge && (
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${opt.badgeClass || 'bg-neutral-800 text-neutral-300'}`}>
+                                      {opt.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-neutral-400 mt-1 pl-6 leading-relaxed">
+                                  {opt.desc}
+                                </div>
                               </button>
-                            ))}
-                          </div>
+                            );
+                          })}
                         </div>
                       )}
+                    </div>
 
-                      {/* Tùy chọn Làm Mượt Cuốn Chiếu (Semantic JSON Patch mỗi 15 chương) */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-neutral-200 font-medium flex items-center gap-1.5">
-                              <span>Làm Mượt Cuốn Chiếu:</span>
-                              <span className="text-[9px] bg-purple-950 text-purple-300 px-1.5 py-0.5 rounded border border-purple-800">
-                                MỖI 15 CHƯƠNG
-                              </span>
+                    {/* MỤC B: CÁC DÒNG TÍNH NĂNG BẬT / TẮT ĐỘC LẬP (MODULAR TOGGLE ROWS) */}
+                    <div className="space-y-2.5 pt-2 border-t border-[#785a28]/30">
+                      <div className="text-xs font-bold text-[#c8aa6e] flex items-center gap-1.5">
+                        <span>◆</span> CÁC TÍNH NĂNG TÙY CHỈNH ĐỘC LẬP (NÚT GẠT CHUẨN ĐỒNG NHẤT):
+                      </div>
+
+                      {/* DÒNG 1: TỰ ĐỘNG BÓC LÔ GLOSSARY THEO SỐ CHƯƠNG */}
+                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 font-bold text-xs text-[#f0e6d2]">
+                              <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 1</span>
+                              <span>Tự Động Bóc Lô Glossary 7 Nhóm Bắt Buộc</span>
                             </div>
-                            <div className="text-[10px] text-neutral-400 mt-0.5">Tự động rà soát quét sạch chữ Hán sót, typo và đồng bộ Master Glossary</div>
+                            <div className="text-[10px] text-[#a09b8c] mt-1 leading-relaxed">
+                              Tự động gom dải chương thô để trích xuất 100% Tên, xưng hô, chức vụ, địa danh, thú, pháp bảo & công pháp trước khi dịch.
+                            </div>
                           </div>
                           <button
                             onClick={() => {
-                              const nextVal = !(advancedSettings.rollingPolishEnabled ?? true);
-                              setAdvancedSettings(prev => ({ ...prev, rollingPolishEnabled: nextVal }));
-                              addLog(`⚙️ Làm mượt cuốn chiếu: ${nextVal ? 'BẬT' : 'TẮT'}`);
+                              const nextVal = advancedSettings.enableBatchGlossaryAutoExtract !== false ? false : true;
+                              setAdvancedSettings(prev => ({ ...prev, enableBatchGlossaryAutoExtract: nextVal }));
+                              addLog(`⚙️ Đã ${nextVal ? 'BẬT' : 'TẮT'} Dòng 1: Tự Động Bóc Lô Glossary`);
                             }}
-                            className={`w-12 h-6 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
-                              (advancedSettings.rollingPolishEnabled ?? true) ? 'bg-purple-600 justify-end' : 'bg-neutral-800 justify-start'
+                            className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer shrink-0 ${
+                              advancedSettings.enableBatchGlossaryAutoExtract !== false ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
                             }`}
                           >
                             <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
                           </button>
                         </div>
-
-                        {(advancedSettings.rollingPolishEnabled ?? true) && (
-                          <div className="flex items-center justify-between pt-1 border-t border-neutral-900">
-                            <span className="text-neutral-400 text-[11px]">Khoảng cách đợt làm mượt:</span>
+                        {advancedSettings.enableBatchGlossaryAutoExtract !== false && (
+                          <div className="flex items-center justify-between pt-1 border-t border-[#785a28]/30">
+                            <span className="text-[10px] text-neutral-400 font-medium">Kích thước lô bóc từ điển:</span>
                             <div className="flex items-center gap-1">
-                              {[10, 15, 20, 25].map(sz => (
+                              {[20, 50, 100].map(sz => (
                                 <button
                                   key={sz}
                                   onClick={() => {
-                                    setAdvancedSettings(prev => ({ ...prev, rollingPolishBatchSize: sz }));
-                                    addLog(`⚙️ Đã đặt khoảng cách làm mượt: ${sz} chương/đợt`);
+                                    setAdvancedSettings(prev => ({ ...prev, batchGlossarySize: sz }));
+                                    addLog(`⚙️ Đã đặt cỡ lô bóc Glossary: ${sz} chương/đợt`);
                                   }}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer ${
-                                    (advancedSettings.rollingPolishBatchSize || 15) === sz
-                                      ? 'bg-purple-600 text-white shadow-sm'
-                                      : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${
+                                    (advancedSettings.batchGlossarySize || 50) === sz
+                                      ? 'bg-[#c8aa6e] text-black shadow-sm'
+                                      : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                                   }`}
                                 >
                                   {sz} ch
                                 </button>
                               ))}
+                              <button
+                                onClick={() => openQuantityEditor(
+                                  'Kích Thước Lô Bóc Glossary (Số Chương)',
+                                  advancedSettings.batchGlossarySize || 50,
+                                  5,
+                                  500,
+                                  'chương',
+                                  (val: number) => {
+                                    setAdvancedSettings(prev => ({ ...prev, batchGlossarySize: val }));
+                                    addLog(`⚙️ Đã đặt cỡ lô bóc Glossary tùy chỉnh: ${val} chương`);
+                                  },
+                                  undefined,
+                                  5
+                                )}
+                                className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold ml-0.5"
+                              >
+                                ✏️ Sửa
+                              </button>
                             </div>
                           </div>
                         )}
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Phân hệ 1.3: Dịch Thuật & Chống Lọt Chữ Hán */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <ShieldAlert className="w-4 h-4 text-blue-400" />
-                      <span className="text-xs font-bold text-neutral-100">3. Cài Đặt Dịch Thuật & Chống Lọt Chữ Hán</span>
-                      <HelpBtn onClick={() => openHelp('settings_translation_anti_hanzi')} />
-                    </div>
-
-                    <div className="space-y-2.5 text-xs">
-                      {/* Ngôn ngữ đích */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-neutral-200 font-medium">Ngôn ngữ đích (Target Language):</span>
-                          <span className="text-blue-400 font-bold font-mono">{advancedSettings.targetLanguage}</span>
+                      {/* DÒNG 2: GỬI KÈM NGỮ CẢNH CUỐI CHƯƠNG TRƯỚC */}
+                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 font-bold text-xs text-[#f0e6d2]">
+                              <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 2</span>
+                              <span>Gửi Kèm Ngữ Cảnh Đoạn Cuối Chương Trước</span>
+                            </div>
+                            <div className="text-[10px] text-[#a09b8c] mt-1 leading-relaxed">
+                              Đính kèm đoạn kết chương trước vào prompt để AI bắt nhịp văn phong, giữ mạch xưng hô và không lệch ngữ cảnh giữa các chương.
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const nextVal = advancedSettings.enablePreviousChapterContext !== false ? false : true;
+                              setAdvancedSettings(prev => ({ ...prev, enablePreviousChapterContext: nextVal }));
+                              addLog(`⚙️ Đã ${nextVal ? 'BẬT' : 'TẮT'} Dòng 2: Gửi kèm ngữ cảnh chương trước`);
+                            }}
+                            className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer shrink-0 ${
+                              advancedSettings.enablePreviousChapterContext !== false ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
+                            }`}
+                          >
+                            <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                          </button>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
-                          {[
-                            'Tiếng Việt',
-                            '日本語',
-                            'English',
-                            '한국어'
-                          ].map(lang => {
-                            const isSelected = advancedSettings.targetLanguage === lang ||
-                              (lang === 'Tiếng Việt' && advancedSettings.targetLanguage.toLowerCase().includes('việt')) ||
-                              (lang === '日本語' && (advancedSettings.targetLanguage.includes('日本語') || advancedSettings.targetLanguage.toLowerCase().includes('nhật')));
-                            return (
+                        {advancedSettings.enablePreviousChapterContext !== false && (
+                          <div className="flex items-center justify-between pt-1 border-t border-[#785a28]/30">
+                            <span className="text-[10px] text-neutral-400 font-medium">Độ dài ngữ cảnh gửi kèm:</span>
+                            <div className="flex items-center gap-1">
+                              {[200, 350, 500, 800].map(len => (
+                                <button
+                                  key={len}
+                                  onClick={() => {
+                                    setAdvancedSettings(prev => ({ ...prev, contextSnippetLength: len }));
+                                    addLog(`⚙️ Đã đặt độ dài ngữ cảnh: ${len} ký tự`);
+                                  }}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${
+                                    (advancedSettings.contextSnippetLength || 350) === len
+                                      ? 'bg-[#c8aa6e] text-black shadow-sm'
+                                      : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
+                                  }`}
+                                >
+                                  {len} kt
+                                </button>
+                              ))}
                               <button
-                                key={lang}
+                                onClick={() => openQuantityEditor(
+                                  'Độ Dài Ngữ Cảnh Gửi Kèm (Ký Tự)',
+                                  advancedSettings.contextSnippetLength || 350,
+                                  50,
+                                  2000,
+                                  'ký tự',
+                                  (val: number) => {
+                                    setAdvancedSettings(prev => ({ ...prev, contextSnippetLength: val }));
+                                    addLog(`⚙️ Đã đặt độ dài ngữ cảnh tùy chỉnh: ${val} ký tự`);
+                                  },
+                                  undefined,
+                                  50
+                                )}
+                                className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold ml-0.5"
+                              >
+                                ✏️ Sửa
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* DÒNG 3: BỘ LỌC & CỨU HỘ CHỮ HÁN TRIỆT ĐỂ */}
+                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 font-bold text-xs text-[#f0e6d2]">
+                            <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 3</span>
+                            <span>Bộ Lọc Chống Lọt Chữ Hán & Typo 2 Lớp</span>
+                          </div>
+                          <div className="text-[10px] text-[#a09b8c] mt-1 leading-relaxed">
+                            Ép AI phiên âm Hán-Việt 100%, khử sạch các chữ Hán dính nửa vời trong câu (VD: '林辰' ➔ 'Lâm Thần', tuyệt đối không để '林 Thần').
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const nextVal = !advancedSettings.antiHanziStrict;
+                            setAdvancedSettings(prev => ({ ...prev, antiHanziStrict: nextVal }));
+                            addLog(`⚙️ Đã ${nextVal ? 'BẬT' : 'TẮT'} Dòng 3: Bộ Lọc Chống Lọt Chữ Hán`);
+                          }}
+                          className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer shrink-0 ${
+                            advancedSettings.antiHanziStrict ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
+                          }`}
+                        >
+                          <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                        </button>
+                      </div>
+
+                      {/* DÒNG 4: TỰ ĐỘNG LÀM MƯỢT FINAL TOÀN DIỆN */}
+                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 font-bold text-xs text-[#f0e6d2]">
+                            <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 4</span>
+                            <span>Tự Động Kích Hoạt Làm Mượt Final Khi Dịch Xong</span>
+                          </div>
+                          <div className="text-[10px] text-[#a09b8c] mt-1 leading-relaxed">
+                            Khi hoàn thành toàn bộ dải chương, tự động chạy Bộ Quét Làm Mượt Final để rà soát chất lượng và trau chuốt toàn bộ tác phẩm.
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const nextVal = advancedSettings.enableAutoFinalPolish !== false ? false : true;
+                            setAdvancedSettings(prev => ({ ...prev, enableAutoFinalPolish: nextVal }));
+                            addLog(`⚙️ Đã ${nextVal ? 'BẬT' : 'TẮT'} Dòng 4: Tự động làm mượt Final`);
+                          }}
+                          className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer shrink-0 ${
+                            advancedSettings.enableAutoFinalPolish !== false ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
+                          }`}
+                        >
+                          <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                        </button>
+                      </div>
+
+                      {/* DÒNG 5: CHẾ ĐỘ DỊCH BÙ CHƯƠNG THIẾU / LỖI (GAP FILLING) */}
+                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 font-bold text-xs text-[#f0e6d2]">
+                            <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 5</span>
+                            <span>Chế Độ Dịch Bù (Bỏ Qua Các Chương Đã Có Bản Dịch)</span>
+                          </div>
+                          <div className="text-[10px] text-[#a09b8c] mt-1 leading-relaxed">
+                            Khi kích hoạt, hệ thống sẽ tự động bỏ qua những chương đã dịch thành công, chỉ dịch các chương bị khuyết hoặc lỗi.
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const nextVal = !isGapFillingMode;
+                            setIsGapFillingMode(nextVal);
+                            addLog(`⚙️ Đã ${nextVal ? 'BẬT' : 'TẮT'} Dòng 5: Chế Độ Dịch Bù Chương`);
+                          }}
+                          className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer shrink-0 ${
+                            isGapFillingMode ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
+                          }`}
+                        >
+                          <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                        </button>
+                      </div>
+
+                      {/* DÒNG 6: TỰ ĐỘNG CỨU HỘ TRỰC TUYẾN (ONLINE AUTO-HEAL) */}
+                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 font-bold text-xs text-[#f0e6d2]">
+                            <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 6</span>
+                            <span>Tự Động Cứu Hộ Trực Tuyến Khi Gặp Lỗi Nặng</span>
+                          </div>
+                          <div className="text-[10px] text-[#a09b8c] mt-1 leading-relaxed">
+                            Phát hiện AI từ chối dịch, lặp từ, kẹt đĩa hoặc mất đoạn nghiêm trọng để tự động nạp key khác dịch lại tức thì.
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const nextVal = advancedSettings.autoHealOnlineEnabled !== false ? false : true;
+                            setAdvancedSettings(prev => ({ ...prev, autoHealOnlineEnabled: nextVal }));
+                            addLog(`⚙️ Đã ${nextVal ? 'BẬT' : 'TẮT'} Dòng 6: Cứu hộ trực tuyến`);
+                          }}
+                          className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer shrink-0 ${
+                            advancedSettings.autoHealOnlineEnabled !== false ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
+                          }`}
+                        >
+                          <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                        </button>
+                      </div>
+
+                      {/* DÒNG 7: BƯỚC NHẢY LÀM MƯỢT CUỐN CHIẾU THỦ CÔNG */}
+                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="text-[#f0e6d2] font-bold text-xs flex items-center gap-2">
+                            <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 7</span>
+                            <span>Bước Nhảy Làm Mượt Cuốn Chiếu:</span>
+                            <span className="text-[9px] bg-[#1e2328] text-[#c8aa6e] px-1.5 py-0.2 rounded border border-[#785a28]">
+                              CHỈ CHẠY KHI ẤN NÚT
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {[10, 15, 20, 25].map(sz => (
+                              <button
+                                key={sz}
                                 onClick={() => {
-                                  setAdvancedSettings(prev => ({ ...prev, targetLanguage: lang }));
-                                  addLog(`⚙️ Đã chuyển Ngôn ngữ đích: ${lang}`);
+                                  setAdvancedSettings(prev => ({ ...prev, rollingPolishBatchSize: sz }));
+                                  addLog(`⚙️ Đã đặt khoảng cách làm mượt: ${sz} chương/đợt`);
                                 }}
-                                className={`py-1.5 px-2 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
-                                  isSelected
-                                    ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${
+                                  (advancedSettings.rollingPolishBatchSize || 15) === sz
+                                    ? 'bg-[#c8aa6e] text-black shadow-sm'
+                                    : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                                 }`}
                               >
-                                {lang}
+                                {sz} ch
                               </button>
-                            );
-                          })}
+                            ))}
+                            <button
+                              onClick={() => openQuantityEditor(
+                                'Bước Nhảy Làm Mượt Cuốn Chiếu (Số Chương)',
+                                advancedSettings.rollingPolishBatchSize || 15,
+                                5,
+                                100,
+                                'chương',
+                                (val: number) => {
+                                  setAdvancedSettings(prev => ({ ...prev, rollingPolishBatchSize: val }));
+                                  addLog(`⚙️ Đã đặt bước nhảy làm mượt tùy chỉnh: ${val} chương`);
+                                },
+                                undefined,
+                                5
+                              )}
+                              className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold ml-0.5"
+                            >
+                              ✏️ Sửa
+                            </button>
+                          </div>
                         </div>
+                        <div className="text-[10px] text-[#a09b8c] leading-relaxed">
+                          💡 Làm mượt cuốn chiếu không tự động chen ngang khi dịch. Bạn có thể nhấn nút <strong>🪄 Làm Mượt Lại</strong> tại Tab Dịch Thuật bất cứ lúc nào để đối chiếu song ngữ vá lỗi.
+                        </div>
+                      </div>
+                    </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ============================================== */}
+              {/* MỤC 4: CÀI ĐẶT DỊCH THUẬT NGÔN NGỮ & ĐÍCH (DROPDOWN ACCORDION) */}
+              {/* ============================================== */}
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsSection4Open(!isSection4Open)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>4. Cài Đặt Dịch Thuật Ngôn Ngữ</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono font-bold">
+                          {advancedSettings.targetLanguage}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isSection4Open ? 'thu gọn' : 'mở rộng ngôn ngữ đích & bộ lọc chống chữ Hán'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('settings_translation_anti_hanzi'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isSection4Open ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
+
+                {isSection4Open && (
+                  <div className="p-3 pt-0 border-t border-[#785a28]/30 space-y-3 animate-fadeIn">
+                    <div className="pt-2.5 space-y-2.5 text-xs">
+                      {/* Ngôn ngữ đích (LoL Dropdown Card) */}
+                      <div className="space-y-1.5 bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40">
+                        <div className="flex items-center justify-between text-neutral-300">
+                          <span className="font-bold text-[#f0e6d2]">Ngôn Ngữ Đích (Target Language):</span>
+                          <span className="text-[9px] text-[#c8aa6e] font-mono">CHỌN 1 TRONG 4</span>
+                        </div>
+
+                        <div
+                          onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
+                          className="bg-gradient-to-r from-[#111923] via-[#0f1d30] to-[#111923] border border-[#c8aa6e] rounded-xl p-2.5 cursor-pointer flex items-center justify-between hover:border-[#f0e6d2] transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#c8aa6e] animate-pulse"></span>
+                            <span className="font-bold text-[#f0e6d2] text-xs">
+                              {advancedSettings.targetLanguage}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold bg-[#785a28]/40 text-[#c8aa6e] px-1.5 py-0.5 rounded border border-[#c8aa6e]/60">
+                              ĐANG CHỌN
+                            </span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isLangDropdownOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+
+                        {isLangDropdownOpen && (
+                          <div className="space-y-1.5 pt-1 animate-fadeIn">
+                            {[
+                              { id: 'Tiếng Việt', flag: '🇻🇳', title: 'Tiếng Việt (Vietnamese)', desc: 'Chuẩn Hán-Việt văn học, tối ưu hoá đại từ xưng hô kiếm hiệp & tiên hiệp' },
+                              { id: '日本語', flag: '🇯🇵', title: '日本語 (Japanese)', desc: 'Tự động sinh Kanji, Hiragana & Katakana tự nhiên, thả lỏng regex' },
+                              { id: 'English', flag: '🇬🇧', title: 'English (US/UK)', desc: 'Standard English fiction formatting and natural phrasing' },
+                              { id: '한국어', flag: '🇰🇷', title: '한국어 (Korean)', desc: 'Natural Hangul localization for light novels and webtoons' },
+                            ].map((item) => {
+                              const isSel = advancedSettings.targetLanguage === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  onClick={() => {
+                                    setAdvancedSettings(prev => ({ ...prev, targetLanguage: item.id }));
+                                    setIsLangDropdownOpen(false);
+                                    addLog(`⚙️ Đã chuyển Ngôn ngữ đích: ${item.id}`);
+                                  }}
+                                  className={`w-full p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                                    isSel
+                                      ? 'bg-[#1e2328] border-[#c8aa6e] text-white shadow-sm'
+                                      : 'bg-[#091428] border-[#785a28]/40 text-neutral-400 hover:text-white hover:border-[#c8aa6e]/70'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between text-xs font-bold">
+                                    <span className="flex items-center gap-1.5">
+                                      <span>{item.flag}</span>
+                                      <span className={isSel ? 'text-[#f0e6d2]' : 'text-neutral-300'}>{item.title}</span>
+                                    </span>
+                                    {isSel && <span className="text-[10px] text-[#c8aa6e]">✓</span>}
+                                  </div>
+                                  <div className="text-[10px] text-[#a09b8c] mt-0.5">{item.desc}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Bộ lọc chống chữ Hán 2 lớp */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 space-y-1.5">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-neutral-200 font-bold flex items-center gap-1.5">
+                            <div className="text-[#f0e6d2] font-bold flex items-center gap-1.5">
                               <span>Bộ Lọc Chống Lọt Chữ Hán 2 Lớp:</span>
-                              <span className="text-[9px] bg-blue-950 text-blue-300 px-1.5 py-0.2 rounded border border-blue-800">
+                              <span className="text-[9px] bg-[#1e2328] text-[#c8aa6e] px-1.5 py-0.2 rounded border border-[#785a28]">
                                 Dual-Layer Guard
                               </span>
                             </div>
-                            <div className="text-[10px] text-neutral-400 mt-0.5">
+                            <div className="text-[10px] text-[#a09b8c] mt-0.5">
                               Lớp 1: Ép khuôn Prompt • Lớp 2: Hậu kiểm Regex thông minh
                             </div>
                           </div>
@@ -3457,66 +4273,56 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                               setAdvancedSettings(prev => ({ ...prev, antiHanziStrict: nextVal }));
                               addLog(`⚙️ Bộ lọc chống lọt chữ Hán: ${nextVal ? 'BẬT' : 'TẮT'}`);
                             }}
-                            className={`w-12 h-6 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
-                              advancedSettings.antiHanziStrict ? 'bg-blue-600 justify-end' : 'bg-neutral-800 justify-start'
+                            className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer ${
+                              advancedSettings.antiHanziStrict ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
                             }`}
                           >
                             <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
                           </button>
                         </div>
-                        <div className="p-2 bg-neutral-900 rounded-lg text-[10px] text-neutral-300 leading-relaxed border border-neutral-800">
-                          {advancedSettings.targetLanguage.toLowerCase().includes('nhật') || advancedSettings.targetLanguage.toLowerCase().includes('japan') ? (
-                            <span className="text-amber-400">
-                              🇯🇵 Ngôn ngữ đích là <strong>Tiếng Nhật</strong>: Hệ thống tự động thả lỏng ràng buộc cấm chữ Hán để AI tự do sinh Kanji, Hiragana và Katakana chuẩn tự nhiên.
-                            </span>
-                          ) : (
-                            <span className="text-emerald-400">
-                              🇻🇳 Ngôn ngữ đích là <strong>Tiếng Việt</strong>: Kích hoạt kỷ luật nghiêm ngặt cấm chữ Hán trong prompt + Tự động quét regex <code className="bg-neutral-950 px-1 rounded text-neutral-200">[\\u4e00-\\u9fa5]</code> sau khi AI sinh để thay bằng âm Hán-Việt chuẩn, bản dịch sạch 100%!
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Độ dài mẫu ngữ cảnh nối chương */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between">
-                        <div>
-                          <div className="text-neutral-200 font-medium">Ngữ cảnh đoạn cuối chương trước:</div>
-                          <div className="text-[10px] text-neutral-400">Đồng nhất xưng hô và bắt nhịp văn phong</div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {[150, 250, 350, 500].map(cnt => (
-                            <button
-                              key={cnt}
-                              onClick={() => {
-                                setAdvancedSettings(prev => ({ ...prev, contextSnippetLength: cnt }));
-                                addLog(`⚙️ Mẫu ngữ cảnh nối chương: ${cnt} ký tự`);
-                              }}
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
-                                (advancedSettings.contextSnippetLength || 350) === cnt
-                                  ? 'bg-blue-600 text-white font-bold'
-                                  : 'bg-neutral-900 text-neutral-400 hover:text-white'
-                              }`}
-                            >
-                              {cnt} kt
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  {/* Phân hệ 1.4: Cài Đặt Trình Đọc */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <BookOpen className="w-4 h-4 text-purple-400" />
-                      <span className="text-xs font-bold text-neutral-100">4. Cài Đặt Trình Đọc & Trải Nghiệm Đọc</span>
-                      <HelpBtn onClick={() => openHelp('settings_reader_experience')} />
+              {/* ============================================== */}
+              {/* MỤC 5: CÀI ĐẶT TRÌNH ĐỌC & TÙY CHỌN KHÁC (DROPDOWN ACCORDION) */}
+              {/* ============================================== */}
+              <div className="bg-[#091428] border border-[#785a28]/60 shadow-[0_4px_20px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden transition-all">
+                <div
+                  onClick={() => setIsSection5Open(!isSection5Open)}
+                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-[#0e1a30] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-[#c8aa6e]/20 border border-[#c8aa6e] flex items-center justify-center text-[#c8aa6e] shrink-0">
+                      <BookOpen className="w-3.5 h-3.5" />
                     </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide flex items-center gap-1.5">
+                        <span>5. Cài Đặt Trình Đọc & Tùy Chọn Khác</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#785a28]/40 text-[#c8aa6e] border border-[#c8aa6e]/40 font-mono font-bold">
+                          {advancedSettings.readerFontSize || 16}px
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-[#a09b8c]">Bấm để {isSection5Open ? 'thu gọn' : 'mở rộng cỡ chữ, màn hình sáng & quản lý dự án'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <HelpBtn onClick={(e) => { e?.stopPropagation(); openHelp('settings_reader_experience'); }} />
+                    <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isSection5Open ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
 
-                    <div className="space-y-2.5 text-xs">
+                {isSection5Open && (
+                  <div className="p-3 pt-0 border-t border-[#785a28]/30 space-y-3 animate-fadeIn">
+                    <div className="pt-2.5 space-y-2.5 text-xs">
                       {/* Cỡ chữ mặc định */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between">
-                        <span className="text-neutral-200 font-medium">Cỡ chữ mặc định khi đọc:</span>
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 flex items-center justify-between">
+                        <div>
+                          <div className="text-[#f0e6d2] font-semibold">Cỡ chữ mặc định khi đọc:</div>
+                          <div className="text-[10px] text-[#a09b8c]">Hiện tại: <strong className="text-[#c8aa6e] font-mono">{advancedSettings.readerFontSize || 16}px</strong></div>
+                        </div>
                         <div className="flex items-center gap-1">
                           {[14, 16, 18, 20, 22].map(sz => (
                             <button
@@ -3525,303 +4331,182 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                                 setAdvancedSettings(prev => ({ ...prev, readerFontSize: sz }));
                                 setReaderFontSize(sz);
                               }}
-                              className={`w-6 h-6 rounded text-[10px] font-mono flex items-center justify-center cursor-pointer ${
+                              className={`w-6 h-6 rounded text-[10px] font-mono flex items-center justify-center cursor-pointer transition-all ${
                                 (advancedSettings.readerFontSize || 16) === sz
-                                  ? 'bg-purple-600 text-white font-bold'
-                                  : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                                  ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm'
+                                  : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
                               }`}
                             >
                               {sz}
                             </button>
                           ))}
+                          <button
+                            onClick={() => openQuantityEditor(
+                              'Cỡ Chữ Đọc Sách (Font Size)',
+                              advancedSettings.readerFontSize || 16,
+                              10,
+                              36,
+                              'px',
+                              (val: number) => {
+                                setAdvancedSettings(prev => ({ ...prev, readerFontSize: val }));
+                                setReaderFontSize(val);
+                                addLog(`⚙️ Đã đặt cỡ chữ đọc sách tùy chỉnh: ${val}px`);
+                              }
+                            )}
+                            className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold ml-0.5"
+                          >
+                            ✏️ Sửa
+                          </button>
                         </div>
                       </div>
 
                       {/* Giữ sáng màn hình khi đọc */}
-                      <div className="bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 flex items-center justify-between">
+                      <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 flex items-center justify-between">
                         <div>
-                          <div className="text-neutral-200 font-medium">Giữ sáng màn hình khi đọc:</div>
-                          <div className="text-[10px] text-neutral-400">Kích hoạt FLAG_KEEP_SCREEN_ON</div>
+                          <div className="text-[#f0e6d2] font-semibold">Giữ sáng màn hình khi đọc:</div>
+                          <div className="text-[10px] text-[#a09b8c]">Kích hoạt FLAG_KEEP_SCREEN_ON</div>
                         </div>
                         <button
                           onClick={() => {
                             setAdvancedSettings(prev => ({ ...prev, keepScreenAwake: !prev.keepScreenAwake }));
                           }}
-                          className={`w-12 h-6 rounded-full transition-colors p-0.5 flex items-center cursor-pointer ${
-                            advancedSettings.keepScreenAwake ? 'bg-purple-600 justify-end' : 'bg-neutral-800 justify-start'
+                          className={`w-12 h-6 rounded-full transition-all p-0.5 flex items-center cursor-pointer ${
+                            advancedSettings.keepScreenAwake ? 'bg-emerald-600 justify-end' : 'bg-neutral-800 justify-start'
                           }`}
                         >
                           <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
                         </button>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* ============================================== */}
-              {/* PHÂN HỆ 2: QUẢN LÝ DỰ ÁN & XÓA DỰ ÁN */}
-              {/* ============================================== */}
-              {settingsSubTab === 'projects' && (
-                <div className="space-y-3">
-                  {/* Current Active Project Details */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Bookmark className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-bold text-neutral-100">Dự Án Đang Mở Hiện Tại</span>
-                      </div>
-                      <span className="text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800 font-mono">
-                        ĐANG KÍCH HOẠT
-                      </span>
-                    </div>
+                      {/* Model Dùng Cho Khâu Làm Mượt Final (LoL Dropdown Card) */}
+                      <div className="space-y-1.5 bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40">
+                        <div className="flex items-center justify-between text-neutral-300">
+                          <span className="font-bold text-[#f0e6d2]">Model Khâu Làm Mượt Final:</span>
+                          <span className="text-[9px] text-[#c8aa6e] font-mono">CHỌN 1 TRONG 4</span>
+                        </div>
+                        <div
+                          onClick={() => setIsPolishModelDropdownOpen(!isPolishModelDropdownOpen)}
+                          className="bg-gradient-to-r from-[#111923] via-[#0f1d30] to-[#111923] border border-[#c8aa6e] rounded-xl p-2.5 cursor-pointer flex items-center justify-between hover:border-[#f0e6d2] transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#c8aa6e] animate-pulse"></span>
+                            <span className="font-bold text-[#f0e6d2] text-xs font-mono">{polishModel}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold bg-[#785a28]/40 text-[#c8aa6e] px-1.5 py-0.5 rounded border border-[#c8aa6e]/60">
+                              ĐANG CHỌN
+                            </span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-[#c8aa6e] transition-transform duration-300 ${isPolishModelDropdownOpen ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
 
-                    <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800 space-y-2 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-400">Tên tác phẩm:</span>
-                        <span className="text-white font-bold">{project?.name}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-400">Số chương gốc:</span>
-                        <span className="text-blue-300 font-mono font-semibold">{project?.chapters?.length || 0} chương</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-400">Đã dịch hoàn thành:</span>
-                        <span className="text-emerald-400 font-mono font-semibold">{project ? Object.keys(project.translatedChapters).length : 0} chương</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-neutral-400">Thuật ngữ Master Glossary:</span>
-                        <span className="text-amber-300 font-mono font-semibold">{project ? Object.keys(project.masterGlossary).length : 0} từ</span>
-                      </div>
-                    </div>
-
-                    {/* Dangerous Action: Delete Project */}
-                    <div className="pt-1">
-                      <button
-                        onClick={() => setShowDeleteProjModal(true)}
-                        className="w-full py-2.5 bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800/80 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-red-950/40 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                        <span>Xóa Vĩnh Viễn Dự Án Này</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* List of All Stored Projects */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-blue-400" />
-                        <span className="text-xs font-bold text-neutral-100">Kho Tất Cả Các Dự Án Đã Lưu</span>
-                        <HelpBtn onClick={() => openHelp('settings_projects_manager')} />
-                      </div>
-                      <button
-                        onClick={() => setShowNewProjModal(true)}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer shadow-sm"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Tạo Mới</span>
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {Object.values(projects).map((p) => {
-                        const isCurrent = p.name === currentProjectName;
-                        const transCount = Object.keys(p.translatedChapters || {}).length;
-                        return (
-                          <div
-                            key={p.name}
-                            className={`p-3 rounded-xl border text-xs transition-all ${
-                              isCurrent
-                                ? 'bg-neutral-950 border-blue-500 text-white shadow-sm'
-                                : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700 text-neutral-300'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="font-bold truncate pr-2 text-sm">{p.name}</span>
-                              {isCurrent ? (
-                                <span className="text-[10px] text-blue-300 bg-blue-950 px-2 py-0.5 rounded-full border border-blue-800 font-semibold shrink-0">
-                                  Đang chọn
-                                </span>
-                              ) : (
+                        {isPolishModelDropdownOpen && (
+                          <div className="space-y-1.5 pt-1 animate-fadeIn">
+                            {[
+                              { id: 'gemini-3.6-flash', title: 'Gemini 3.6 Flash (Khuyên Dùng)', desc: 'Tốc độ siêu tốc, thông minh và cực nhạy khi trau chuốt văn học' },
+                              { id: 'gemini-2.5-flash', title: 'Gemini 2.5 Flash', desc: 'Thế hệ 2.5 ổn định, cân bằng giữa tốc độ và độ mượt' },
+                              { id: 'gemini-2.0-flash', title: 'Gemini 2.0 Flash', desc: 'Phiên bản gọn nhẹ, tiết kiệm tài nguyên' },
+                              { id: 'gemini-2.5-pro', title: 'Gemini 2.5 Pro', desc: 'Mô hình chuyên sâu cho văn bản độ khó cao và cấu trúc phức tạp' },
+                            ].map((item) => {
+                              const isSel = polishModel === item.id;
+                              return (
                                 <button
+                                  key={item.id}
                                   onClick={() => {
-                                    setCurrentProjectName(p.name);
-                                    setRawTextInput(p.chapters.join('\n\n'));
-                                    fullRawTextRef.current = p.chapters.join('\n\n');
-                                    setFromChapInput(1);
-                                    setToChapInput(p.chapters.length || 1);
-                                    setChapterListPage(0);
-                                    setCurrentChapterIndex(0);
-                                    addLog(`📁 Đã chuyển sang dự án: [${p.name}] (${Object.keys(p.translatedChapters || {}).length}/${p.chapters.length} chương)`);
+                                    setPolishModel(item.id);
+                                    setIsPolishModelDropdownOpen(false);
+                                    addLog(`⚙️ Đã chọn model làm mượt Final: ${item.id}`);
                                   }}
-                                  className="text-[10px] text-white bg-blue-600 hover:bg-blue-500 px-2.5 py-1 rounded-lg cursor-pointer shrink-0 font-semibold shadow-sm transition-all"
+                                  className={`w-full p-2 rounded-xl border text-left cursor-pointer transition-all ${
+                                    isSel
+                                      ? 'bg-[#1e2328] border-[#c8aa6e] text-white shadow-sm'
+                                      : 'bg-[#091428] border-[#785a28]/40 text-neutral-400 hover:text-white hover:border-[#c8aa6e]/70'
+                                  }`}
                                 >
-                                  Chuyển sang
+                                  <div className="flex items-center justify-between text-xs font-bold">
+                                    <span className={isSel ? 'text-[#f0e6d2]' : 'text-neutral-300'}>{item.title}</span>
+                                    {isSel && <span className="text-[10px] text-[#c8aa6e]">✓</span>}
+                                  </div>
+                                  <div className="text-[10px] text-[#a09b8c] mt-0.5">{item.desc}</div>
                                 </button>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between text-[11px] text-neutral-400">
-                              <span>Tiến độ: <strong className="text-neutral-200 font-mono">{transCount}/{p.chapters.length} chương</strong></span>
-                              <span>Glossary: <strong className="text-emerald-400 font-mono">{Object.keys(p.masterGlossary || {}).length} từ</strong></span>
-                            </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="p-2.5 bg-neutral-950 rounded-xl border border-neutral-800 text-[10px] text-neutral-400 leading-relaxed">
-                      🛡️ <strong>Bảo toàn tuyệt đối</strong>: Mọi dự án được lưu vĩnh viễn trên máy cho đến khi bạn chủ động bấm nút Xóa. Kho Key API và Prompt ở Tab 1 được cô lập riêng biệt, hoàn toàn không bị ảnh hưởng khi chuyển đổi hay xóa dự án!
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ============================================== */}
-              {/* PHÂN HỆ 3: GOD-MODE & XUẤT TÁC PHẨM */}
-              {/* ============================================== */}
-              {settingsSubTab === 'godmode' && (
-                <div className="space-y-3">
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span className="text-xs font-bold text-neutral-100">5. Kiểm Soát 5 Lớp Chạy Ngầm (God-Mode)</span>
-                        <HelpBtn onClick={() => openHelp('settings_god_mode')} />
+                        )}
                       </div>
-                      <span className="text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800 font-mono">
-                        5/5 KÍCH HOẠT
-                      </span>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      {[
-                        { name: 'Lớp 1: Foreground Service', active: godModeActive, desc: 'Dịch liên tục trên thanh thông báo' },
-                        { name: 'Lớp 2: CPU WakeLock', active: wakeLockActive, desc: 'Chống Deep Sleep khi tắt màn hình' },
-                        { name: 'Lớp 3: Bỏ qua Tối ưu Pin (Doze Mode)', active: batteryOptimizationIgnored, desc: 'Không bị hệ thống ngắt tiến trình' },
-                        { name: 'Lớp 4: WorkManager Chó Canh (Watchdog)', active: workManagerWatchdog, desc: 'Tự động hồi sinh tiến trình sau 15s nếu bị tắt' },
-                        { name: 'Lớp 5: Root OOM Score -1000', active: isDeviceRooted, desc: 'Miễn nhiễm 100% với lệnh Kill của Android OS' },
-                      ].map((layer, idx) => (
-                        <div key={idx} className="p-2 bg-neutral-950 rounded-xl border border-neutral-800 flex items-center justify-between text-xs">
-                          <div>
-                            <div className="font-semibold text-neutral-200">{layer.name}</div>
-                            <div className="text-[10px] text-neutral-400">{layer.desc}</div>
+                      {/* Phân hệ: Quản Lý Dự Án */}
+                      <div className="pt-2 border-t border-[#785a28]/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[#c8aa6e] text-xs flex items-center gap-1.5">
+                            <Bookmark className="w-3.5 h-3.5" />
+                            <span>QUẢN LÝ DỰ ÁN & TIẾN TRÌNH:</span>
+                          </span>
+                          <button
+                            onClick={() => setShowNewProjModal(true)}
+                            className="px-2 py-0.5 bg-[#c8aa6e] hover:bg-[#d8ba7e] text-black font-extrabold rounded text-[10px] flex items-center gap-1 cursor-pointer shadow-sm"
+                          >
+                            <Plus className="w-2.5 h-2.5" />
+                            <span>Tạo Mới</span>
+                          </button>
+                        </div>
+                        <div className="p-2.5 bg-[#050505] rounded-xl border border-[#785a28]/40 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-neutral-400">Tên tác phẩm:</span>
+                            <span className="text-[#f0e6d2] font-bold">{project?.name}</span>
                           </div>
-                          <span className="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded font-mono font-bold">
-                            ON
+                          <div className="flex items-center justify-between">
+                            <span className="text-neutral-400">Tiến độ:</span>
+                            <span className="text-[#c8aa6e] font-mono font-semibold">{project ? Object.keys(project.translatedChapters).length : 0}/{project?.chapters?.length || 0} chương</span>
+                          </div>
+                          <div className="pt-1">
+                            <button
+                              onClick={() => setShowDeleteProjModal(true)}
+                              className="w-full py-1.5 bg-red-950/80 hover:bg-red-900 text-red-200 border border-red-800/80 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3 text-red-400" />
+                              <span>Xóa Vĩnh Viễn Dự Án Này</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Phân hệ: 5 Lớp Chạy Ngầm (God-Mode) */}
+                      <div className="pt-2 border-t border-[#785a28]/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[#c8aa6e] text-xs flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>5 LỚP CHẠY NGẦM (GOD-MODE):</span>
+                          </span>
+                          <span className="text-[9px] text-emerald-400 bg-emerald-950 px-1.5 py-0.2 rounded border border-emerald-800 font-mono">
+                            5/5 KÍCH HOẠT
                           </span>
                         </div>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={onOpenGodModeModal}
-                      className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border border-neutral-700 cursor-pointer"
-                    >
-                      <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Xem Chi Tiết Lệnh Root & Kiến Trúc God-Mode</span>
-                    </button>
-
-                    {/* BẢNG ĐO ĐẠC LINUX KERNEL THỰC TẾ (REAL-TIME KERNEL DIAGNOSTICS) */}
-                    <div className="p-3 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-2 font-mono text-[11px]">
-                      <div className="flex items-center justify-between border-b border-neutral-800/80 pb-1.5 font-sans font-bold text-xs text-neutral-200">
-                        <div className="flex items-center gap-1.5">
-                          <Terminal className="w-3.5 h-3.5 text-blue-400" />
-                          <span>Thông Số Linux Kernel Thực Tế</span>
-                        </div>
                         <button
-                          onClick={handleRefreshKernel}
-                          disabled={isRefreshingKernel}
-                          className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-mono cursor-pointer"
+                          onClick={onOpenGodModeModal}
+                          className="w-full py-1.5 bg-[#1e2328] hover:bg-[#2e3338] text-[#f0e6d2] rounded-lg text-xs font-semibold flex items-center justify-center gap-1 border border-[#785a28] cursor-pointer"
                         >
-                          <RefreshCw className={`w-3 h-3 ${isRefreshingKernel ? 'animate-spin' : ''}`} />
-                          <span>Làm mới</span>
+                          <ShieldAlert className="w-3 h-3 text-[#c8aa6e]" />
+                          <span>Chi Tiết Lệnh Root & Linux Kernel</span>
                         </button>
                       </div>
-                      <div className="flex justify-between text-neutral-400">
-                        <span>Process ID (PID):</span>
-                        <span className="text-blue-300 font-bold">{kernelPid}</span>
-                      </div>
-                      <div className="flex justify-between text-neutral-400">
-                        <span>User ID (UID):</span>
-                        <span className="text-neutral-300 font-bold">{kernelUid}</span>
-                      </div>
-                      <div className="flex justify-between text-neutral-400">
-                        <span>/proc/self/oom_score_adj:</span>
-                        <span className="text-emerald-400 font-bold">{kernelOomScore} (Bất Tử LMK)</span>
-                      </div>
-                      <div className="flex justify-between text-neutral-400">
-                        <span>Phantom Process Killer:</span>
-                        <span className="text-emerald-400 font-bold">VÔ HIỆU HÓA (2.147.483.647)</span>
-                      </div>
-                      <div className="flex justify-between text-neutral-400">
-                        <span>Doze Mode Whitelist:</span>
-                        <span className="text-cyan-300 font-bold">DUMPSYS WHITELISTED</span>
-                      </div>
                     </div>
                   </div>
-
-                  {/* Model Dùng Cho Khâu Làm Mượt Final */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-purple-400" />
-                      <span className="text-xs font-bold text-neutral-100">Model Dùng Cho Khâu Làm Mượt Final</span>
-                    </div>
-                    <p className="text-[11px] text-neutral-400">
-                      Khâu quét sạch chữ Hán và làm mượt toàn văn độc lập với model dịch chương. Mặc định sử dụng <span className="text-purple-300 font-bold">Gemini 3.6 Flash</span> để đạt chuẩn Hán-Việt mượt mà nhất.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'].map(pm => (
-                        <button
-                          key={pm}
-                          onClick={() => {
-                            setPolishModel(pm);
-                            addLog(`⚙️ Đã chọn model làm mượt Final: ${pm}`);
-                          }}
-                          className={`py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                            polishModel === pm
-                              ? 'bg-purple-950/70 border-purple-500 text-purple-200'
-                              : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:border-neutral-700'
-                          }`}
-                        >
-                          {pm.replace('gemini-', '')}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Export Full Novel */}
-                  <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3.5 space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <Download className="w-4 h-4 text-emerald-400" />
-                      <span className="text-xs font-bold text-neutral-100">Xuất Toàn Văn Tác Phẩm</span>
-                      <HelpBtn onClick={() => openHelp('export_full_txt')} />
-                    </div>
-                    <p className="text-[11px] text-neutral-400">
-                      Đóng gói toàn bộ các chương đã dịch sang 1 trong 5 định dạng Ebook phổ biến (TXT, EPUB, HTML, MOBI, AZW3) và tải ngay về máy.
-                    </p>
-                    <button
-                      onClick={handleExportFullNovel}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>📥 Xuất Tác Phẩm (TXT, EPUB, HTML, MOBI, AZW3)</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 
         </div>
 
-        {/* BOTTOM NAVIGATION: 4 TABS */}
-        <div className="h-16 bg-neutral-900 border-t border-neutral-800 px-2 flex items-center justify-around select-none shrink-0">
+        {/* BOTTOM NAVIGATION: 4 TABS (STRICT 4-COLOR PALETTE) */}
+        <div className="h-16 bg-[#091428] border-t border-[#785a28]/60 px-2 flex items-center justify-around select-none shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.6)]">
           <button
             onClick={() => setActiveBottomTab('keys')}
             className={`flex flex-col items-center justify-center w-20 py-1 rounded-xl transition-all cursor-pointer ${
-              activeBottomTab === 'keys' ? 'text-amber-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
+              activeBottomTab === 'keys'
+                ? 'text-[#c8aa6e] font-bold bg-[#785a28]/25 border border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.25)]'
+                : 'text-neutral-400 hover:text-[#f0e6d2] border border-transparent'
             }`}
           >
             <Key className="w-5 h-5" />
@@ -3831,7 +4516,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           <button
             onClick={() => setActiveBottomTab('translate')}
             className={`flex flex-col items-center justify-center w-20 py-1 rounded-xl transition-all cursor-pointer ${
-              activeBottomTab === 'translate' ? 'text-blue-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
+              activeBottomTab === 'translate'
+                ? 'text-[#c8aa6e] font-bold bg-[#785a28]/25 border border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.25)]'
+                : 'text-neutral-400 hover:text-[#f0e6d2] border border-transparent'
             }`}
           >
             <Zap className="w-5 h-5" />
@@ -3841,7 +4528,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           <button
             onClick={() => setActiveBottomTab('chapters')}
             className={`flex flex-col items-center justify-center w-20 py-1 rounded-xl transition-all cursor-pointer ${
-              activeBottomTab === 'chapters' ? 'text-emerald-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
+              activeBottomTab === 'chapters'
+                ? 'text-[#c8aa6e] font-bold bg-[#785a28]/25 border border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.25)]'
+                : 'text-neutral-400 hover:text-[#f0e6d2] border border-transparent'
             }`}
           >
             <BookOpen className="w-5 h-5" />
@@ -3851,7 +4540,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
           <button
             onClick={() => setActiveBottomTab('settings')}
             className={`flex flex-col items-center justify-center w-20 py-1 rounded-xl transition-all cursor-pointer ${
-              activeBottomTab === 'settings' ? 'text-purple-400 font-bold' : 'text-neutral-400 hover:text-neutral-200'
+              activeBottomTab === 'settings'
+                ? 'text-[#c8aa6e] font-bold bg-[#785a28]/25 border border-[#c8aa6e]/50 shadow-[0_0_10px_rgba(200,170,110,0.25)]'
+                : 'text-neutral-400 hover:text-[#f0e6d2] border border-transparent'
             }`}
           >
             <Settings className="w-5 h-5" />
@@ -4520,11 +5211,11 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
       {/* EXPORT 5 EBOOK FORMATS MODAL */}
       {showExportModal && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+          <div className="bg-neutral-900 border border-[#785a28]/60 rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Download className="w-5 h-5 text-emerald-400" />
-                <span className="font-bold text-white text-sm">Xuất Bản Dịch Ebook</span>
+                <Download className="w-5 h-5 text-[#c8aa6e]" />
+                <span className="font-bold text-[#f0e6d2] text-sm">Xuất Bản Dịch Ebook</span>
               </div>
               <button 
                 onClick={() => setShowExportModal(false)}
@@ -4549,18 +5240,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
                 <div
                   key={item.fmt}
                   onClick={() => handleExportNovelFormat(item.fmt)}
-                  className="p-3 bg-neutral-950 hover:bg-neutral-800/80 border border-neutral-800 hover:border-emerald-600/50 rounded-2xl flex items-center justify-between cursor-pointer transition-all group"
+                  className="p-3 bg-neutral-950 hover:bg-[#1e2328] border border-neutral-800 hover:border-[#c8aa6e]/60 rounded-2xl flex items-center justify-between cursor-pointer transition-all group"
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{item.icon}</span>
                     <div>
-                      <div className="font-bold text-xs text-white group-hover:text-emerald-400 transition-colors">
+                      <div className="font-bold text-xs text-white group-hover:text-[#c8aa6e] transition-colors">
                         {item.label}
                       </div>
                       <div className="text-[10px] text-neutral-400">{item.desc}</div>
                     </div>
                   </div>
-                  <Download className="w-4 h-4 text-neutral-500 group-hover:text-emerald-400 transition-colors" />
+                  <Download className="w-4 h-4 text-neutral-500 group-hover:text-[#c8aa6e] transition-colors" />
                 </div>
               ))}
             </div>
@@ -4571,6 +5262,69 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
             >
               Đóng
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* UNIVERSAL QUANTITY / NUMBER EDITOR MODAL */}
+      {editQuantityModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#091428] border border-[#c8aa6e] rounded-3xl p-5 w-full max-w-xs space-y-4 shadow-[0_0_30px_rgba(200,170,110,0.3)]">
+            <div className="flex items-center justify-between border-b border-[#785a28]/40 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⚙️</span>
+                <span className="font-bold text-[#f0e6d2] text-xs uppercase tracking-wide">Tùy Chỉnh Thông Số</span>
+              </div>
+              <button 
+                onClick={() => setEditQuantityModal(null)}
+                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-neutral-200">{editQuantityModal.title}</div>
+              <div className="text-[10px] text-[#a09b8c]">
+                Khoảng giá trị hợp lệ: {editQuantityModal.min} – {editQuantityModal.max} {editQuantityModal.unit}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-[#050505] p-2.5 rounded-xl border border-[#785a28]">
+              <input
+                type="number"
+                min={editQuantityModal.min}
+                max={editQuantityModal.max}
+                step={editQuantityModal.step || 1}
+                value={tempQuantityInput}
+                onChange={(e) => setTempQuantityInput(e.target.value)}
+                className="flex-1 bg-transparent text-center font-mono text-lg font-bold text-[#c8aa6e] focus:outline-none"
+                autoFocus
+              />
+              <span className="text-xs text-neutral-400 font-mono pr-2">{editQuantityModal.unit}</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={() => setEditQuantityModal(null)}
+                className="flex-1 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-xl text-xs font-semibold cursor-pointer border border-neutral-800"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={() => {
+                  const num = parseFloat(tempQuantityInput);
+                  if (!isNaN(num)) {
+                    const clamped = Math.min(editQuantityModal.max, Math.max(editQuantityModal.min, num));
+                    editQuantityModal.onSave(clamped);
+                  }
+                  setEditQuantityModal(null);
+                }}
+                className="flex-1 py-2 bg-[#c8aa6e] hover:bg-[#d8ba7e] text-black font-extrabold rounded-xl text-xs shadow-md shadow-amber-600/30 cursor-pointer"
+              >
+                Lưu Thay Đổi
+              </button>
+            </div>
           </div>
         </div>
       )}
