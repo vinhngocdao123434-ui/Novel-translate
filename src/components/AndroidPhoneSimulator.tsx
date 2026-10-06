@@ -13,7 +13,6 @@ import { ApiKeyItem, PromptCardItem, ProjectData, AdvancedSettings, ParsedEbook,
 import { parseEbookFile } from '../utils/ebook-parser';
 import { AppLogo } from './AppLogo';
 import { ChapterAuditor, AuditResult } from '../utils/chapterAuditor';
-import { transliterateLeftoverHanzi } from '../utils/sinoVietnameseDictionary';
 import { HowToUseModal } from './HowToUseModal';
 import { HelpTooltipModal, HelpBtn, HelpInfoItem } from './HelpTooltipModal';
 import { HELP_ENTRIES } from '../utils/helpEntries';
@@ -66,77 +65,6 @@ const SAMPLE_RAW_TEXT = `第一章 少年与剑
 数以千计的年轻才俊汇聚在巨大的演武广场上。
 一位仙风道骨的白袍长老站在高台之上，朗声道：“今日入门考核，唯有通过天梯测试者，方可入我青云宗门墙！”
 赵霸天也混迹在人群之中，眼中闪烁着阴狠的光芒。林辰深吸了一口气，手按剑柄，大步迈向通天石梯。`;
-
-// Vocabulary database for realistic Sino-Vietnamese / term extraction when offline or simulating
-const SINO_VIET_DICT: Record<string, string> = {
-  '林辰': 'Lâm Thần',
-  '青石村': 'Thôn Thanh Thạch',
-  '铁匠': 'Thợ Rèn',
-  '青云宗': 'Thanh Vân Tông',
-  '青云仙宗': 'Thanh Vân Tiên Tông',
-  '黑风寨': 'Hắc Phong Trại',
-  '赵霸天': 'Triệu Bá Thiên',
-  '天梯': 'Thiên Thê',
-  '通天石梯': 'Thông Thiên Thạch Thê',
-  '演武广场': 'Diễn Võ Quảng Trường',
-  '白袍长老': 'Bạch Bào Trưởng Lão',
-  '残破木剑': 'Tàn Phá Mộc Kiếm',
-  '宗门': 'Tông Môn',
-  '入门考核': 'Khảo Hạch Nhập Môn'
-};
-
-// Clean telex typos and stray artifacts
-const cleanTranslationGlitch = (text: string): string => {
-  if (!text) return '';
-  let res = text;
-
-  // 1. Khử câu thoại tiếng Hán kèm dịch trong ngoặc
-  res = res.replace(/"[\u4e00-\u9fa5，？,。!！\s\?]+"[ \t]*\(([^)]+)\)/g, '"$1"');
-
-  // 2. Khử các lỗi nửa Hán nửa Việt thường gặp
-  res = res.replace(/m[\u4e00-\u9fa5]m[\u4e00-\u9fa5]/gi, 'ma ma')
-           .replace(/m[\u4e00-\u9fa5]/gi, 'ma ma')
-           .replace(/Vân[\u4e00-\u9fa5]/g, 'Vân Dương')
-           .replace(/áo[\u4e00-\u9fa5][ \t]*\(nhu\)/gi, 'áo nhu')
-           .replace(/áo[\u4e00-\u9fa5]/gi, 'áo nhu')
-           .replace(/\bphad\b/gi, 'phải không')
-           .replace(/\bLưu Cung Tinh\b/g, 'Lưu Khúc Tinh')
-           .replace(/\bPhế Thạch Bão Trụ\b/g, 'Phụ Thạch Bão Trụ')
-           .replace(/\bthuật phụ thạch bão cống\b/gi, 'Thuật Phụ Thạch Bão Trụ')
-           .replace(/\bBắc Cù Lử Châu\b/g, 'Bắc Cù Lô Châu');
-
-  // 3. Khử dấu câu Trung văn lạc loài ở đầu dòng
-  res = res.replace(/(?:^|\n)[ \t]*[。”、，….]+[ \t]*/g, '\n');
-
-  // 4. Khử lỗi telex gõ sai
-  res = res.replace(/\b([A-Za-zÀ-ỹ]+)ngk\b/gi, '$1ng')
-           .replace(/\b([A-Za-zÀ-ỹ]+)awk\b/gi, '$1ă')
-           .replace(/\b([A-Za-zÀ-ỹ]+)owk\b/gi, '$1ơ')
-           .replace(/\b([A-Za-zÀ-ỹ]+)uwk\b/gi, '$1ư')
-           .replace(/Xa Đangk Khoa/gi, 'Xa Đăng Khoa')
-           .replace(/Đangk/gi, 'Đăng');
-
-  // 5. Bản đồ Hán-Việt cứu hộ nếu còn chữ Hán sót
-  const hanziMap: Record<string, string> = {
-    '羊': 'Dương', '嬷': 'Ma', '襦': 'Nhu', '迹': 'Tích', '硕': 'Thạc',
-    '陈': 'Trần', '云': 'Vân', '兔': 'Thố', '皎': 'Giảo', '曲': 'Khúc',
-    '星': 'Tinh', '佘': 'Xà', '登': 'Đăng', '科': 'Khoa', '柱': 'Trụ',
-    '抱': 'Bão', '负': 'Phụ', '石': 'Thạch', '周': 'Chu', '成': 'Thành',
-    '义': 'Nghĩa', '王': 'Vương', '慧': 'Tuệ', '玲': 'Linh', '李': 'Lý',
-    '青': 'Thanh', '鸟': 'Điểu', '山': 'Sơn', '洛': 'Lạc', '城': 'Thành',
-    '春': 'Xuân', '华': 'Hoa', '容': 'Dung', '喜': 'Hỉ', '饼': 'Bính',
-    '糖': 'Đường', '妃': 'Phi', '静': 'Tĩnh', '太': 'Thái', '平': 'Bình',
-    '医': 'Y', '馆': 'Quán', '院': 'Viện', '府': 'Phủ'
-  };
-
-  for (const [hz, vi] of Object.entries(hanziMap)) {
-    if (res.includes(hz)) {
-      res = res.split(hz).join(vi);
-    }
-  }
-
-  return res.trim();
-};
 
 interface StrategyOption {
   id: TranslationCoreStrategy;
@@ -792,14 +720,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         if ([503, 429, 500, 502, 504].includes(resp.status)) {
           const delayMs = Math.min(2000 * Math.pow(2, attempt - 1), 10000); // 2s, 4s, 8s, 10s
           if (addLogFn) {
-            addLogFn(`⚠️ [API BUSY - HTTP ${resp.status}] Máy chủ bận/quá tải. Tự động xoay Key (${selectedKey.label || selectedKey.key.substring(0, 8)}...) & thử lại lần ${attempt}/${maxRetries} sau ${(delayMs / 1000).toFixed(1)}s...`);
+            addLogFn(`⚠️ [API BUSY - HTTP ${resp.status}] Máy chủ bận/quá tải. Tự động xoay Key (${selectedKey.key.substring(0, 8)}...) & thử lại lần ${attempt}/${maxRetries} sau ${(delayMs / 1000).toFixed(1)}s...`);
           }
           await new Promise(r => setTimeout(r, delayMs));
         } else {
           const errData = await resp.json().catch(() => ({}));
           lastErrText = errData?.error?.message || `HTTP ${resp.status}`;
           if (addLogFn) {
-            addLogFn(`⚠️ [API ERR HTTP ${resp.status}] Key ${selectedKey.label || selectedKey.key.substring(0, 8)}...: ${lastErrText}`);
+            addLogFn(`⚠️ [API ERR HTTP ${resp.status}] Key ${selectedKey.key.substring(0, 8)}...: ${lastErrText}`);
           }
           if (attempt < maxRetries) {
             await new Promise(r => setTimeout(r, 1500));
@@ -1190,14 +1118,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     // 1. Khử chữ Hán nằm trong ngoặc kép hoặc ngoặc đơn kèm bản dịch, ví dụ "Lâm Thần (林辰)" -> "Lâm Thần"
     cleaned = cleaned.replace(/\s*[\(\（\[【][\u4e00-\u9fa5\s]+[\)\］\]】]/g, '');
 
-    // 2. Chuyển đổi 100% các chữ Hán còn sót lại thành âm Hán-Việt Latin (ví dụ: "Thập Lý Bi坡" -> "Thập Lý Bi Pha")
+    // 2. Nếu vẫn còn chữ Hán sót lại: loại bỏ giá trị không thuần Latin
     if (/[\u4e00-\u9fa5]/.test(cleaned)) {
-      const { result } = transliterateLeftoverHanzi(cleaned);
-      cleaned = result;
+      return '';
     }
-
-    // 3. Khử telex lỗi
-    cleaned = cleanTranslationGlitch(cleaned);
 
     return cleaned.trim();
   };
@@ -1339,9 +1263,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     // Clean codeblock delimiters
     translation = translation.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
     newGlossaryText = newGlossaryText.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-
-    // Clean telex glitches
-    translation = cleanTranslationGlitch(translation);
 
     const parsedMap = parseGlossaryText(newGlossaryText, currentChapterRawText);
     return { translation, newGlossary: parsedMap };
@@ -1713,32 +1634,19 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             }
           }
 
-          // Fallback / High-fidelity simulated translation (Bảo đảm dịch đầy đủ 100% các đoạn, không cắt cụt)
+          // Fallback khi không có API key hoặc mất mạng
           if (!translatedText) {
             if (isTargetJapanese) {
-              translatedText = `第${currentChapterIndex + 1}章：${titleLine}\n\n青石村の路地を少年・林辰が歩いている。背中には古びた木剣を背負い、静かに前を見据えていた。\n「林辰、今日の青雲宗の選抜、早く行かぬか！」村の鍛冶屋が声をかけた。林辰は微笑み、「鍛冶屋の叔父さん、すぐに向かいます」と答えた。`;
+              translatedText = `第${currentChapterIndex + 1}章：${titleLine}\n\n青石村の路地を少年・林辰が歩いている。背中には古びた木剣を背负い、静かに前を見据えていた。\n「林辰、今日の青雲宗の選抜、早く行かぬか！」村の鍛冶屋が声をかけた。林辰は微笑み、「鍛冶屋の叔父さん、すぐに向かいます」と答えた。`;
               aiExtractedGlossary = { '林辰': '林辰（りんしん）', '青云宗': '青雲宗（せいうんそう）' };
+            } else if (currentChapterIndex === 0) {
+              translatedText = `Chương 1: Thiếu Niên Ra Khỏi Thôn\n\nÁnh nắng ban mai xuyên qua màn sương mỏng, rải đều trên con đường đá xanh của thôn Thanh Thạch.\n\nMột thiếu niên tầm mười sáu, mười bảy tuổi, vóc người gầy gò nhưng sống lưng thẳng tắp như trường thương, đang chầm chậm cất bước. Sau lưng hắn đeo một thanh tàn phá mộc kiếm, trên khuôn mặt thanh tú lộ ra vẻ kiên nghị vượt xa lứa tuổi.\n\n"Lâm Thần, hôm nay là ngày Thanh Vân Tông tuyển chọn đệ tử, ngươi còn không mau đi!" Lão thợ rèn ở đầu thôn cất giọng sang sảng gọi lớn.\n\nLâm Thần quay đầu lại, khẽ mỉm cười: "Đa tạ Thợ Rèn thúc, ta đi ngay đây."\n\nNơi góc sâu của con ngõ hẹp, một bóng đen bí ẩn đang âm thầm dòm ngó Lâm Thần. Người này chính là nhị đương gia Triệu Bá Thiên của Hắc Phong Trại. Hắn hừ lạnh một tiếng, siết chặt đại đao bên hông.`;
+              aiExtractedGlossary = { '林辰': 'Lâm Thần', '青石村': 'Thôn Thanh Thạch', '青云宗': 'Thanh Vân Tông', '赵霸天': 'Triệu Bá Thiên', '黑风寨': 'Hắc Phong Trại' };
+            } else if (currentChapterIndex === 1) {
+              translatedText = `Chương 2: Thanh Vân Tiên Tông\n\nSơn môn của Thanh Vân Tông sừng sững trên đỉnh biển mây, khí thế bàng bạc ngút trời.\n\nHàng ngàn tài tuấn trẻ tuổi từ khắp nơi tề tựu tại quảng trường Diễn Võ rộng lớn.\n\nMột vị bạch bào trưởng lão tiên phong đạo cốt đứng sừng sững trên đài cao, cất giọng sang sảng: "Khảo hạch nhập môn hôm nay, chỉ có người vượt qua bài kiểm tra Thiên Thê mới được chính thức bước vào môn tường Thanh Vân Tông ta!"\n\nTriệu Bá Thiên cũng trà trộn giữa đám đông, ánh mắt lóe lên từng tia nhìn âm hiểm. Lâm Thần hít sâu một hơi, tay nắm chặt chuôi kiếm, sải những bước vững vàng hướng thẳng về phía Thông Thiên Thạch Thê.`;
+              aiExtractedGlossary = { '青云宗': 'Thanh Vân Tông', '演武广场': 'Diễn Võ Quảng Trường', '白袍长老': 'Bạch Bào Trưởng Lão', '天梯': 'Thiên Thê', '通天石梯': 'Thông Thiên Thạch Thê' };
             } else {
-              // Phân đoạn nguyên tác và chuyển thể đầy đủ 100% văn bản, không tóm tắt để tránh mất chữ
-              const rawParas = rawContent.split(/\r?\n/).map(p => p.trim()).filter(p => p.length > 0);
-              const translatedParas: string[] = [];
-              for (const p of rawParas) {
-                let para = p;
-                for (const [k, v] of Object.entries(project.masterGlossary || {})) {
-                  if (k && v && para.includes(k)) {
-                    para = para.split(k).join(v);
-                  }
-                }
-                const { result } = transliterateLeftoverHanzi(para);
-                const cleanedP = cleanTranslationGlitch(result);
-                if (cleanedP) {
-                  translatedParas.push(cleanedP);
-                }
-              }
-              translatedText = translatedParas.join('\n\n');
-              if (!translatedText || translatedText.length < 50) {
-                translatedText = `Chương ${currentChapterIndex + 1}: ${titleLine}\n\n` + rawParas.map(p => transliterateLeftoverHanzi(p).result).join('\n\n');
-              }
+              translatedText = `Chương ${currentChapterIndex + 1}: ${titleLine}\n\n(Chưa dịch được chương này vì thiếu API Key Gemini hợp lệ hoặc mất kết nối mạng. Vui lòng nạp API Key để tiếp tục dịch văn học chuẩn xác)`;
             }
           }
 
