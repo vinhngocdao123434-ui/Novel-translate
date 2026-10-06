@@ -55,6 +55,7 @@ export interface AdvancedSettings {
   // Glossary AI Auto-Learning Settings
   autoLearnGlossary?: boolean;
   minTermLength: number; // e.g. 2 chars (1 - 8)
+  maxTermLength?: number; // e.g. 8 chars (3 - 30)
   minFrequency: number; // e.g. 2 occurrences (1 - 10)
   conflictPolicy: 'keep-old' | 'overwrite';
   blacklistWords: string[]; // pronouns & common fillers
