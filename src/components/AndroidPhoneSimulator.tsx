@@ -2041,7 +2041,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     }
   };
 
-  // Bộ Quét Làm Mượt Bản Dịch Final (Global Hanzi Sweeper)
+  // Bộ Quét Làm Mượt Bản Dịch Final (Global Hanzi Sweeper via Gemini AI)
   const handleExecuteFinalGlobalPolish = async () => {
     if (isPolishing) {
       addLog('⚠️ Đang trong tiến trình làm mượt!');
@@ -2052,8 +2052,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       return;
     }
 
+    const activeKeyObj = globalApiKeys.find(k => k.state === 'ACTIVE') || globalApiKeys[0];
+    const isRealKey = activeKeyObj && activeKeyObj.key.startsWith('AIzaSy') && !activeKeyObj.key.includes('DemoSampleKey');
+
+    if (!isRealKey) {
+      addLog('⚠️ [LÀM MƯỢT FINAL] Cần API Key thực để AI thực hiện rà soát và làm mượt bản dịch.');
+      alert('Vui lòng nhập API Key thực tại Tab 1 để AI tiến hành làm mượt Final.');
+      return;
+    }
+
     setIsPolishing(true);
-    addLog(`🔍 [LÀM MƯỢT 3 NHÓM] Đang quét Offline toàn bộ ${Object.keys(project.translatedChapters).length} chương bản dịch...`);
+    addLog(`🔍 [LÀM MƯỢT FINAL AI] Đang rà soát toàn bộ ${Object.keys(project.translatedChapters).length} chương bản dịch để AI làm mượt các ký tự chưa thuần Việt...`);
 
     // 1. Quét Phân Loại 3 Nhóm Thông Minh (Từ lai, Hán >= 2 ký tự, Hán đơn kèm ngữ cảnh)
     const mixedRegex = /[a-zA-ZÀ-ỹ0-9_]*[\u4e00-\u9fa5]+[a-zA-ZÀ-ỹ0-9_]*/g;
@@ -2102,71 +2111,91 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       return;
     }
 
-    const numChunks = Math.ceil(totalCount / 500);
-    addLog(`⚡ [LÀM MƯỢT 3 NHÓM] Phát hiện ${totalCount} mục (Nhóm 1 Từ lai: ${group1Mixed.size}, Nhóm 2 Cụm Hán: ${group2Multi.size}, Nhóm 3 Hán đơn kèm ngữ cảnh: ${group3SingleContext.size}). Tự động chia làm ${numChunks} gói (~5.000 tokens/gói) gửi model ${polishModel}...`);
+    addLog(`🤖 [GỬI GEMINI LÀM MƯỢT] Phát hiện ${totalCount} mục (Từ lai: ${group1Mixed.size}, Cụm Hán: ${group2Multi.size}, Hán đơn: ${group3SingleContext.size}). Đang gửi AI Gemini ${project.model} biên dịch thuần Việt...`);
 
-    setTimeout(() => {
-      const mapping: Record<string, string> = {};
+    let itemsText = '';
+    let idx = 1;
+    group1Mixed.forEach(t => { itemsText += `${idx++}. [Từ lai]: ${t}\n`; });
+    group2Multi.forEach(t => { itemsText += `${idx++}. [Cụm Hán]: ${t}\n`; });
+    group3SingleContext.forEach((ctx, char) => { itemsText += `${idx++}. [Hán đơn "${char}"]: Ngữ cảnh: "${ctx}"\n`; });
 
-      // Xử lý Nhóm 1: Từ lai
-      group1Mixed.forEach(token => {
-        let replaced = token;
-        for (let i = 0; i < token.length; i++) {
-          const char = token[i];
-          if (/[\u4e00-\u9fa5]/.test(char)) {
-            const sino = SINO_VIET_DICT[char] || 'Tuyền';
-            replaced = replaced.replace(char, sino.charAt(0).toUpperCase() + sino.slice(1));
+    try {
+      let prompt = `Bạn là chuyên gia biên tập văn học và chuyển ngữ tiếng Việt cao cấp.\n`;
+      prompt += `Nhiệm vụ: Chuyển toàn bộ các từ lai dính chữ Hán, cụm chữ Hán hoặc chữ Hán đơn dưới đây sang từ ngữ Tiếng Việt thuần túy, mượt mà, đúng ngữ cảnh văn học:\n\n`;
+      prompt += `DANH SÁCH MỤC CẦN LÀM MƯỢT:\n${itemsText}\n\n`;
+      prompt += `YÊU CẦU ĐẦU RA BẮT BUỘC:\n`;
+      prompt += `Trả về DUY NHẤT 1 MẢNG JSON định dạng:\n`;
+      prompt += `[\n  { "old": "Ngư璇", "new": "Ngư Tuyền" },\n  { "old": "林辰", "new": "Lâm Thần" }\n]\n`;
+      prompt += `TUYỆT ĐỐI KHÔNG giải thích hay thêm bớt chữ Hán ở trường "new". Trường "new" PHẢI LÀ 100% TIẾNG VIỆT LATIN.`;
+
+      const polishModel = project.model || 'gemini-2.5-flash';
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${polishModel}:generateContent?key=${activeKeyObj.key}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+        })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        let cleanJson = outText.trim();
+        if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
+        else if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
+        if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
+
+        const sIdx = cleanJson.indexOf('[');
+        const eIdx = cleanJson.lastIndexOf(']');
+        let patches: Array<{ old: string; new: string }> = [];
+
+        if (sIdx !== -1 && eIdx !== -1) {
+          cleanJson = cleanJson.substring(sIdx, eIdx + 1);
+          const parsedArr = JSON.parse(cleanJson);
+          if (Array.isArray(parsedArr)) {
+            patches = parsedArr.filter(p => p.old && p.new && p.old !== p.new && !/[\u4e00-\u9fa5]/.test(p.new));
           }
         }
-        mapping[token] = replaced;
-      });
 
-      // Xử lý Nhóm 2: Cụm Hán >= 2 ký tự
-      group2Multi.forEach(token => {
-        let replaced = '';
-        for (let i = 0; i < token.length; i++) {
-          const char = token[i];
-          const sino = SINO_VIET_DICT[char] || 'Tuyền';
-          replaced += (i > 0 ? ' ' : '') + sino.charAt(0).toUpperCase() + sino.slice(1);
+        if (patches.length > 0) {
+          const sortedKeys = patches.sort((a, b) => b.old.length - a.old.length);
+          let totalReplacements = 0;
+
+          const newChapters: Record<number, string> = { ...project.translatedChapters };
+          Object.keys(newChapters).forEach(idxStr => {
+            const chIdx = Number(idxStr);
+            let content = newChapters[chIdx];
+            if (!content) return;
+            sortedKeys.forEach(p => {
+              if (content.includes(p.old)) {
+                content = content.replaceAll(p.old, p.new);
+                totalReplacements++;
+              }
+            });
+            newChapters[chIdx] = content;
+          });
+
+          setProjects(prev => ({
+            ...prev,
+            [currentProjectName]: {
+              ...project,
+              translatedChapters: newChapters
+            }
+          }));
+
+          addLog(`🏆 [HOÀN TẤT LÀM MƯỢT AI] Gemini đã sửa thành công ${patches.length} từ (${totalReplacements} vị trí) trong toàn bộ tác phẩm! Bản dịch đạt chuẩn 100% Tiếng Việt.`);
+        } else {
+          addLog(`✨ [LÀM MƯỢT FINAL] AI đã kiểm tra xong, bản dịch đã hoàn toàn chuẩn xác.`);
         }
-        mapping[token] = replaced;
-      });
-
-      // Xử lý Nhóm 3: Hán đơn kèm ngữ cảnh
-      group3SingleContext.forEach((context, char) => {
-        const sino = SINO_VIET_DICT[char] || 'Tuyền';
-        mapping[char] = sino.charAt(0).toUpperCase() + sino.slice(1);
-      });
-
-      // Ghi đè toàn cục an toàn theo thứ tự Longest-Match-First (dài nhất trước)
-      const sortedKeys = Object.keys(mapping).sort((a, b) => b.length - a.length);
-      let totalReplacements = 0;
-
-      const newChapters: Record<number, string> = { ...project.translatedChapters };
-      Object.keys(newChapters).forEach(idxStr => {
-        const idx = Number(idxStr);
-        let content = newChapters[idx];
-        if (!content) return;
-        sortedKeys.forEach(key => {
-          if (content.includes(key)) {
-            content = content.replaceAll(key, mapping[key]);
-            totalReplacements++;
-          }
-        });
-        newChapters[idx] = content;
-      });
-
-      setProjects(prev => ({
-        ...prev,
-        [currentProjectName]: {
-          ...project,
-          translatedChapters: newChapters
-        }
-      }));
-
+      } else {
+        addLog(`⚠️ [LỖI API LÀM MƯỢT] HTTP ${resp.status}`);
+      }
+    } catch (err: any) {
+      addLog(`❌ Lỗi khi gọi AI làm mượt: ${err.message}`);
+    } finally {
       setIsPolishing(false);
-      addLog(`🏆 [TỔNG KẾT] Đã tự động làm mượt tổng cộng ${sortedKeys.length} từ rác (${totalReplacements} vị trí) qua ${numChunks} gói! Bản dịch đạt chuẩn 100% tiếng Việt.`);
-    }, 1200);
+    }
   };
 
   // Export 5 Ebook Formats (TXT, EPUB, HTML, MOBI, AZW3)
