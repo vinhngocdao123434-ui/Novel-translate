@@ -15,7 +15,7 @@ export interface PromptCardItem {
 export type TranslationCoreStrategy = 
   | 'STRATEGY_PURE_LITERARY'     // Dịch Thuần Túy Văn Học (Chuẩn xác, tự nhiên & nhanh nhất)
   | 'STRATEGY_DUAL_TASK'          // Vừa Dịch Vừa Trích Xuất Glossary Mới trong 1 Request (Tiết kiệm Token)
-  | 'STRATEGY_PRE_INJECT_RAW'     // Khóa Thuật Ngữ Nghiêm Ngặt - Constrained Decoding (Khóa Tên 100%, Raw Nguyên Vẹn)
+  | 'STRATEGY_PRE_INJECT_RAW'     // Ghi Đè Thuật Ngữ Lên Bản Raw Trước Khi Dịch (Khóa Tên 100%)
   | 'STRATEGY_DUAL_PASS'          // Dịch Kép Phản Biện 2-Pass (Pass 1 Dịch + Pass 2 Tổng Biên Tập Đối Soát)
   | 'STRATEGY_COT_THINKING';      // Dịch Suy Luận Ngữ Cảnh CoT (Deep Thinking / Giải Mã Thành Ngữ)
 
@@ -50,6 +50,9 @@ export interface AdvancedSettings {
   enableAutoFinalPolish: boolean; // Tự động kích hoạt Làm Mượt Final sau khi hoàn tất dải chương
   antiHanziStrict: boolean; // Bộ lọc 2 lớp chống lọt chữ Hán & typo bộ gõ
   autoHealOnlineEnabled: boolean; // Tự động cứu hộ trực tuyến khi gặp lỗi nặng / nghẽn mạng
+  rollingPolishBatchSize?: number; // e.g. 15 chapters (chạy khi ấn nút thủ công)
+  batchGlossarySubChunkSize?: number; // Kích thước phân đoạn Bóc Lô Glossary (e.g. 10 chương/sub-chunk, từ 5 - 30)
+  finalPolishChunkSize?: number; // Kích thước phân đoạn Làm Mượt Final (e.g. 40 mục/chunk, từ 10 - 100)
 
   // Glossary AI Auto-Learning Settings
   autoLearnGlossary?: boolean;
