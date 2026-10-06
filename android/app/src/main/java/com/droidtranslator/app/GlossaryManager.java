@@ -34,14 +34,22 @@ public class GlossaryManager {
         return count;
     }
 
-    public static boolean isValidGlossaryKey(String key, int minTermLength) {
+    public static boolean isValidGlossaryKey(String key, int minTermLength, int maxTermLength) {
         if (key == null) return false;
         String trimmed = cleanTerm(key).trim();
         if (trimmed.isEmpty()) return false;
 
-        // Bắt buộc phải có chữ Hán và đạt độ dài tối thiểu
+        // Bắt buộc phải có chữ Hán và đạt độ dài tối thiểu & không vượt quá tối đa
         int chineseCount = countChineseChars(trimmed);
-        if (chineseCount < (minTermLength > 0 ? minTermLength : 2)) return false;
+        int min = minTermLength > 0 ? minTermLength : 2;
+        int max = maxTermLength > 0 ? maxTermLength : 8;
+        if (chineseCount < min || chineseCount > max) return false;
+        if (trimmed.length() > max) return false;
+
+        // Loại bỏ ký tự đặc biệt, dấu câu
+        if (trimmed.matches(".*[，。！？：“”、《》；…—\\s,\\.?!:\"'\\-_\050\051\\[\\]{}~/\\\\|`@#$%^&*+=<>].*")) {
+            return false;
+        }
 
         // Loại bỏ các tiêu đề danh mục / prompt header bị AI sao chép lại
         String upper = trimmed.toUpperCase();
@@ -58,7 +66,11 @@ public class GlossaryManager {
         return true;
     }
 
-    public static int purgeInvalidEntries(Map<String, String> glossary, int minTermLength) {
+    public static boolean isValidGlossaryKey(String key, int minTermLength) {
+        return isValidGlossaryKey(key, minTermLength, 8);
+    }
+
+    public static int purgeInvalidEntries(Map<String, String> glossary, int minTermLength, int maxTermLength) {
         if (glossary == null || glossary.isEmpty()) return 0;
         int removed = 0;
         Iterator<Map.Entry<String, String>> it = glossary.entrySet().iterator();
@@ -66,12 +78,16 @@ public class GlossaryManager {
             Map.Entry<String, String> entry = it.next();
             String key = entry.getKey();
             String val = entry.getValue();
-            if (!isValidGlossaryKey(key, minTermLength) || val == null || val.trim().isEmpty() || key.trim().equalsIgnoreCase(val.trim())) {
+            if (!isValidGlossaryKey(key, minTermLength, maxTermLength) || val == null || val.trim().isEmpty() || key.trim().equalsIgnoreCase(val.trim())) {
                 it.remove();
                 removed++;
             }
         }
         return removed;
+    }
+
+    public static int purgeInvalidEntries(Map<String, String> glossary, int minTermLength) {
+        return purgeInvalidEntries(glossary, minTermLength, 8);
     }
 
     public static GlossaryEntry parseLine(String line, String chapterRawText, int minTermLength, int minFrequency) {

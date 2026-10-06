@@ -1026,19 +1026,32 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     '衣服', '茶杯', '房门', '桌子', '椅子', '头发', '手指', '胸口', '后背', '呼吸', '面色', '目光', '声音',
     '神色', '动作', '力气', '时间', '片刻', '瞬间', '刹那', '周围', '四周', '眼前', '身后', '头颅', '手腕', '脚下',
     '嘴唇', '牙齿', '舌头', '脖子', '肩膀', '腰部', '肚子', '膝盖', '双手', '双腿', '拳头', '手臂', '脸庞', '面容',
-    '视线', '鼻尖', '耳边', '脑海', '心头', '心底', '掌心', '脚底', '身躯', '肉身', '血液', '经脉', '骨骼',
+    '视线', '鼻尖', '耳边', '脑海', '心头', '心底', '掌心', '脚底', '身躯', '肉身', '血液', '经脉', '骨骼', '筋骨', '脏腑',
+    '丹田', '识海', '灵气', '真气', '内力', '气血', '功力', '身形', '气息', '意念', '神识', '灵识', '魂魄', '元神', '心神',
     // Đồ vật đời thường & cảnh quan thông thường
     '长剑', '大刀', '长枪', '匕首', '石头', '树木', '树叶', '花草', '阳光', '月光', '清风', '微风', '暴雨',
     '大门', '窗户', '地面', '天空', '大地', '山峰', '树林', '道路', '小路', '街道', '屋子', '房间', '墙壁', '台阶', '石板',
     '杯子', '筷子', '碗碟', '刀剑', '兵器', '武器', '弓箭', '盾牌', '盔甲', '战袍', '锦袍', '黑袍', '白袍', '青袍',
     '鞋子', '步履', '石桌', '木门', '院子', '庭院', '后院', '门外', '门内', '窗前', '床榻', '被褥',
+    // Từ vựng, cụm từ, thành ngữ & danh từ thường gặp
+    '走个过场', '看起来像个样子', '性格冷傲', '出身西北军卒', '半个修行者', '地位', '寻常捕快', '不可同日而语',
+    '行踪诡秘', '知府', '无能', '西北', '祸乱', '参上一本', '紧张万分', '身怀法器',
+    '冷傲', '过场', '军卒', '捕快', '行踪', '诡秘', '参上', '一本', '紧张', '万分', '寻常', '半个',
+    '东南', '东北', '西南', '正东', '正西', '正南', '正北', '东方', '西方', '南方', '北方',
+    '身份', '资格', '能力', '实力', '权力', '势力', '名声', '名气', '声望', '威望',
+    '灾祸', '劫难', '危机', '变故', '动静', '举动', '行径', '性格', '心性', '品性', '脾气',
+    '知县', '县令', '太守', '刺史', '衙役', '官差', '差役', '狱卒', '士兵', '侍卫', '护卫', '侍从', '仆从', '下人', '家丁', '丫鬟',
+    '掌柜', '小二', '伙计', '百姓', '平民', '凡人', '凡俗', '世俗', '修士', '修者', '修行者', '修仙者', '武者', '武夫', '武士',
+    '剑客', '刀客', '刺客', '散修', '魔头', '邪修', '妖道', '老道', '和尚', '道士', '尼姑', '书生', '秀才', '商贾', '商人',
+    '老者', '老妇', '老妪', '少年', '少女', '青年', '壮汉', '大汉', '汉子', '妇人', '女子', '男子', '童子', '孩童', '幼童', '婴儿',
     // Hành động, cảm xúc & thần thái thông thường
     '微笑', '冷笑', '大笑', '点头', '摇头', '皱眉', '叹息', '沉思', '犹豫', '愤怒', '恐惧', '震惊', '平静',
     '开始', '结束', '出现', '消失', '离开', '返回', '进入', '走出', '站立', '坐下', '倒地', '飞起', '看到', '听到',
     '想到', '感到', '知道', '明白', '发现', '注意', '感觉', '觉得', '说话', '开口', '询问', '回答', '呼喊', '大喊',
     '咆哮', '怒吼', '沉默', '不语', '转身', '回头', '迈步', '疾驰', '狂奔', '飞掠', '凝重', '淡然', '冷漠',
+    '吐血', '惨叫', '低吼', '暴喝', '怒喝', '冷哼', '嗤笑', '狞笑', '苦笑', '惊呼',
     // Phó từ, liên từ & đại từ thông dụng
-    '突然', '猛然', '悄然', '赫然', '竟然', '果然', '依然', '甚至', '仿佛', '似乎', '如同', '犹如',
+    '突然', '猛然', '悄然', '赫然', '竟然', '果然', '依然', '甚至', '仿佛', '似乎', '如同', '犹如', '宛如', '好似',
     '什么', '怎么', '为何', '如何', '这里', '那里', '哪里', '这个', '那个', '这些', '那些', '自己', '他们', '她们', '我们', '你们',
     '大家', '众人', '所有人', '有人', '无人', '别人', '彼此', '双方',
     // Lượng từ & từ đếm thông thường
@@ -1067,7 +1080,24 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     // 3. Tuyệt đối loại trừ danh từ chung, bộ phận cơ thể, từ vựng đời thường
     if (COMMON_NON_PROPER_NOUNS.has(cleanKey)) return false;
 
-    // 4. Loại trừ nhãn danh mục prompt hoặc nhãn hệ thống
+    // 4. Lọc các mẫu cụm từ / câu văn / quán ngữ đời thường không phải danh từ riêng:
+    const FORBIDDEN_PREFIXES = [
+      '看起来', '像是', '如同', '仿佛', '似乎', '犹如', '宛如', '好似',
+      '出身', '半个', '一个', '两个', '走个', '所谓', '可谓', '如此',
+      '十分', '万分', '极其', '非常', '不可', '不能', '不知', '不曾',
+      '不见', '不见得', '何等', '怎样', '怎么', '身怀', '手持', '怀中',
+      '眼见', '只见', '突然', '猛然', '不知不觉', '与此同时', '不得不', '无可奈何', '显而易见'
+    ];
+    if (FORBIDDEN_PREFIXES.some(p => cleanKey.startsWith(p))) return false;
+
+    const FORBIDDEN_SUFFIXES = [
+      '万分', '不已', '连连', '阵阵', '重重', '满满', '微微', '淡淡', '冷冷', '悄悄',
+      '暗暗', '渐渐', '徐徐', '滚滚', '滔滔', '凛然', '森然', '凄凉', '凄惨', '诡秘',
+      '冷傲', '狂傲', '傲慢', '无能', '无力', '无双', '无数', '有加', '过场', '的样子', '之势', '之感', '之状'
+    ];
+    if (FORBIDDEN_SUFFIXES.some(s => cleanKey.endsWith(s))) return false;
+
+    // 5. Loại trừ nhãn danh mục prompt hoặc nhãn hệ thống
     const upper = cleanKey.toUpperCase();
     if (
       upper.includes('CÔNG PHÁP') || upper.includes('CHIÊU THỨC') || upper.includes('THÂN PHÁP') ||
@@ -1109,18 +1139,22 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     if (!dict) return {};
     const cleaned: Record<string, string> = {};
     const maxLen = advancedSettings.maxTermLength || 8;
+    const minLen = advancedSettings.minTermLength || 2;
     for (const [k, v] of Object.entries(dict)) {
       const trimmedK = k.trim();
       const sanitizedV = sanitizeGlossaryTargetValue(v);
+      const cCount = countChineseChars(trimmedK);
       
       // Bắt buộc tuân thủ: đúng danh từ riêng, không vượt quá maxTermLength, và nghĩa dịch gọn gàng
       if (
+        cCount >= minLen &&
+        cCount <= maxLen &&
         trimmedK.length <= maxLen &&
-        countChineseChars(trimmedK) <= maxLen &&
         isValidGlossaryKey(trimmedK) &&
         sanitizedV &&
         !/[\u4e00-\u9fa5]/.test(sanitizedV) &&
         sanitizedV.split(/\s+/).length <= 6 &&
+        sanitizedV.length <= 35 &&
         trimmedK.toLowerCase() !== sanitizedV.toLowerCase()
       ) {
         cleaned[trimmedK] = sanitizedV;
@@ -1130,12 +1164,13 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   };
 
   // Helper: Parse any raw glossary text lines (key = val, key ➔ val, etc.)
-  const parseGlossaryText = (text: string, currentChapterRawText?: string): Record<string, string> => {
+  const parseGlossaryText = (text: string, currentChapterRawText?: string | string[]): Record<string, string> => {
     if (!text) return {};
     const parsedMap: Record<string, string> = {};
     const lines = text.split('\n');
     const maxLen = advancedSettings.maxTermLength || 8;
     const minLen = advancedSettings.minTermLength || 2;
+    const minFreq = advancedSettings.minFrequency || 2;
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -1168,10 +1203,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         const lowerVal = val.toLowerCase();
         if (lowerVal.startsWith('là ') || lowerVal.startsWith('chính là ') || lowerVal.startsWith('có nghĩa là ') || lowerVal.startsWith('được gọi là ')) continue;
 
-        // 4. ĐIỀU KIỆN TẦN SUẤT THEO CÀI ĐẶT
+        // 4. ĐIỀU KIỆN TẦN SUẤT THEO CÀI ĐẶT: Xuất hiện tối thiểu minFreq lần trong 1 chương
         if (currentChapterRawText) {
-          const occ = countOccurrences(currentChapterRawText, rawKey);
-          if (occ < (advancedSettings.minFrequency || 2)) continue;
+          if (typeof currentChapterRawText === 'string') {
+            const occ = countOccurrences(currentChapterRawText, rawKey);
+            if (occ < minFreq) continue;
+          } else if (Array.isArray(currentChapterRawText)) {
+            const maxInChapter = currentChapterRawText.length > 0
+              ? Math.max(...currentChapterRawText.map(ch => countOccurrences(ch, rawKey)))
+              : 0;
+            if (maxInChapter < minFreq) continue;
+          }
         }
 
         // 5. BỘ LỌC TỪ CẤM
@@ -1241,24 +1283,39 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   const mergeGlossaryCustomPolicy = (
     existingGlossary: Record<string, string>,
     aiGlossary: Record<string, string>,
-    chapterRawContent?: string
+    chapterRawContent?: string | string[]
   ): { updatedGlossary: Record<string, string>; newlyAdded: Record<string, string> } => {
     const updated = { ...existingGlossary };
     const newlyAdded: Record<string, string> = {};
+    const maxLen = advancedSettings.maxTermLength || 8;
+    const minLen = advancedSettings.minTermLength || 2;
+    const minFreq = advancedSettings.minFrequency || 2;
 
     for (const [key, val] of Object.entries(aiGlossary)) {
       const trimmedKey = key.trim();
       const trimmedVal = sanitizeGlossaryTargetValue(val);
       if (!trimmedKey || !trimmedVal) continue;
 
+      const cCount = countChineseChars(trimmedKey);
+      if (cCount < minLen || cCount > maxLen) continue;
+      if (trimmedKey.length > maxLen) continue;
       if (!isValidGlossaryKey(trimmedKey)) continue;
       if (trimmedKey.toLowerCase() === trimmedVal.toLowerCase()) continue;
+      if (trimmedVal.length > 35 || trimmedVal.split(/\s+/).length > 6) continue;
+      if (/[\u4e00-\u9fa5]/.test(trimmedVal)) continue;
 
-      if (chapterRawContent && countOccurrences(chapterRawContent, trimmedKey) < (advancedSettings.minFrequency || 2)) {
-        continue;
+      if (chapterRawContent) {
+        if (typeof chapterRawContent === 'string') {
+          if (countOccurrences(chapterRawContent, trimmedKey) < minFreq) continue;
+        } else if (Array.isArray(chapterRawContent)) {
+          const maxInCh = chapterRawContent.length > 0 
+            ? Math.max(...chapterRawContent.map(ch => countOccurrences(ch, trimmedKey)))
+            : 0;
+          if (maxInCh < minFreq) continue;
+        }
       }
 
-      if (advancedSettings.blacklistWords && advancedSettings.blacklistWords.some(w => trimmedVal.toLowerCase().includes(w.toLowerCase()))) {
+      if (advancedSettings.blacklistWords && advancedSettings.blacklistWords.some(w => trimmedVal.toLowerCase().includes(w.toLowerCase()) || trimmedKey.toLowerCase().includes(w.toLowerCase()))) {
         continue;
       }
 
@@ -1382,29 +1439,26 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             setProcessedBatchStarts(prev => [...prev, batchStart]);
             const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
             const chaptersInBatch = project.chapters.slice(batchStart, batchEnd);
+            const combinedBatchRaw = chaptersInBatch.join('\n\n');
             const maxRawLen = advancedSettings.maxTermLength || 8;
-            addLog(`🔍 [BÓC LÔ GLOSSARY 7 NHÓM] Đang gom ${chaptersInBatch.length} chương thô (Chương ${batchStart + 1} ➔ ${batchEnd}) để AI trích xuất Master Glossary (Chỉ lọc Danh từ riêng, từ gốc ≤ ${maxRawLen} ký tự)...`);
+            const minFreq = advancedSettings.minFrequency || 2;
+            addLog(`🔍 [BÓC LÔ GLOSSARY 7 NHÓM] Đang gom ${chaptersInBatch.length} chương thô (Chương ${batchStart + 1} ➔ ${batchEnd}) để AI trích xuất Master Glossary (Chỉ lọc Danh từ riêng, từ gốc ≤ ${maxRawLen} ký tự, tần suất ≥ ${minFreq} lần)...`);
 
             if (isRealKey) {
               try {
-                let batchPrompt = `Bạn là chuyên gia trích xuất thực thể và xây dựng từ điển tiểu thuyết văn học (Glossary Architect).\n`;
-                batchPrompt += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và trích xuất TUYỆT ĐỐI CHỈ CÁC DANH TỪ RIÊNG (Proper Nouns) thuộc 7 nhóm bắt buộc:\n`;
-                batchPrompt += `1. TÊN NHÂN VẬT & BIỆT DANH: Tên người chính/phụ, đạo hiệu, ngoại hiệu (VD: 林辰 ➔ Lâm Thần, 赵霸天 ➔ Triệu Bá Thiên).\n`;
-                batchPrompt += `2. XƯNG HÔ & CHỨC VỤ ĐẶC THÙ: Quan chức triều đình, nha môn, bang phái, thân phận, gia tộc (VD: 知县 ➔ Tri huyện, 主簿 ➔ Chủ bộ, 捕快 ➔ Bộ khoái, 巡抚 ➔ Tuần phủ, 掌柜 ➔ Chưởng quỹ).\n`;
-                batchPrompt += `3. ĐỊA DANH & ĐỊA ĐIỂM: Tông môn, vương quốc, phủ, huyện, thành trì, thôn trang, sơn mạch (VD: 大河府 ➔ Phủ Đại Hà, 河宴县 ➔ Huyện Hà Yến, 青云宗 ➔ Thanh Vân Tông, 青石村 ➔ Thôn Thanh Thạch).\n`;
-                batchPrompt += `4. YÊU THÚ & LINH THÚ: Tên các loài dị thú, linh sủng, ma thú có tên riêng (VD: 啸月狼 ➔ Khiếu Nguyệt Lang, 吞天雀 ➔ Thôn Thiên Tước).\n`;
-                batchPrompt += `5. PHÁP BẢO & VẬT PHẨM: Thần binh, phù lục, đan dược, dược thảo có tên riêng (VD: 斩灵剑 ➔ Trảm Linh Kiếm, 筑基丹 ➔ Trúc Cơ Đan).\n`;
-                batchPrompt += `6. CÔNG PHÁP & CHIÊU THỨC: Tâm pháp, khẩu quyết, quyền pháp, kiếm quyết (VD: 梵圣真魔功 ➔ Phạn Thánh Chân Ma Công, 青云剑决 ➔ Thanh Vân Kiếm Quyết).\n`;
-                batchPrompt += `7. CẢNH GIỚI TU LUYỆN: Giai tầng võ đạo (VD: 练气 ➔ Luyện Khí, 筑基 ➔ Trúc Cơ, 金丹 ➔ Kim Đan, 元婴 ➔ Nguyên Anh).\n\n`;
-                batchPrompt += `[QUY TẮC BẮT BUỘC - NGHIÊM NGẶT 100%]:\n`;
-                batchPrompt += `- TUYỆT ĐỐI CHỈ LỌC DANH TỪ RIÊNG. NGHIÊM CẤM đưa các từ vựng thông thường, đồ vật đời thường (quần áo, bàn ghế, chén trà, cây cỏ, đá sỏi), bộ phận cơ thể (tay, chân, mắt, mũi, miệng, đầu, ngực, lưng), động từ, tính từ hoặc câu thoại vào danh sách!\n`;
-                batchPrompt += `- GIỚI HẠN ĐỘ DÀI TỪ GỐC: Từ gốc tiếng Trung KHÔNG ĐƯỢC VƯỢT QUÁ ${maxRawLen} KÝ TỰ (≤ ${maxRawLen} chữ Hán). BẤT KỲ TỪ NÀO DÀI HƠN ${maxRawLen} CHỮ HÁN BỊ CẤM, TUYỆT ĐỐI KHÔNG ĐƯA VÀO DANH SÁCH!\n`;
+                let batchPrompt = `Bạn là chuyên gia trích xuất Danh Từ Riêng (Proper Nouns) cho tiểu thuyết văn học.\n`;
+                batchPrompt += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và TUYỆT ĐỐI CHỈ TRÍCH XUẤT CÁC DANH TỪ RIÊNG CỐ ĐỊNH (Strict Proper Nouns Only):\n`;
+                batchPrompt += `1. TÊN RIÊNG NHÂN VẬT & BIỆT DANH (VD: 林辰 ➔ Lâm Thần, 赵霸天 ➔ Triệu Bá Thiên)\n`;
+                batchPrompt += `2. ĐỊA DANH RIÊNG & TÔNG MÔN RIÊNG (VD: 青云宗 ➔ Thanh Vân Tông, 青石村 ➔ Thôn Thanh Thạch, 大河府 ➔ Phủ Đại Hà)\n`;
+                batchPrompt += `3. THẦN BINH & CÔNG PHÁP ĐỘC QUYỀN CÓ TÊN RIÊNG (VD: 斩灵剑 ➔ Trảm Linh Kiếm, 梵圣真魔功 ➔ Phạn Thánh Chân Ma Công)\n\n`;
+                batchPrompt += `[QUY TẮC BẮT BUỘC - CỰC CỲ CÔ ĐỌNG & TINH LỌC]:\n`;
+                batchPrompt += `- TUYỆT ĐỐI CHỈ LỌC DANH TỪ RIÊNG. NGHIÊM CẤM đưa danh từ chung (như chưởng quỹ, tri huyện, bổ khoái, gia đinh, hắc y nhân), từ vựng đời thường, đồ vật (quần áo, bàn ghế, chén trà), bộ phận cơ thể (tay, chân, mắt, mũi, mày, tim), động từ, tính từ hoặc câu thoại vào danh sách!\n`;
+                batchPrompt += `- GIỚI HẠN ĐỘ DÀI TỪ GỐC: Từ gốc tiếng Trung KHÔNG ĐƯỢC VƯỢT QUÁ ${maxRawLen} CHỮ HÁN (≤ ${maxRawLen} ký tự).\n`;
+                batchPrompt += `- ĐIỀU KIỆN TẦN SUẤT XUẤT HIỆN: CHỈ TRÍCH XUẤT những từ xuất hiện lặp lại từ ${minFreq} LẦN TRỞ LÊN trong cùng một chương. Bỏ qua các từ chỉ xuất hiện thoáng qua.\n`;
                 batchPrompt += `- Định dạng mỗi dòng: [TừGốcTiếngTrung] = [NghĩaHánViệtChuẩn]\n`;
-                batchPrompt += `- TUYỆT ĐỐI KHÔNG BỎ HOẶC ĐỂ CHỨA BẤT KỲ KÝ TỰ CHỮ HÁN NÀO Ở PHẦN NGHĨA DỊCH TIẾNG VIỆT (BÊN PHẢI DẤU =). PHẦN NGHĨA DỊCH PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT.\n`;
+                batchPrompt += `- PHẦN NGHĨA DỊCH TIẾNG VIỆT PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT (TUYỆT ĐỐI KHÔNG CHỨA BẤT KỲ CHỮ HÁN NÀO).\n`;
                 batchPrompt += `- VÍ DỤ CHUẨN: 十里坡 = Thập Lý Bi Pha (CẤM VIẾT: 十里坡 = Thập Lý Bi坡)\n`;
-                batchPrompt += `- TUYỆT ĐỐI KHÔNG đảo ngược thứ tự tiếng Việt = tiếng Trung.\n`;
-                batchPrompt += `- Phiên âm Hán-Việt chuẩn xác, thanh thoát, đúng quy chuẩn từ điển văn học dịch thuật.\n`;
-                batchPrompt += `- Trả về danh sách thuần túy (không kèm markdown giải thích rườm rà).\n\n`;
+                batchPrompt += `- Trả về danh sách cực kỳ ngắn gọn, cô đọng, chỉ gồm các Danh Từ Riêng thực sự trọng yếu.\n\n`;
                 batchPrompt += `[CÁC CHƯƠNG THÔ]:\n` + chaptersInBatch.map((c, i) => `--- CHƯƠNG ${batchStart + i + 1} ---\n${c}`).join('\n\n');
 
                 const bResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
@@ -1412,22 +1466,22 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     contents: [{ parts: [{ text: batchPrompt }] }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+                    generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
                   })
                 });
 
                 if (bResp.ok) {
                   const bData = await bResp.json();
                   const bOut = bData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                  const extractedGloss = parseGlossaryText(bOut);
+                  const extractedGloss = parseGlossaryText(bOut, chaptersInBatch);
                   const foundCount = Object.keys(extractedGloss).length;
 
                   if (foundCount > 0) {
                     setProjects(prev => {
                       const cur = prev[currentProjectName];
-                      const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, extractedGloss);
+                      const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, extractedGloss, chaptersInBatch);
                       const addedCount = Object.keys(newlyAdded).length;
-                      addLog(`🎉 [BÓC LÔ HOÀN TẤT] AI đã tìm thấy ${foundCount} thuật ngữ từ Lô ${batchStart + 1} ➔ ${batchEnd}. Đã nạp ${addedCount} từ mới vào Master Glossary (Tổng hiện có: ${Object.keys(updatedGlossary).length} từ)!`);
+                      addLog(`🎉 [BÓC LÔ HOÀN TẤT] AI đã tìm thấy ${foundCount} danh từ riêng trọng yếu (≥ ${minFreq} lần/chương, ≤ ${maxRawLen} kt) từ Lô ${batchStart + 1} ➔ ${batchEnd}. Đã nạp ${addedCount} từ mới vào Master Glossary!`);
                       return {
                         ...prev,
                         [currentProjectName]: {
@@ -1437,7 +1491,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       };
                     });
                   } else {
-                    addLog(`ℹ️ [BÓC LÔ] AI không phát hiện thêm thuật ngữ mới nào trong lô chương ${batchStart + 1} ➔ ${batchEnd}.`);
+                    addLog(`ℹ️ [BÓC LÔ] Không phát hiện thêm danh từ riêng mới nào thỏa mãn điều kiện (tần suất ≥ ${minFreq} lần/chương, ≤ ${maxRawLen} kt) trong lô chương ${batchStart + 1} ➔ ${batchEnd}.`);
                   }
                 } else {
                   addLog(`⚠️ [BÓC LÔ LỖI] API trả về HTTP ${bResp.status}`);
@@ -1446,31 +1500,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 addLog(`⚠️ [BÓC LÔ LỖI] ${bErr.message}`);
               }
             } else {
-              // Simulated / Offline Batch Extraction
-              const offlineExtracted: Record<string, string> = {};
-              for (const ch of chaptersInBatch) {
-                for (const [k, v] of Object.entries(SINO_VIET_DICT)) {
-                  if (ch.includes(k) && !project.masterGlossary[k]) {
-                    offlineExtracted[k] = v;
-                  }
-                }
-              }
-              const foundCount = Object.keys(offlineExtracted).length;
-              if (foundCount > 0) {
-                setProjects(prev => {
-                  const cur = prev[currentProjectName];
-                  const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, offlineExtracted);
-                  const addedCount = Object.keys(newlyAdded).length;
-                  addLog(`🎉 [BÓC LÔ (OFFLINE)] Đã nạp ${addedCount} thuật ngữ vào Master Glossary (Tổng hiện có: ${Object.keys(updatedGlossary).length} từ)!`);
-                  return {
-                    ...prev,
-                    [currentProjectName]: {
-                      ...cur,
-                      masterGlossary: updatedGlossary
-                    }
-                  };
-                });
-              }
+              // Simulated / Offline Batch Extraction - Không tự động nạp từ điển từ vựng chung vào Master Glossary
+              addLog(`ℹ️ [BÓC LÔ (OFFLINE)] Đang ở chế độ giả lập. Vui lòng nhập API Key thực để AI tự động trích xuất danh từ riêng chuẩn xác.`);
             }
           }
 
@@ -1532,7 +1563,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 }
 
                 if (isDualTaskStrategy) {
-                  promptSb += `[QUY TẮC ĐẦU RA - 1 REQUEST 2 TÁC VỤ]:\n===TRANSLATION===\n(Toàn bộ bản dịch trôi chảy)\n===NEW_GLOSSARY===\n(Trích xuất các danh từ riêng, chức vụ, xưng hô MỚI xuất hiện trong chương hiện tại chưa có trong Glossary trên:\n[TừGốc] = [NghĩaDịch])`;
+                  promptSb += `[QUY TẮC ĐẦU RA - 1 REQUEST 2 TÁC VỤ]:\n===TRANSLATION===\n(Toàn bộ bản dịch trôi chảy hoàn chỉnh)\n===NEW_GLOSSARY===\n(TUYỆT ĐỐI CHỈ TRÍCH XUẤT CÁC DANH TỪ RIÊNG CỐ ĐỊNH MỚI như Tên người, Địa danh riêng, Tông môn riêng xuất hiện từ ${advancedSettings.minFrequency || 2} lần trở lên trong chương này chưa có trong Glossary trên. NGHIÊM CẤM bóc danh từ chung, đồ vật, bộ phận cơ thể, từ vựng đời thường. Nếu không có từ mới đạt chuẩn, để trống phần này:\n[TừGốc] = [NghĩaDịch])`;
                 } else {
                   promptSb += `[QUY TẮC ĐẦU RA BẮT BUỘC]:\n===TRANSLATION===\n(Toàn bộ bản dịch tiếng Việt trôi chảy hoàn chỉnh)`;
                 }
@@ -2440,6 +2471,59 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     addLog(`📤 Đã xuất ${sorted.length} thuật ngữ ra tệp ${project.name}_GLOSSARY.txt`);
   };
 
+  // Thanh lọc toàn bộ từ rác trong Master Glossary (Áp dụng bộ lọc Proper Noun + Max Length + Min Length)
+  const handlePurgeJunkGlossary = () => {
+    if (!project || Object.keys(project.masterGlossary).length === 0) {
+      alert('Kho từ điển hiện tại đang trống!');
+      return;
+    }
+    const initialCount = Object.keys(project.masterGlossary).length;
+    const cleaned = purgeInvalidGlossaryEntries(project.masterGlossary);
+    const removedCount = initialCount - Object.keys(cleaned).length;
+
+    setProjects(prev => {
+      const cur = prev[currentProjectName];
+      return {
+        ...prev,
+        [currentProjectName]: {
+          ...cur,
+          masterGlossary: cleaned
+        }
+      };
+    });
+
+    if (removedCount > 0) {
+      addLog(`🧹 [THANH LỌC TỪ ĐIỂN]: Đã loại bỏ ${removedCount} từ rác/từ chung/từ dài > ${advancedSettings.maxTermLength || 8} ký tự! Giữ lại ${Object.keys(cleaned).length} thuật ngữ danh từ riêng chuẩn.`);
+      alert(`Đã loại bỏ ${removedCount} từ rác, cụm từ dài hoặc danh từ chung!\nKho từ điển hiện còn lại ${Object.keys(cleaned).length} thuật ngữ danh từ riêng chuẩn.`);
+    } else {
+      addLog(`✨ Kho từ điển Master Glossary của bạn đang 100% sạch sẽ và đạt chuẩn (≤ ${advancedSettings.maxTermLength || 8} ký tự)!`);
+      alert(`Kho từ điển Master Glossary của bạn đang 100% sạch sẽ và đạt chuẩn (≤ ${advancedSettings.maxTermLength || 8} ký tự)!`);
+    }
+  };
+
+  // Xóa toàn bộ từ điển
+  const handleClearEntireGlossary = () => {
+    if (!project || Object.keys(project.masterGlossary).length === 0) {
+      alert('Kho từ điển hiện tại đã trống!');
+      return;
+    }
+    const totalCount = Object.keys(project.masterGlossary).length;
+    if (confirm(`Bạn có chắc chắn muốn XÓA TOÀN BỘ ${totalCount} từ trong Master Glossary của dự án [${currentProjectName}] không? Thao tác này không thể hoàn tác!`)) {
+      setProjects(prev => {
+        const cur = prev[currentProjectName];
+        return {
+          ...prev,
+          [currentProjectName]: {
+            ...cur,
+            masterGlossary: {}
+          }
+        };
+      });
+      addLog(`🗑️ Đã xóa toàn bộ ${totalCount} từ trong Master Glossary của dự án [${currentProjectName}].`);
+      alert(`Đã xóa toàn bộ ${totalCount} thuật ngữ khỏi Master Glossary.`);
+    }
+  };
+
   // Manual Batch Glossary Extraction
   const handleManualBatchGlossaryExtract = async () => {
     if (!project || project.chapters.length === 0) {
@@ -2451,21 +2535,28 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
     const chaptersInBatch = project.chapters.slice(batchStart, batchEnd);
 
-    addLog(`🔍 [BÓC LÔ THỦ CÔNG] Bắt đầu trích xuất Master Glossary cho Lô ${batchStart + 1} ➔ ${batchEnd}...`);
+    const maxRawLen = advancedSettings.maxTermLength || 8;
+    const minFreq = advancedSettings.minFrequency || 2;
+    addLog(`🔍 [BÓC LÔ THỦ CÔNG] Bắt đầu trích xuất Master Glossary cho Lô ${batchStart + 1} ➔ ${batchEnd} (Chỉ danh từ riêng, từ gốc ≤ ${maxRawLen} kt, tần suất ≥ ${minFreq} lần/chương)...`);
 
     const activeKeyObj = globalApiKeys.find(k => k.state === 'ACTIVE') || globalApiKeys[0];
     const isRealKey = activeKeyObj && activeKeyObj.key.startsWith('AIzaSy') && !activeKeyObj.key.includes('DemoSampleKey');
 
     if (isRealKey) {
       try {
-        let batchPrompt = `Bạn là chuyên gia trích xuất thực thể và xây dựng từ điển tiểu thuyết văn học (Glossary Architect).\n`;
-        batchPrompt += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và trích xuất TOÀN DIỆN 100% các thuật ngữ, danh từ riêng, xưng hô và danh xưng thế giới, bao gồm 7 nhóm bắt buộc:\n`;
-        batchPrompt += `1. TÊN NHÂN VẬT & BIỆT DANH\n2. XƯNG HÔ, CHỨC VỤ, VAI VẾ\n3. ĐỊA DANH & ĐỊA ĐIỂM\n4. YÊU THÚ, LINH THÚ & THẦN THÚ\n5. PHÁP BẢO, VŨ KHÍ, ĐAN DƯỢC & VẬT PHẨM\n6. CÔNG PHÁP, CHIÊU THỨC & THÂN PHÁP\n7. CẢNH GIỚI TU LUYỆN & PHẨM CẤP\n\n`;
-        batchPrompt += `QUY TẮC BẮT BUỘC:\n`;
+        let batchPrompt = `Bạn là chuyên gia trích xuất Danh Từ Riêng (Proper Nouns) cho tiểu thuyết văn học.\n`;
+        batchPrompt += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và TUYỆT ĐỐI CHỈ TRÍCH XUẤT CÁC DANH TỪ RIÊNG CỐ ĐỊNH (Strict Proper Nouns Only):\n`;
+        batchPrompt += `1. TÊN RIÊNG NHÂN VẬT & BIỆT DANH (VD: 林辰 ➔ Lâm Thần, 赵霸天 ➔ Triệu Bá Thiên)\n`;
+        batchPrompt += `2. ĐỊA DANH RIÊNG & TÔNG MÔN RIÊNG (VD: 青云宗 ➔ Thanh Vân Tông, 青石村 ➔ Thôn Thanh Thạch, 大河府 ➔ Phủ Đại Hà)\n`;
+        batchPrompt += `3. THẦN BINH & CÔNG PHÁP ĐỘC QUYỀN CÓ TÊN RIÊNG (VD: 斩灵剑 ➔ Trảm Linh Kiếm, 梵圣真魔功 ➔ Phạn Thánh Chân Ma Công)\n\n`;
+        batchPrompt += `[QUY TẮC BẮT BUỘC - CỰC CỲ CÔ ĐỌNG & TINH LỌC]:\n`;
+        batchPrompt += `- TUYỆT ĐỐI CHỈ LỌC DANH TỪ RIÊNG. NGHIÊM CẤM đưa danh từ chung (như chưởng quỹ, tri huyện, bổ khoái, gia đinh, hắc y nhân), từ vựng đời thường, đồ vật (quần áo, bàn ghế, chén trà), bộ phận cơ thể (tay, chân, mắt, mũi, mày, tim), động từ, tính từ hoặc câu thoại vào danh sách!\n`;
+        batchPrompt += `- GIỚI HẠN ĐỘ DÀI TỪ GỐC: Từ gốc tiếng Trung KHÔNG ĐƯỢC VƯỢT QUÁ ${maxRawLen} CHỮ HÁN (≤ ${maxRawLen} ký tự).\n`;
+        batchPrompt += `- ĐIỀU KIỆN TẦN SUẤT XUẤT HIỆN: CHỈ TRÍCH XUẤT những từ xuất hiện lặp lại từ ${minFreq} LẦN TRỞ LÊN trong cùng một chương. Bỏ qua các từ chỉ xuất hiện thoáng qua.\n`;
         batchPrompt += `- Định dạng mỗi dòng: [TừGốcTiếngTrung] = [NghĩaHánViệtChuẩn]\n`;
-        batchPrompt += `- TUYỆT ĐỐI KHÔNG BỎ HOẶC ĐỂ CHỨA BẤT KỲ KÝ TỰ CHỮ HÁN NÀO Ở PHẦN NGHĨA DỊCH TIẾNG VIỆT (BÊN PHẢI DẤU =). PHẦN NGHĨA DỊCH PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT.\n`;
+        batchPrompt += `- PHẦN NGHĨA DỊCH TIẾNG VIỆT PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT (TUYỆT ĐỐI KHÔNG CHỨA BẤT KỲ CHỮ HÁN NÀO).\n`;
         batchPrompt += `- VÍ DỤ CHUẨN: 十里坡 = Thập Lý Bi Pha (CẤM VIẾT: 十里坡 = Thập Lý Bi坡)\n`;
-        batchPrompt += `- Trả về danh sách thuần túy (không kèm markdown giải thích rườm rà).\n\n`;
+        batchPrompt += `- Trả về danh sách cực kỳ ngắn gọn, cô đọng, chỉ gồm các Danh Từ Riêng thực sự trọng yếu.\n\n`;
         batchPrompt += `[CÁC CHƯƠNG THÔ]:\n` + chaptersInBatch.map((c, i) => `--- CHƯƠNG ${batchStart + i + 1} ---\n${c}`).join('\n\n');
 
         const bResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
@@ -2473,22 +2564,22 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: batchPrompt }] }],
-            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
           })
         });
 
         if (bResp.ok) {
           const bData = await bResp.json();
           const bOut = bData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          const extractedGloss = parseGlossaryText(bOut);
+          const extractedGloss = parseGlossaryText(bOut, chaptersInBatch);
           const foundCount = Object.keys(extractedGloss).length;
 
           if (foundCount > 0) {
             setProjects(prev => {
               const cur = prev[currentProjectName];
-              const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, extractedGloss);
+              const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, extractedGloss, chaptersInBatch);
               const addedCount = Object.keys(newlyAdded).length;
-              addLog(`🎉 [BÓC LÔ THÀNH CÔNG] AI đã tìm thấy ${foundCount} thuật ngữ từ Lô ${batchStart + 1} ➔ ${batchEnd}. Đã nạp ${addedCount} từ mới sạch chữ Hán vào Master Glossary (Tổng hiện có: ${Object.keys(updatedGlossary).length} từ)!`);
+              addLog(`🎉 [BÓC LÔ THÀNH CÔNG] AI đã tìm thấy ${foundCount} danh từ riêng trọng yếu (≥ ${minFreq} lần/chương, ≤ ${maxRawLen} kt) từ Lô ${batchStart + 1} ➔ ${batchEnd}. Đã nạp ${addedCount} từ mới vào Master Glossary!`);
               return {
                 ...prev,
                 [currentProjectName]: {
@@ -2498,7 +2589,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
               };
             });
           } else {
-            addLog(`ℹ️ [BÓC LÔ] AI không phát hiện thêm thuật ngữ mới nào trong lô chương ${batchStart + 1} ➔ ${batchEnd}.`);
+            addLog(`ℹ️ [BÓC LÔ] AI không phát hiện thêm danh từ riêng mới nào thỏa mãn điều kiện (tần suất ≥ ${minFreq} lần/chương, ≤ ${maxRawLen} kt) trong lô chương ${batchStart + 1} ➔ ${batchEnd}.`);
           }
         } else {
           addLog(`⚠️ [BÓC LÔ LỖI] API trả về HTTP ${bResp.status}`);
@@ -2507,27 +2598,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         addLog(`⚠️ [BÓC LÔ LỖI] ${bErr.message}`);
       }
     } else {
-      const offlineExtracted: Record<string, string> = {};
-      for (const ch of chaptersInBatch) {
-        for (const [k, v] of Object.entries(SINO_VIET_DICT)) {
-          if (ch.includes(k) && !project.masterGlossary[k]) {
-            offlineExtracted[k] = sanitizeGlossaryTargetValue(v);
-          }
-        }
-      }
-      setProjects(prev => {
-        const cur = prev[currentProjectName];
-        const { updatedGlossary, newlyAdded } = mergeGlossaryCustomPolicy(cur.masterGlossary, offlineExtracted);
-        const addedCount = Object.keys(newlyAdded).length;
-        addLog(`🎉 [BÓC LÔ (OFFLINE)] Đã nạp ${addedCount} thuật ngữ vào Master Glossary!`);
-        return {
-          ...prev,
-          [currentProjectName]: {
-            ...cur,
-            masterGlossary: updatedGlossary
-          }
-        };
-      });
+      addLog(`ℹ️ [BÓC LÔ (OFFLINE)] Đang ở chế độ giả lập. Vui lòng nhập API Key thực để AI tự động trích xuất danh từ riêng chuẩn xác.`);
     }
   };
 
@@ -3457,11 +3528,102 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                     <div>
                       <div className="text-xs font-bold text-[#f0e6d2] uppercase tracking-wide">3. Kho Thuật Ngữ Master Glossary</div>
                       <div className="text-[10px] text-[#a09b8c]">
-                        {project ? Object.keys(project.masterGlossary).length : 0} thuật ngữ lưu trong bộ nhớ
+                        {project ? Object.keys(project.masterGlossary).length : 0} thuật ngữ lưu trong bộ nhớ (≤ {advancedSettings.maxTermLength || 8} kt, ≥ {advancedSettings.minFrequency || 2} lần/ch)
                       </div>
                     </div>
                   </div>
-                  <HelpBtn onClick={() => openHelp('master_glossary')} />
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handlePurgeJunkGlossary}
+                      className="px-2 py-1 bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                      title="Quét và xóa sạch các từ rác, cụm từ dài > maxTermLength hoặc danh từ chung"
+                    >
+                      <Sparkles className="w-3 h-3 text-[#c8aa6e]" />
+                      <span>🧹 Lọc Rác</span>
+                    </button>
+                    <HelpBtn onClick={() => openHelp('master_glossary')} />
+                  </div>
+                </div>
+
+                {/* Quick Glossary Fine-Tuning Bar (Tiện ích nhanh ngay tại Tab Dịch) */}
+                <div className="bg-[#050c18] p-2 rounded-xl border border-[#785a28]/30 space-y-1.5 text-[10.5px]">
+                  {/* Hàng 1: Độ dài tối đa từ gốc */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#a09b8c]">Từ gốc tối đa (Max Raw): <strong className="text-[#c8aa6e] font-mono">≤ {advancedSettings.maxTermLength || 8} kt</strong></span>
+                    <div className="flex items-center gap-1">
+                      {[4, 6, 8, 10, 12].map(l => (
+                        <button
+                          key={l}
+                          onClick={() => {
+                            setAdvancedSettings(prev => ({ ...prev, maxTermLength: l }));
+                            addLog(`⚙️ Đã đặt Độ dài tối đa Glossary: <= ${l} ký tự`);
+                          }}
+                          className={`w-5 h-5 rounded text-[9.5px] font-mono flex items-center justify-center cursor-pointer transition-all ${
+                            (advancedSettings.maxTermLength || 8) === l
+                              ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm'
+                              : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => openQuantityEditor(
+                          'Độ Dài Ký Tự Tối Đa Glossary (Max Raw Length)',
+                          advancedSettings.maxTermLength || 8,
+                          2,
+                          50,
+                          'ký tự',
+                          (val: number) => {
+                            setAdvancedSettings(prev => ({ ...prev, maxTermLength: val }));
+                            addLog(`⚙️ Đã đặt Độ dài tối đa: <= ${val} ký tự`);
+                          }
+                        )}
+                        className="px-1 py-0.5 rounded text-[9px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold"
+                      >
+                        ✏️
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Hàng 2: Tần suất xuất hiện tối thiểu trong chương */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#a09b8c]">Tần suất tối thiểu/chương: <strong className="text-[#c8aa6e] font-mono">≥ {advancedSettings.minFrequency || 2} lần</strong></span>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 5, 10].map(f => (
+                        <button
+                          key={f}
+                          onClick={() => {
+                            setAdvancedSettings(prev => ({ ...prev, minFrequency: f }));
+                            addLog(`⚙️ Đã đặt Tần suất tối thiểu Glossary: >= ${f} lần/chương`);
+                          }}
+                          className={`w-5 h-5 rounded text-[9.5px] font-mono flex items-center justify-center cursor-pointer transition-all ${
+                            (advancedSettings.minFrequency || 2) === f
+                              ? 'bg-[#c8aa6e] text-black font-extrabold shadow-sm'
+                              : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
+                          }`}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => openQuantityEditor(
+                          'Tần Suất Xuất Hiện Tối Thiểu Trong Chương',
+                          advancedSettings.minFrequency || 2,
+                          1,
+                          50,
+                          'lần',
+                          (val: number) => {
+                            setAdvancedSettings(prev => ({ ...prev, minFrequency: val }));
+                            addLog(`⚙️ Đã đặt Tần suất tối thiểu: >= ${val} lần`);
+                          }
+                        )}
+                        className="px-1 py-0.5 rounded text-[9px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold"
+                      >
+                        ✏️
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -4089,10 +4251,13 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       <div className="bg-[#050505] p-2.5 rounded-xl border border-[#785a28]/40 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-[#f0e6d2] font-semibold">Tần suất xuất hiện tối thiểu trong chương:</span>
-                          <span className="text-[#c8aa6e] font-mono font-bold">≥ {advancedSettings.minFrequency || 2} lần</span>
+                          <span className="text-[#c8aa6e] font-mono font-bold">≥ {advancedSettings.minFrequency || 2} lần/chương</span>
+                        </div>
+                        <div className="text-[10px] text-[#a09b8c] leading-relaxed">
+                          Thuật ngữ phải xuất hiện từ mức này trở lên trong 1 chương mới được tự động trích xuất nạp vào từ điển.
                         </div>
                         <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map(freq => (
+                          {[1, 2, 3, 5, 10].map(freq => (
                             <button
                               key={freq}
                               onClick={() => {
@@ -4114,7 +4279,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                               advancedSettings.minFrequency || 2,
                               1,
                               50,
-                              'lần lặp',
+                              'lần',
                               (val: number) => {
                                 setAdvancedSettings(prev => ({ ...prev, minFrequency: val }));
                                 addLog(`⚙️ Đã đặt Tần suất tối thiểu tùy chỉnh: >= ${val} lần`);
@@ -4245,6 +4410,25 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                             + Thêm
                           </button>
                         </div>
+                      </div>
+
+                      {/* NÚT THANH LỌC RÁC GLOSSARY TOÀN DIỆN */}
+                      <div className="pt-2 border-t border-[#785a28]/30 flex items-center gap-2">
+                        <button
+                          onClick={handlePurgeJunkGlossary}
+                          className="flex-1 py-2 bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer transition-all"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-[#c8aa6e]" />
+                          <span>🧹 Lọc Sạch Rác Glossary (≤ {advancedSettings.maxTermLength || 8} kt, chỉ danh từ riêng)</span>
+                        </button>
+                        <button
+                          onClick={handleClearEntireGlossary}
+                          className="py-2 px-3 bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/60 rounded-xl text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all"
+                          title="Xóa toàn bộ từ trong Master Glossary"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          <span>Xóa Hết</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -5072,16 +5256,35 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   {Object.keys(project.masterGlossary).length} từ
                 </span>
               </div>
-              <button 
-                onClick={() => setShowFullGlossaryModal(false)}
-                className="text-neutral-400 hover:text-white p-1 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePurgeJunkGlossary}
+                  className="px-2.5 py-1 bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
+                  title="Lọc sạch rác, cụm từ dài hoặc danh từ chung"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#c8aa6e]" />
+                  <span>🧹 Lọc Rác</span>
+                </button>
+                <button 
+                  onClick={() => setShowFullGlossaryModal(false)}
+                  className="text-neutral-400 hover:text-white p-1 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Criteria Info Banner */}
+            <div className="mt-2.5 px-3 py-1.5 bg-[#050c18] border border-[#785a28]/40 rounded-xl text-[11px] text-[#a09b8c] flex items-center justify-between">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="text-[#c8aa6e] font-bold">🛡️ Bộ lọc chuẩn:</span>
+                <span>Từ gốc ≤ <strong className="text-white font-mono">{advancedSettings.maxTermLength || 8} kt</strong> | Tần suất ≥ <strong className="text-white font-mono">{advancedSettings.minFrequency || 2} lần/chương</strong></span>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-bold shrink-0 ml-1">100% Danh Từ Riêng</span>
             </div>
 
             {/* Instant Search Bar */}
-            <div className="py-3">
+            <div className="py-2.5 space-y-2">
               <div className="relative">
                 <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
                 <input
@@ -5097,10 +5300,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
               </div>
 
               {/* Quick Actions in Drawer */}
-              <div className="flex items-center gap-2 mt-2">
-                <label className="flex-1 py-1.5 px-3 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Nạp Tệp .txt (raw=vi)</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                <label className="py-1.5 px-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer truncate">
+                  <Upload className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Nạp .txt</span>
                   <input
                     type="file"
                     accept=".txt"
@@ -5115,10 +5318,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
                 <button
                   onClick={handleExportGlossaryFile}
-                  className="flex-1 py-1.5 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer truncate"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Xuất File .txt</span>
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Xuất .txt</span>
+                </button>
+
+                <button
+                  onClick={handleClearEntireGlossary}
+                  className="py-1.5 px-2 bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/60 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer truncate"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <span className="truncate">Xóa Hết</span>
                 </button>
               </div>
             </div>
