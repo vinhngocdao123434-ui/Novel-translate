@@ -311,11 +311,7 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     Intent serviceIntent = new Intent(MainActivity.this, TranslationForegroundService.class);
                     serviceIntent.putExtra("INFO", info != null ? info : "Tiến trình dịch ngầm DroidTranslator đang chạy");
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(serviceIntent);
-                    } else {
-                        startService(serviceIntent);
-                    }
+                    ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
                     Log.d(TAG, "Foreground service started from Web: " + info);
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to start foreground service: " + e.getMessage());
@@ -328,7 +324,7 @@ public class MainActivity extends AppCompatActivity {
             new Handler(Looper.getMainLooper()).post(() -> {
                 try {
                     Intent serviceIntent = new Intent(MainActivity.this, TranslationForegroundService.class);
-                    stopService(serviceIntent);
+                    MainActivity.this.stopService(serviceIntent);
                     Log.d(TAG, "Foreground service stopped from Web");
                 } catch (Exception e) {
                     Log.e(TAG, "Failed to stop foreground service: " + e.getMessage());
@@ -346,7 +342,7 @@ public class MainActivity extends AppCompatActivity {
         @JavascriptInterface
         public void copyToClipboard(final String text) {
             new Handler(Looper.getMainLooper()).post(() -> {
-                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipboardManager clipboard = (ClipboardManager) MainActivity.this.getSystemService(Context.CLIPBOARD_SERVICE);
                 if (clipboard != null) {
                     ClipData clip = ClipData.newPlainText("DroidTranslator", text);
                     clipboard.setPrimaryClip(clip);
@@ -380,11 +376,11 @@ public class MainActivity extends AppCompatActivity {
         public void requestBatteryOptimizationIgnore() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 try {
-                    PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-                    if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    PowerManager pm = (PowerManager) MainActivity.this.getSystemService(Context.POWER_SERVICE);
+                    if (pm != null && !pm.isIgnoringBatteryOptimizations(MainActivity.this.getPackageName())) {
                         Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                        intent.setData(Uri.parse("package:" + getPackageName()));
-                        startActivity(intent);
+                        intent.setData(Uri.parse("package:" + MainActivity.this.getPackageName()));
+                        MainActivity.this.startActivity(intent);
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Lỗi cấp quyền bỏ tối ưu pin: " + e.getMessage());
