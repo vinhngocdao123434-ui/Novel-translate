@@ -230,6 +230,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   const [batteryOptimizationIgnored, setBatteryOptimizationIgnored] = useState<boolean>(true);
   const [workManagerWatchdog, setWorkManagerWatchdog] = useState<boolean>(true);
 
+  // Sync with native AndroidBridge if running inside APK
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+      const bridge = (window as any).AndroidBridge;
+      if (typeof bridge.isRootAvailable === 'function') {
+        try {
+          setIsDeviceRooted(Boolean(bridge.isRootAvailable()));
+        } catch (e) {}
+      }
+    }
+  }, []);
+
   // 1. KHO GLOBAL API KEYS (Vĩnh Cửu - Độc lập hoàn toàn với dự án)
   const [globalApiKeys, setGlobalApiKeys] = useState<ApiKeyItem[]>(() => {
     try {
@@ -533,11 +545,32 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
 
   const handleRefreshKernel = () => {
     setIsRefreshingKernel(true);
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge?.applyGodModeRoot) {
+      try {
+        (window as any).AndroidBridge.applyGodModeRoot();
+      } catch (e) {}
+    }
     setTimeout(() => {
       setIsRefreshingKernel(false);
       addLog('🔍 [Kernel Diagnostics]: Đọc /proc/self/oom_score_adj = -1000. Trạng thái Miễn Nhiễm LMK Kill: ACTIVE');
     }, 400);
   };
+
+  // Sync translation background status with Android Native Foreground Service
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+      const bridge = (window as any).AndroidBridge;
+      if (isTranslating && !isPaused) {
+        try {
+          bridge.startForegroundService(`Đang dịch chương ${currentChapterIndex + 1}...`);
+        } catch (e) {}
+      } else if (!isTranslating) {
+        try {
+          bridge.stopForegroundService();
+        } catch (e) {}
+      }
+    }
+  }, [isTranslating, isPaused, currentChapterIndex]);
   
   // Prompt Modal (Add / Edit)
   const [showPromptModal, setShowPromptModal] = useState<boolean>(false);
@@ -2159,9 +2192,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal }) =
   ) : [];
 
   return (
-    <div className="flex flex-col items-center justify-center p-2 sm:p-4">
-      {/* PHONE CASING */}
-      <div className="w-full max-w-[430px] bg-[#03060d] border-4 border-[#785a28]/80 rounded-[44px] shadow-[0_0_50px_rgba(0,0,0,0.8),0_0_20px_rgba(120,90,40,0.25)] overflow-hidden flex flex-col h-[790px] relative text-neutral-100">
+    <div className="flex flex-col items-center justify-center p-0 sm:p-3 w-full">
+      {/* PHONE CASING: Full screen on mobile / inside APK, Elegant Gold Casing on Desktop */}
+      <div className="w-full max-w-full sm:max-w-[440px] bg-[#03060d] border-0 sm:border-4 border-[#785a28]/80 rounded-none sm:rounded-[44px] shadow-none sm:shadow-[0_0_50px_rgba(0,0,0,0.8),0_0_20px_rgba(120,90,40,0.25)] overflow-hidden flex flex-col h-[calc(100vh-130px)] sm:h-[790px] relative text-neutral-100">
         
         {/* TOP PHONE NOTCH & STATUS BAR */}
         <div className="h-10 bg-[#091428] px-5 flex items-center justify-between text-xs text-[#a09b8c] select-none shrink-0 border-b border-[#785a28]/40">

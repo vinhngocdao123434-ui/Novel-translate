@@ -17,7 +17,13 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { downloadNativeProjectZip } from './utils/zip-exporter';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'simulator' | 'studio' | 'split'>('split');
+  const isAndroidNative = typeof window !== 'undefined' && Boolean((window as any).AndroidBridge);
+  const [activeTab, setActiveTab] = useState<'simulator' | 'studio' | 'split'>(() => {
+    if (typeof window !== 'undefined' && (Boolean((window as any).AndroidBridge) || window.innerWidth < 1024)) {
+      return 'simulator';
+    }
+    return 'split';
+  });
   const [isGodModeModalOpen, setIsGodModeModalOpen] = useState<boolean>(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState<boolean>(false);
 
@@ -53,7 +59,7 @@ export default function App() {
             }`}
           >
             <Smartphone className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Máy Ảo</span> Simulator
+            <span>App Dịch</span>
           </button>
 
           <button
@@ -65,7 +71,7 @@ export default function App() {
             }`}
           >
             <Code className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Android</span> Studio Code
+            <span>Studio Code</span>
           </button>
 
           <button
@@ -108,7 +114,7 @@ export default function App() {
       <div className="bg-neutral-900 border-b border-neutral-800/80 px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between text-xs text-neutral-400 gap-2">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span className="text-neutral-300 font-medium">Native Architecture:</span>
+          <span className="text-neutral-300 font-medium">{isAndroidNative ? 'Android Native Running:' : 'Native Architecture:'}</span>
           <span>100% Java thuần</span>
           <span>·</span>
           <span>Android SDK 35</span>
