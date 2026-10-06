@@ -27,7 +27,6 @@ const filesToSync = [
   { path: 'app/src/main/java/com/droidtranslator/app/model/ApiKeyItem.java', file: 'android/app/src/main/java/com/droidtranslator/app/model/ApiKeyItem.java', lang: 'java', desc: 'Model ApiKeyItem' },
   { path: 'app/src/main/java/com/droidtranslator/app/model/PromptCardItem.java', file: 'android/app/src/main/java/com/droidtranslator/app/model/PromptCardItem.java', lang: 'java', desc: 'Model PromptCardItem' },
   { path: 'app/src/main/java/com/droidtranslator/app/GlossaryManager.java', file: 'android/app/src/main/java/com/droidtranslator/app/GlossaryManager.java', lang: 'java', desc: 'Glossary Manager' },
-  { path: 'app/src/main/java/com/droidtranslator/app/SinoVietnameseDictionary.java', file: 'android/app/src/main/java/com/droidtranslator/app/SinoVietnameseDictionary.java', lang: 'java', desc: 'Từ điển Hán-Việt 1500+ từ' },
   { path: 'app/src/main/java/com/droidtranslator/app/ChapterAuditor.java', file: 'android/app/src/main/java/com/droidtranslator/app/ChapterAuditor.java', lang: 'java', desc: 'Bộ thẩm định chất lượng chương' },
   { path: 'app/src/main/java/com/droidtranslator/app/GeminiEngine.java', file: 'android/app/src/main/java/com/droidtranslator/app/GeminiEngine.java', lang: 'java', desc: 'Động cơ Gemini Engine 2.5/3.6 Flash' },
   { path: 'app/src/main/java/com/droidtranslator/app/service/TranslationForegroundService.java', file: 'android/app/src/main/java/com/droidtranslator/app/service/TranslationForegroundService.java', lang: 'java', desc: 'Foreground Service chạy ngầm 12h' },

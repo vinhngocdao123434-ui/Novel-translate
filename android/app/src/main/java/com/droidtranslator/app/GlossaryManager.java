@@ -51,6 +51,18 @@ public class GlossaryManager {
             return false;
         }
 
+        // Loại trừ các tiền tố, cụm đàm thoại đời thường không phải danh từ riêng
+        String[] forbiddenPrefixes = new String[] {
+            "看起来", "像是", "如同", "仿佛", "似乎", "犹如", "宛如", "好似",
+            "出身", "半个", "一个", "两个", "走个", "所谓", "可谓", "如此",
+            "十分", "万分", "极其", "非常", "不可", "不能", "不知", "不曾",
+            "不见", "不见得", "何等", "怎样", "怎么", "身怀", "手持", "怀中",
+            "眼见", "只见", "突然", "猛然", "不知不觉", "与此同时", "不得不", "无可奈何", "显而易见"
+        };
+        for (String p : forbiddenPrefixes) {
+            if (trimmed.startsWith(p)) return false;
+        }
+
         // Loại bỏ các tiêu đề danh mục / prompt header bị AI sao chép lại
         String upper = trimmed.toUpperCase();
         if (upper.contains("CÔNG PHÁP") || upper.contains("CHIÊU THỨC") || upper.contains("THÂN PHÁP") ||
@@ -236,47 +248,5 @@ public class GlossaryManager {
             }
         }
         return result;
-    }
-
-    // =========================================================================
-    // PHÂN HỆ PATCH DICTIONARY (VIỆT - VIỆT) & LÀM MƯỢT CUỐN CHIẾU 15 CHƯƠNG
-    // =========================================================================
-    public static class PatchEntry {
-        public String oldText;
-        public String newText;
-
-        public PatchEntry(String oldText, String newText) {
-            this.oldText = oldText;
-            this.newText = newText;
-        }
-    }
-
-    public static String applyPatches(String text, List<PatchEntry> patches) {
-        if (text == null || patches == null || patches.isEmpty()) return text;
-        String res = text;
-        for (PatchEntry p : patches) {
-            if (p.oldText != null && !p.oldText.isEmpty() && p.newText != null && !p.oldText.equals(p.newText)) {
-                res = res.replace(p.oldText, p.newText);
-            }
-        }
-        return res;
-    }
-
-    public static int syncPatchesToMasterGlossary(Map<String, String> masterGlossary, List<PatchEntry> patches) {
-        if (masterGlossary == null || patches == null || patches.isEmpty()) return 0;
-        int updated = 0;
-        for (PatchEntry p : patches) {
-            if (p.oldText == null || p.oldText.trim().isEmpty() || p.newText == null) continue;
-            String oldTrim = p.oldText.trim();
-            String newTrim = p.newText.trim();
-            for (Map.Entry<String, String> entry : masterGlossary.entrySet()) {
-                String val = entry.getValue();
-                if (val != null && (val.equals(oldTrim) || val.contains(oldTrim))) {
-                    entry.setValue(val.replace(oldTrim, newTrim));
-                    updated++;
-                }
-            }
-        }
-        return updated;
     }
 }

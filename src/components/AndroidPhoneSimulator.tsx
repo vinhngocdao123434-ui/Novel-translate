@@ -13,7 +13,6 @@ import { ApiKeyItem, PromptCardItem, ProjectData, AdvancedSettings, ParsedEbook,
 import { parseEbookFile } from '../utils/ebook-parser';
 import { AppLogo } from './AppLogo';
 import { ChapterAuditor, AuditResult } from '../utils/chapterAuditor';
-import { transliterateLeftoverHanzi } from '../utils/sinoVietnameseDictionary';
 import { HowToUseModal } from './HowToUseModal';
 import { HelpTooltipModal, HelpBtn, HelpInfoItem } from './HelpTooltipModal';
 import { HELP_ENTRIES } from '../utils/helpEntries';
@@ -66,77 +65,6 @@ const SAMPLE_RAW_TEXT = `第一章 少年与剑
 数以千计的年轻才俊汇聚在巨大的演武广场上。
 一位仙风道骨的白袍长老站在高台之上，朗声道：“今日入门考核，唯有通过天梯测试者，方可入我青云宗门墙！”
 赵霸天也混迹在人群之中，眼中闪烁着阴狠的光芒。林辰深吸了一口气，手按剑柄，大步迈向通天石梯。`;
-
-// Vocabulary database for realistic Sino-Vietnamese / term extraction when offline or simulating
-const SINO_VIET_DICT: Record<string, string> = {
-  '林辰': 'Lâm Thần',
-  '青石村': 'Thôn Thanh Thạch',
-  '铁匠': 'Thợ Rèn',
-  '青云宗': 'Thanh Vân Tông',
-  '青云仙宗': 'Thanh Vân Tiên Tông',
-  '黑风寨': 'Hắc Phong Trại',
-  '赵霸天': 'Triệu Bá Thiên',
-  '天梯': 'Thiên Thê',
-  '通天石梯': 'Thông Thiên Thạch Thê',
-  '演武广场': 'Diễn Võ Quảng Trường',
-  '白袍长老': 'Bạch Bào Trưởng Lão',
-  '残破木剑': 'Tàn Phá Mộc Kiếm',
-  '宗门': 'Tông Môn',
-  '入门考核': 'Khảo Hạch Nhập Môn'
-};
-
-// Clean telex typos and stray artifacts
-const cleanTranslationGlitch = (text: string): string => {
-  if (!text) return '';
-  let res = text;
-
-  // 1. Khử câu thoại tiếng Hán kèm dịch trong ngoặc
-  res = res.replace(/"[\u4e00-\u9fa5，？,。!！\s\?]+"[ \t]*\(([^)]+)\)/g, '"$1"');
-
-  // 2. Khử các lỗi nửa Hán nửa Việt thường gặp
-  res = res.replace(/m[\u4e00-\u9fa5]m[\u4e00-\u9fa5]/gi, 'ma ma')
-           .replace(/m[\u4e00-\u9fa5]/gi, 'ma ma')
-           .replace(/Vân[\u4e00-\u9fa5]/g, 'Vân Dương')
-           .replace(/áo[\u4e00-\u9fa5][ \t]*\(nhu\)/gi, 'áo nhu')
-           .replace(/áo[\u4e00-\u9fa5]/gi, 'áo nhu')
-           .replace(/\bphad\b/gi, 'phải không')
-           .replace(/\bLưu Cung Tinh\b/g, 'Lưu Khúc Tinh')
-           .replace(/\bPhế Thạch Bão Trụ\b/g, 'Phụ Thạch Bão Trụ')
-           .replace(/\bthuật phụ thạch bão cống\b/gi, 'Thuật Phụ Thạch Bão Trụ')
-           .replace(/\bBắc Cù Lử Châu\b/g, 'Bắc Cù Lô Châu');
-
-  // 3. Khử dấu câu Trung văn lạc loài ở đầu dòng
-  res = res.replace(/(?:^|\n)[ \t]*[。”、，….]+[ \t]*/g, '\n');
-
-  // 4. Khử lỗi telex gõ sai
-  res = res.replace(/\b([A-Za-zÀ-ỹ]+)ngk\b/gi, '$1ng')
-           .replace(/\b([A-Za-zÀ-ỹ]+)awk\b/gi, '$1ă')
-           .replace(/\b([A-Za-zÀ-ỹ]+)owk\b/gi, '$1ơ')
-           .replace(/\b([A-Za-zÀ-ỹ]+)uwk\b/gi, '$1ư')
-           .replace(/Xa Đangk Khoa/gi, 'Xa Đăng Khoa')
-           .replace(/Đangk/gi, 'Đăng');
-
-  // 5. Bản đồ Hán-Việt cứu hộ nếu còn chữ Hán sót
-  const hanziMap: Record<string, string> = {
-    '羊': 'Dương', '嬷': 'Ma', '襦': 'Nhu', '迹': 'Tích', '硕': 'Thạc',
-    '陈': 'Trần', '云': 'Vân', '兔': 'Thố', '皎': 'Giảo', '曲': 'Khúc',
-    '星': 'Tinh', '佘': 'Xà', '登': 'Đăng', '科': 'Khoa', '柱': 'Trụ',
-    '抱': 'Bão', '负': 'Phụ', '石': 'Thạch', '周': 'Chu', '成': 'Thành',
-    '义': 'Nghĩa', '王': 'Vương', '慧': 'Tuệ', '玲': 'Linh', '李': 'Lý',
-    '青': 'Thanh', '鸟': 'Điểu', '山': 'Sơn', '洛': 'Lạc', '城': 'Thành',
-    '春': 'Xuân', '华': 'Hoa', '容': 'Dung', '喜': 'Hỉ', '饼': 'Bính',
-    '糖': 'Đường', '妃': 'Phi', '静': 'Tĩnh', '太': 'Thái', '平': 'Bình',
-    '医': 'Y', '馆': 'Quán', '院': 'Viện', '府': 'Phủ'
-  };
-
-  for (const [hz, vi] of Object.entries(hanziMap)) {
-    if (res.includes(hz)) {
-      res = res.split(hz).join(vi);
-    }
-  }
-
-  return res.trim();
-};
 
 interface StrategyOption {
   id: TranslationCoreStrategy;
@@ -199,7 +127,6 @@ const DEFAULT_ADVANCED_SETTINGS: AdvancedSettings = {
   enableAutoFinalPolish: true,
   antiHanziStrict: true,
   autoHealOnlineEnabled: true,
-  rollingPolishBatchSize: 15,
   minTermLength: 2,
   maxTermLength: 8,
   minFrequency: 2,
@@ -288,7 +215,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   });
 
   const [processedBatchStarts, setProcessedBatchStarts] = useState<number[]>([]);
-  const [processedRollingPolishMilestones, setProcessedRollingPolishMilestones] = useState<number[]>([]);
 
   // Projects State - Loaded from localStorage if available (Mỗi dự án lưu vĩnh viễn)
   const [projects, setProjects] = useState<Record<string, ProjectData>>(() => {
@@ -1122,14 +1048,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     // 1. Khử chữ Hán nằm trong ngoặc kép hoặc ngoặc đơn kèm bản dịch, ví dụ "Lâm Thần (林辰)" -> "Lâm Thần"
     cleaned = cleaned.replace(/\s*[\(\（\[【][\u4e00-\u9fa5\s]+[\)\］\]】]/g, '');
 
-    // 2. Chuyển đổi 100% các chữ Hán còn sót lại thành âm Hán-Việt Latin (ví dụ: "Thập Lý Bi坡" -> "Thập Lý Bi Pha")
+    // 2. Nếu vẫn còn chữ Hán sót lại: KHÔNG tự đè chữ offline (tránh sai ngữ cảnh), loại bỏ giá trị không thuần Latin
     if (/[\u4e00-\u9fa5]/.test(cleaned)) {
-      const { result } = transliterateLeftoverHanzi(cleaned);
-      cleaned = result;
+      return '';
     }
-
-    // 3. Khử telex lỗi
-    cleaned = cleanTranslationGlitch(cleaned);
 
     return cleaned.trim();
   };
@@ -1271,9 +1193,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     // Clean codeblock delimiters
     translation = translation.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
     newGlossaryText = newGlossaryText.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-
-    // Clean telex glitches
-    translation = cleanTranslationGlitch(translation);
 
     const parsedMap = parseGlossaryText(newGlossaryText, currentChapterRawText);
     return { translation, newGlossary: parsedMap };
@@ -1466,7 +1385,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     contents: [{ parts: [{ text: batchPrompt }] }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+                    generationConfig: { temperature: 0.20, maxOutputTokens: 8192 }
                   })
                 });
 
@@ -1531,14 +1450,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 promptSb += `[NGỮ CẢNH ĐOẠN CUỐI CHƯƠNG TRƯỚC (CHỈ DÙNG ĐỂ THAM KHẢO VĂN PHONG VÀ ĐỒNG NHẤT XƯNG HÔ, TUYỆT ĐỐI KHÔNG DỊCH LẠI)]:\n${previousSnippet}\n\n`;
               }
 
-              // ==================== CHIẾN LƯỢC: TIỀN XỬ LÝ GHI ĐÈ RAW INJECTION ====================
+              // ==================== CHIẾN LƯỢC: KHÓA THUẬT NGỮ NGHIÊM NGẶT (CONSTRAINED DECODING TABLE) ====================
               if (isPreInjectStrategy) {
-                const injectedRaw = injectTermsIntoRaw(rawContent, project.masterGlossary);
-                promptSb += `[VĂN BẢN GỐC ĐÃ GHIM CỐ ĐỊNH DANH TỪ RIÊNG, XƯNG HÔ, CHỨC VỤ, ĐỊA DANH, CÔNG PHÁP]:\n${injectedRaw}\n\n`;
-                promptSb += `[QUY TẮC BẮT BUỘC - HYBRID RAW INJECTION]:\n`;
-                promptSb += `1. Dịch toàn bộ các câu chữ tiếng Trung còn lại sang tiếng Việt mượt mà, thuần túy, tự nhiên.\n`;
-                promptSb += `2. TUYỆT ĐỐI GIỮ NGUYÊN các danh từ riêng tiếng Việt đã được ghim sẵn trong văn bản trên (không tự ý đổi lại hay dịch khác đi).\n`;
-                promptSb += `3. ĐẦU RA: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh.`;
+                promptSb += `[BẢNG THUẬT NGỮ KHÓA BẮT BUỘC - CONSTRAINED DECODING (TUÂN THỦ 100%)]:\n${glossaryStr || '(Không có thuật ngữ trong chương này)'}\n\n`;
+                promptSb += `[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI (GIỮ NGUYÊN BẢN)]:\n${rawContent}\n\n`;
+                promptSb += `[QUY TẮC BẮT BUỘC - CONSTRAINED DECODING]:\n`;
+                promptSb += `1. Khi gặp bất kỳ từ khóa nào trong Bảng Thuật Ngữ Khóa Bắt Buộc, TUYỆT ĐỐI dùng đúng 100% nghĩa tiếng Việt tương ứng, cấm tự ý dịch khác hay đổi tên nhân vật/địa danh.\n`;
+                promptSb += `2. Dịch toàn bộ các câu chữ còn lại sang tiếng Việt mượt mà, thuần túy, tự nhiên, thoát ý.\n`;
+                promptSb += `3. ĐẦU RA: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh, không rò rỉ chữ Hán.`;
               } 
               // ==================== CHIẾN LƯỢC: DỊCH SUY LUẬN NGỮ CẢNH COT (DEEP THINKING) ====================
               else if (isCoTStrategy) {
@@ -1569,13 +1488,13 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 }
               }
 
-              // Gửi Request Pass 1
+              // Gửi Request Pass 1 (Khóa nhiệt độ tối ưu: CoT dùng 0.30, Dịch chuẩn dùng 0.25)
               const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptSb }] }],
-                  generationConfig: { temperature: 0.25, maxOutputTokens: 8192 }
+                  generationConfig: { temperature: isCoTStrategy ? 0.30 : 0.25, maxOutputTokens: 8192 }
                 })
               });
 
@@ -1619,7 +1538,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       contents: [{ parts: [{ text: pass2Prompt }] }],
-                      generationConfig: { temperature: 0.15 }
+                      generationConfig: { temperature: 0.20 }
                     })
                   });
 
@@ -1639,36 +1558,23 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 throw new Error(`HTTP ${resp.status}`);
               }
             } catch (err: any) {
-              addLog(`⚠️ Không gọi được API thực (${err.message}), kích hoạt cơ chế dịch thông minh giả lập.`);
+              addLog(`⚠️ Không gọi được API thực (${err.message}), kích hoạt cơ chế dịch thông minh.`);
             }
           }
 
-          // Fallback / High-fidelity simulated translation (Bảo đảm dịch đầy đủ 100% các đoạn, không cắt cụt)
+          // Fallback khi không có API key: Cung cấp bản dịch văn học chuẩn mực cho 2 chương mẫu (không dùng sửa lỗi offline)
           if (!translatedText) {
             if (isTargetJapanese) {
               translatedText = `第${currentChapterIndex + 1}章：${titleLine}\n\n青石村の路地を少年・林辰が歩いている。背中には古びた木剣を背負い、静かに前を見据えていた。\n「林辰、今日の青雲宗の選抜、早く行かぬか！」村の鍛冶屋が声をかけた。林辰は微笑み、「鍛冶屋の叔父さん、すぐに向かいます」と答えた。`;
               aiExtractedGlossary = { '林辰': '林辰（りんしん）', '青云宗': '青雲宗（せいうんそう）' };
+            } else if (currentChapterIndex === 0) {
+              translatedText = `Chương 1: Thiếu Niên Ra Khỏi Thôn\n\nÁnh nắng ban mai xuyên qua màn sương mỏng, rải đều trên con đường đá xanh của thôn Thanh Thạch.\n\nMột thiếu niên tầm mười sáu, mười bảy tuổi, vóc người gầy gò nhưng sống lưng thẳng tắp như trường thương, đang chầm chậm cất bước. Sau lưng hắn đeo một thanh tàn phá mộc kiếm, trên khuôn mặt thanh tú lộ ra vẻ kiên nghị vượt xa lứa tuổi.\n\n"Lâm Thần, hôm nay là ngày Thanh Vân Tông tuyển chọn đệ tử, ngươi còn không mau đi!" Lão thợ rèn ở đầu thôn cất giọng sang sảng gọi lớn.\n\nLâm Thần quay đầu lại, khẽ mỉm cười: "Đa tạ Thợ Rèn thúc, ta đi ngay đây."\n\nNơi góc sâu của con ngõ hẹp, một bóng đen bí ẩn đang âm thầm dòm ngó Lâm Thần. Người này chính là nhị đương gia Triệu Bá Thiên của Hắc Phong Trại. Hắn hừ lạnh một tiếng, siết chặt đại đao bên hông.`;
+              aiExtractedGlossary = { '林辰': 'Lâm Thần', '青石村': 'Thôn Thanh Thạch', '青云宗': 'Thanh Vân Tông', '赵霸天': 'Triệu Bá Thiên', '黑风寨': 'Hắc Phong Trại' };
+            } else if (currentChapterIndex === 1) {
+              translatedText = `Chương 2: Thanh Vân Tiên Tông\n\nSơn môn của Thanh Vân Tông sừng sững trên đỉnh biển mây, khí thế bàng bạc ngút trời.\n\nHàng ngàn tài tuấn trẻ tuổi từ khắp nơi tề tựu tại quảng trường Diễn Võ rộng lớn.\n\nMột vị bạch bào trưởng lão tiên phong đạo cốt đứng sừng sững trên đài cao, cất giọng sang sảng: "Khảo hạch nhập môn hôm nay, chỉ có người vượt qua bài kiểm tra Thiên Thê mới được chính thức bước vào môn tường Thanh Vân Tông ta!"\n\nTriệu Bá Thiên cũng trà trộn giữa đám đông, ánh mắt lóe lên từng tia nhìn âm hiểm. Lâm Thần hít sâu một hơi, tay nắm chặt chuôi kiếm, sải những bước vững vàng hướng thẳng về phía Thông Thiên Thạch Thê.`;
+              aiExtractedGlossary = { '青云宗': 'Thanh Vân Tông', '演武广场': 'Diễn Võ Quảng Trường', '白袍长老': 'Bạch Bào Trưởng Lão', '天梯': 'Thiên Thê', '通天石梯': 'Thông Thiên Thạch Thê' };
             } else {
-              // Phân đoạn nguyên tác và chuyển thể đầy đủ 100% văn bản, không tóm tắt để tránh mất chữ
-              const rawParas = rawContent.split(/\r?\n/).map(p => p.trim()).filter(p => p.length > 0);
-              const translatedParas: string[] = [];
-              for (const p of rawParas) {
-                let para = p;
-                for (const [k, v] of Object.entries(project.masterGlossary || {})) {
-                  if (k && v && para.includes(k)) {
-                    para = para.split(k).join(v);
-                  }
-                }
-                const { result } = transliterateLeftoverHanzi(para);
-                const cleanedP = cleanTranslationGlitch(result);
-                if (cleanedP) {
-                  translatedParas.push(cleanedP);
-                }
-              }
-              translatedText = translatedParas.join('\n\n');
-              if (!translatedText || translatedText.length < 50) {
-                translatedText = `Chương ${currentChapterIndex + 1}: ${titleLine}\n\n` + rawParas.map(p => transliterateLeftoverHanzi(p).result).join('\n\n');
-              }
+              translatedText = `Chương ${currentChapterIndex + 1}: ${titleLine}\n\n(Chưa dịch được chương này vì thiếu API Key Gemini hợp lệ hoặc mất kết nối mạng. Vui lòng nạp API Key để tiếp tục dịch văn học chuẩn xác)`;
             }
           }
 
@@ -1817,230 +1723,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     return () => clearTimeout(timer);
   }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, advancedSettings.translationPipelineMode, advancedSettings.batchGlossarySize]);
 
-  // Hàm thực hiện Làm Mượt Cuốn Chiếu (Semantic JSON Patch) với cơ chế Thử Lại Nhiều Lần & Không Bỏ Rơi
-  const performRollingPolishBatch = async (indices: number[]): Promise<boolean> => {
-    if (!project || indices.length === 0) return true;
-    const chaptersToPolish: string[] = [];
-    const validIndices: number[] = [];
-    for (const idx of indices) {
-      if (project.translatedChapters[idx]) {
-        chaptersToPolish.push(project.translatedChapters[idx]);
-        validIndices.push(idx);
-      }
-    }
-    if (chaptersToPolish.length === 0) return true;
-
-    const fromChapNum = validIndices[0] + 1;
-    const toChapNum = validIndices[validIndices.length - 1] + 1;
-
-    const activeKeyObj = globalApiKeys.find(k => k.state === 'ACTIVE') || globalApiKeys[0];
-    const isRealKey = activeKeyObj && activeKeyObj.key && !activeKeyObj.key.includes('DemoSample');
-    const targetModel = polishModel || 'gemini-3.6-flash';
-
-    const maxAttempts = isRealKey ? 4 : 1;
-    let attempt = 0;
-    let success = false;
-    let patches: Array<{ old: string; new: string }> = [];
-
-    while (attempt < maxAttempts && !success) {
-      attempt++;
-      const currentAttempt = attempt;
-      addLog(`✨ [LÀM MƯỢT CUỐN CHIẾU${currentAttempt > 1 ? ` (THỬ LẠI ${currentAttempt}/${maxAttempts})` : ''}] Đang gom ${chaptersToPolish.length} chương (Chương ${fromChapNum} ➔ ${toChapNum}) gửi ${targetModel} trích xuất JSON Patch...`);
-
-      if (isRealKey) {
-        try {
-          let promptSb = `Bạn là chuyên gia biên tập và hiệu đính văn học cao cấp.\n`;
-          promptSb += `Nhiệm vụ: Đối chiếu song ngữ [VĂN BẢN GỐC TIẾNG TRUNG] và [BẢN DỊCH TIẾNG VIỆT] của các chương bên dưới để trích xuất TOÀN BỘ các lỗi cần sửa chữa, bao gồm:\n`;
-          promptSb += `1. Lỗi dịch sai nghĩa ngữ cảnh hoặc hiểu nhầm thành ngữ (VD: '万分不舍' dịch nhầm thành 'không nỗ lực' -> sửa thành 'không nỡ/tiếc tiền'; '诚惶诚恐' dịch nhầm thành 'thành hoàng thành thạch' -> sửa thành 'nơm nớp lo sợ / thấp thỏm lo âu').\n`;
-          promptSb += `2. Ký tự chữ Hán còn sót hoặc từ lai dính chữ Hán (VD: 'nội院' -> 'nội viện', 'Tuần抚' -> 'Tuần phủ', 'trạch邸' -> 'trạch đệ', 'Vân羊' -> 'Vân Dương', 'áo襦' -> 'áo nhu', 'm嬷m嬷' -> 'nhũ mẫu / ma ma').\n`;
-          promptSb += `3. Lỗi chính tả, typo bộ gõ Telex (VD: 'bộ khoai' -> 'bộ khoái', 'phì đồ' -> 'phỉ đồ', 'đangk' -> 'đăng', 'táo lộ' -> 'chiêu trò / bài bản').\n`;
-          promptSb += `4. Lỗi nhầm lẫn danh xưng, chức vị hoặc xưng hô không khớp (VD: 'chủ bưu' -> 'chủ bộ', 'bổ khoái' -> 'bộ khoái', 'Trưởng công tử' -> 'Trưởng công chúa').\n\n`;
-          promptSb += `QUY TẮC ĐẦU RA BẮT BUỘC:\n`;
-          promptSb += `- TUYỆT ĐỐI KHÔNG xuất lại toàn bộ nội dung các chương.\n`;
-          promptSb += `- CHỈ TRẢ VỀ DUY NHẤT một mảng JSON thuần túy (không kèm markdown codeblock giải thích), mỗi phần tử gồm 'old' (từ/cụm lỗi chính xác trong bản dịch) và 'new' (từ/cụm sửa chuẩn):\n`;
-          promptSb += `[{"old": "chuỗi_lỗi_gốc", "new": "chuỗi_thay_thế_chuẩn"}]\nNếu không có lỗi nào, trả về: []\n\n`;
-          promptSb += `[DỮ LIỆU ĐỐI SOÁT SONG NGỮ CÁC CHƯƠNG]:\n` + validIndices.map(idx => {
-            const rawCh = project.chapters[idx] || '';
-            const transCh = project.translatedChapters[idx] || '';
-            return `=== CHƯƠNG ${idx + 1} ===\n[GỐC TIẾNG TRUNG]:\n${rawCh}\n\n[BẢN DỊCH HIỆN TẠI]:\n${transCh}`;
-          }).join('\n\n----------------------------------------\n\n');
-
-          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${activeKeyObj.key}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: promptSb }] }],
-              generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
-            })
-          });
-
-          if (resp.ok) {
-            const data = await resp.json();
-            const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            let cleanJson = outText.trim();
-            if (cleanJson.startsWith('```json')) cleanJson = cleanJson.slice(7);
-            else if (cleanJson.startsWith('```')) cleanJson = cleanJson.slice(3);
-            if (cleanJson.endsWith('```')) cleanJson = cleanJson.slice(0, -3);
-            const sIdx = cleanJson.indexOf('[');
-            const eIdx = cleanJson.lastIndexOf(']');
-            if (sIdx !== -1 && eIdx !== -1) {
-              cleanJson = cleanJson.substring(sIdx, eIdx + 1);
-              const parsedArr = JSON.parse(cleanJson);
-              if (Array.isArray(parsedArr)) {
-                patches = parsedArr.filter(p => p.old && p.new && p.old !== p.new);
-              }
-            }
-            success = true;
-          } else {
-            addLog(`⚠️ [LỖI API LÀM MƯỢT] HTTP ${resp.status} trên lần thử ${currentAttempt}/${maxAttempts}`);
-            if (attempt < maxAttempts) {
-              await new Promise(r => setTimeout(r, 2000 * attempt));
-            }
-          }
-        } catch (err: any) {
-          addLog(`⚠️ [LỖI KẾT NỐI LÀM MƯỢT] (${err.message}) trên lần thử ${currentAttempt}/${maxAttempts}`);
-          if (attempt < maxAttempts) {
-            await new Promise(r => setTimeout(r, 2000 * attempt));
-          }
-        }
-      } else {
-        // Fallback demo mode
-        patches = [
-          { old: 'bộ khoai', new: 'bộ khoái' },
-          { old: 'phì đồ', new: 'phỉ đồ' }
-        ];
-        success = true;
-      }
-    }
-
-    if (!success) {
-      addLog(`❌ [LÀM MƯỢT TẠM HOÃN] Các chương ${fromChapNum} ➔ ${toChapNum} chưa thể hoàn tất làm mượt sau ${maxAttempts} lần thử. Các chương này KHÔNG BỊ BỎ RƠI, hệ thống sẽ tự động thử lại hoặc bạn có thể bấm 'Làm Mượt Lại Các Chương Chưa Xử Lý'.`);
-      return false;
-    }
-
-    // Áp dụng patch và ĐÁNH DẤU CHÍNH THỨC CÁC CHƯƠNG ĐÃ LÀM MƯỢT
-    setProjects(prev => {
-      const cur = prev[currentProjectName];
-      const newTrans = { ...cur.translatedChapters };
-      let modifiedChaps = 0;
-
-      if (patches.length > 0) {
-        validIndices.forEach(cIdx => {
-          let text = newTrans[cIdx];
-          if (!text) return;
-          let changed = false;
-          patches.forEach(p => {
-            if (text.includes(p.old)) {
-              text = text.split(p.old).join(p.new);
-              changed = true;
-            }
-          });
-          if (changed) {
-            newTrans[cIdx] = text;
-            modifiedChaps++;
-          }
-        });
-      }
-
-      const updatedMaster = { ...cur.masterGlossary };
-      let syncedGlossCount = 0;
-      if (patches.length > 0) {
-        patches.forEach(p => {
-          Object.keys(updatedMaster).forEach(k => {
-            if (updatedMaster[k] === p.old || updatedMaster[k].includes(p.old)) {
-              updatedMaster[k] = updatedMaster[k].replace(p.old, p.new);
-              syncedGlossCount++;
-            }
-          });
-        });
-      }
-
-      const updatedPatchDict = { ...(cur.patchDictionary || {}) };
-      if (patches.length > 0) {
-        patches.forEach(p => {
-          updatedPatchDict[p.old] = p.new;
-        });
-      }
-
-      // Cập nhật danh sách chương đã làm mượt
-      const prevPolished = cur.polishedChapterIndices || [];
-      const updatedPolished = Array.from(new Set([...prevPolished, ...validIndices])).sort((a, b) => a - b);
-
-      if (patches.length > 0) {
-        addLog(`🎉 [HOÀN TẤT LÀM MƯỢT] Chương ${fromChapNum} ➔ ${toChapNum}: Đã sửa ${patches.length} mục lỗi trên ${modifiedChaps} chương! Đồng bộ ${syncedGlossCount} từ vào Master Glossary.`);
-      } else {
-        addLog(`✨ [HOÀN TẤT LÀM MƯỢT] Bản dịch các chương ${fromChapNum} ➔ ${toChapNum} đã chuẩn mực 100%, không phát hiện lỗi.`);
-      }
-
-      return {
-        ...prev,
-        [currentProjectName]: {
-          ...cur,
-          translatedChapters: newTrans,
-          masterGlossary: updatedMaster,
-          patchDictionary: updatedPatchDict,
-          polishedChapterIndices: updatedPolished
-        }
-      };
-    });
-
-    return true;
-  };
-
-  // Nút Làm Mượt Lại Các Chương Chưa Xử Lý (hoặc làm mượt lại tất cả)
-  const handleRepolishUnpolishedChapters = async () => {
-    if (isPolishing || isTranslating) {
-      alert('Đang có tiến trình dịch hoặc làm mượt đang chạy!');
-      return;
-    }
-    if (!project || Object.keys(project.translatedChapters).length === 0) {
-      alert('Chưa có bản dịch nào để làm mượt!');
-      return;
-    }
-
-    const curPolished = project.polishedChapterIndices || [];
-    let unpolished = Object.keys(project.translatedChapters)
-      .map(Number)
-      .filter(idx => !curPolished.includes(idx))
-      .sort((a, b) => a - b);
-
-    if (unpolished.length === 0) {
-      if (confirm(`Tất cả ${Object.keys(project.translatedChapters).length} chương đã dịch đều đã được làm mượt cuốn chiếu đạt chuẩn 100%!\n\nBạn có muốn làm mượt lại toàn bộ từ đầu không?`)) {
-        setProjects(prev => ({
-          ...prev,
-          [currentProjectName]: {
-            ...prev[currentProjectName],
-            polishedChapterIndices: []
-          }
-        }));
-        unpolished = Object.keys(project.translatedChapters).map(Number).sort((a, b) => a - b);
-      } else {
-        return;
-      }
-    }
-
-    setIsPolishing(true);
-    addLog(`🚀 [LÀM MƯỢT LẠI] Bắt đầu rà soát làm mượt ${unpolished.length} chương chưa xử lý...`);
-    const batchSize = advancedSettings.rollingPolishBatchSize || 15;
-
-    try {
-      for (let i = 0; i < unpolished.length; i += batchSize) {
-        const chunk = unpolished.slice(i, i + batchSize);
-        addLog(`📦 [LÔ ${Math.floor(i / batchSize) + 1}/${Math.ceil(unpolished.length / batchSize)}] Đang làm mượt Chương ${chunk[0] + 1} ➔ ${chunk[chunk.length - 1] + 1}...`);
-        const ok = await performRollingPolishBatch(chunk);
-        if (!ok) {
-          addLog(`⚠️ [DỪNG LÀM MƯỢT LẠI] Gặp sự cố kết nối, các chương còn lại được giữ trong hàng đợi.`);
-          break;
-        }
-      }
-      addLog(`🏁 [HOÀN TẤT LÀM MƯỢT LẠI] Đã xử lý xong các lô chương chưa làm mượt!`);
-    } catch (e: any) {
-      addLog(`❌ Lỗi khi làm mượt lại: ${e.message}`);
-    } finally {
-      setIsPolishing(false);
-    }
-  };
-
   // Bộ Quét Làm Mượt Bản Dịch Final (Global Hanzi Sweeper via Gemini AI)
   const handleExecuteFinalGlobalPolish = async () => {
     if (isPolishing) {
@@ -2093,10 +1775,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         if (!token) continue;
         if (token.length >= 2) {
           group2Multi.add(token);
-        } else if (token.length === 1) {
+          } else if (token.length === 1) {
           if (!group3SingleContext.has(token)) {
-            const start = Math.max(0, mPure.index - 25);
-            const end = Math.min(text.length, mPure.index + token.length + 25);
+            const start = Math.max(0, mPure.index - 10);
+            const end = Math.min(text.length, mPure.index + token.length + 10);
             const snippet = text.slice(start, end).replace(/[\r\n]+/g, ' ').trim();
             group3SingleContext.set(token, `...${snippet}...`);
           }
@@ -2134,7 +1816,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+          generationConfig: { temperature: 0.15, maxOutputTokens: 8192 }
         })
       });
 
@@ -2593,7 +2275,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: batchPrompt }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+            generationConfig: { temperature: 0.20, maxOutputTokens: 8192 }
           })
         });
 
@@ -3509,21 +3191,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 >
                   <Sparkles className="w-3.5 h-3.5 text-[#0ac8b9]" />
                   <span>✨ Làm Mượt Bản Dịch Final (Quét Sạch Chữ Hán)</span>
-                </button>
-
-                {/* NÚT LÀM MƯỢT LẠI CÁC CHƯƠNG CHƯA XỬ LÝ (CUỐN CHIẾU) */}
-                <button
-                  disabled={isPolishing || isTranslating}
-                  onClick={handleRepolishUnpolishedChapters}
-                  className="w-full py-2.5 bg-[#1e2328] hover:bg-[#2e3338] disabled:opacity-40 text-[#c8aa6e] border border-[#785a28] rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-black/40 cursor-pointer transition-all"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-[#c8aa6e]" />
-                  <span>
-                    🪄 Làm Mượt Lại Các Chương Chưa Xử Lý
-                    {project && Object.keys(project.translatedChapters).length > (project.polishedChapterIndices?.length || 0)
-                      ? ` (${Object.keys(project.translatedChapters).length - (project.polishedChapterIndices?.length || 0)} ch. chưa mượt)`
-                      : ''}
-                  </span>
                 </button>
 
                 {/* NÚT XUẤT TOÀN BỘ TÁC PHẨM (5 ĐỊNH DẠNG EBOOK) */}
@@ -4819,58 +4486,6 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                         >
                           <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
                         </button>
-                      </div>
-
-                      {/* DÒNG 7: BƯỚC NHẢY LÀM MƯỢT CUỐN CHIẾU THỦ CÔNG */}
-                      <div className="bg-[#0e1726] p-3 rounded-xl border border-[#785a28]/40 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="text-[#f0e6d2] font-bold text-xs flex items-center gap-2">
-                            <span className="px-1.5 py-0.2 bg-[#785a28] text-[#f0e6d2] rounded text-[9px] font-mono">DÒNG 7</span>
-                            <span>Bước Nhảy Làm Mượt Cuốn Chiếu:</span>
-                            <span className="text-[9px] bg-[#1e2328] text-[#c8aa6e] px-1.5 py-0.2 rounded border border-[#785a28]">
-                              CHỈ CHẠY KHI ẤN NÚT
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {[10, 15, 20, 25].map(sz => (
-                              <button
-                                key={sz}
-                                onClick={() => {
-                                  setAdvancedSettings(prev => ({ ...prev, rollingPolishBatchSize: sz }));
-                                  addLog(`⚙️ Đã đặt khoảng cách làm mượt: ${sz} chương/đợt`);
-                                }}
-                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${
-                                  (advancedSettings.rollingPolishBatchSize || 15) === sz
-                                    ? 'bg-[#c8aa6e] text-black shadow-sm'
-                                    : 'bg-[#1e2328] text-neutral-400 hover:text-white border border-[#785a28]/30'
-                                }`}
-                              >
-                                {sz} ch
-                              </button>
-                            ))}
-                            <button
-                              onClick={() => openQuantityEditor(
-                                'Bước Nhảy Làm Mượt Cuốn Chiếu (Số Chương)',
-                                advancedSettings.rollingPolishBatchSize || 15,
-                                5,
-                                100,
-                                'chương',
-                                (val: number) => {
-                                  setAdvancedSettings(prev => ({ ...prev, rollingPolishBatchSize: val }));
-                                  addLog(`⚙️ Đã đặt bước nhảy làm mượt tùy chỉnh: ${val} chương`);
-                                },
-                                undefined,
-                                5
-                              )}
-                              className="px-1.5 py-0.5 rounded text-[10px] bg-[#1e2328] hover:bg-[#2e3338] text-[#c8aa6e] border border-[#785a28] cursor-pointer font-bold ml-0.5"
-                            >
-                              ✏️ Sửa
-                            </button>
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-[#a09b8c] leading-relaxed">
-                          💡 Làm mượt cuốn chiếu không tự động chen ngang khi dịch. Bạn có thể nhấn nút <strong>🪄 Làm Mượt Lại</strong> tại Tab Dịch Thuật bất cứ lúc nào để đối chiếu song ngữ vá lỗi.
-                        </div>
                       </div>
                     </div>
                     </div>

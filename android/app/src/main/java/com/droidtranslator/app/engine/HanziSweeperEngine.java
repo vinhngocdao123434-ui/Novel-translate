@@ -72,8 +72,8 @@ public class HanziSweeperEngine {
                     // Nhóm 3: Chữ Hán đơn độc lập (VD: 璇) -> Cắt neo ngữ cảnh xung quanh
                     String singleChar = token;
                     if (!result.singleHanziContext.containsKey(singleChar)) {
-                        int start = Math.max(0, pureMatcher.start() - 25);
-                        int end = Math.min(text.length(), pureMatcher.end() + 25);
+                        int start = Math.max(0, pureMatcher.start() - 10);
+                        int end = Math.min(text.length(), pureMatcher.end() + 10);
                         String rawSnippet = text.substring(start, end).replace('\n', ' ').replace('\r', ' ').trim();
                         result.singleHanziContext.put(singleChar, "..." + rawSnippet + "...");
                     }

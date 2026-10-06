@@ -1,5 +1,3 @@
-import { transliterateLeftoverHanzi } from './sinoVietnameseDictionary';
-
 export interface AuditIssue {
   type:
     | 'empty_content'
