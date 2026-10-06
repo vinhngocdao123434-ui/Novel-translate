@@ -6,7 +6,25 @@ cd "$DIR"
 
 if command -v gradle >/dev/null 2>&1; then
     exec gradle "$@"
+fi
+
+FOUND_GRADLE=$(find "$HOME/.gradle/wrapper/dists" -name gradle -type f -perm -u+x 2>/dev/null | head -n 1)
+if [ -n "$FOUND_GRADLE" ] && [ -x "$FOUND_GRADLE" ]; then
+    exec "$FOUND_GRADLE" "$@"
+fi
+
+echo "Gradle not found in PATH, auto-downloading Gradle 8.7..."
+TMP_DIR="/tmp/gradle-dist"
+mkdir -p "$TMP_DIR"
+if command -v curl >/dev/null 2>&1; then
+    curl -sL "https://services.gradle.org/distributions/gradle-8.7-bin.zip" -o "$TMP_DIR/gradle.zip"
+elif command -v wget >/dev/null 2>&1; then
+    wget -q "https://services.gradle.org/distributions/gradle-8.7-bin.zip" -O "$TMP_DIR/gradle.zip"
 else
-    echo "Gradle not found in PATH. Please install Gradle 8.7+ or run through GitHub Actions."
+    echo "Error: curl or wget is required to download Gradle."
     exit 1
 fi
+
+unzip -q -o "$TMP_DIR/gradle.zip" -d "$TMP_DIR"
+chmod +x "$TMP_DIR/gradle-8.7/bin/gradle"
+exec "$TMP_DIR/gradle-8.7/bin/gradle" "$@"
