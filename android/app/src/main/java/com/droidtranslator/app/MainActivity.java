@@ -852,7 +852,6 @@ public class MainActivity extends AppCompatActivity {
     private boolean enableDualPassProofreading = false;
     private boolean enableBatchGlossaryAutoExtract = true;
     private boolean enablePreviousChapterContext = true;
-    private int contextSnippetLength = 350;
     private boolean enableAutoFinalPolish = true;
     private boolean isStrategySelectorExpanded = false;
     private final Set<Integer> processedBatchGlossaryStartIndices = new HashSet<>();
@@ -3406,8 +3405,11 @@ public class MainActivity extends AppCompatActivity {
         int fromIndex = chapterIndices.get(0);
         int toIndex = chapterIndices.get(chapterIndices.size() - 1);
 
+        List<String> rawBatchChapters = new ArrayList<>();
         List<String> chaptersToPolish = new ArrayList<>();
         for (int idx : chapterIndices) {
+            String r = (idx >= 0 && idx < rawChapters.size()) ? rawChapters.get(idx) : "";
+            rawBatchChapters.add(r);
             String t = translatedChapters.get(idx);
             if (t != null && !t.trim().isEmpty()) chaptersToPolish.add(t);
         }
@@ -3429,7 +3431,7 @@ public class MainActivity extends AppCompatActivity {
             mainHandler.post(() -> appendLog("✨ [LÀM MƯỢT CUỐN CHIẾU" + (currentAttempt > 1 ? " (THỬ LẠI " + currentAttempt + "/" + maxAttempts + ")" : "") + "] Đang gom " + chaptersToPolish.size() + " chương (Chương " + (fromIndex + 1) + " ➔ " + (toIndex + 1) + ") gửi " + targetPolishModel + " để trích xuất JSON Patch..."));
 
             try {
-                List<GlossaryManager.PatchEntry> patches = engine.extractRollingPatches(chaptersToPolish, targetPolishModel, msg -> mainHandler.post(() -> appendLog(msg)));
+                List<GlossaryManager.PatchEntry> patches = engine.extractRollingPatches(rawBatchChapters, chaptersToPolish, targetPolishModel, msg -> mainHandler.post(() -> appendLog(msg)));
 
                 if (patches != null && !patches.isEmpty()) {
                     int chaptersModified = 0;
