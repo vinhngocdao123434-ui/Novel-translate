@@ -447,14 +447,8 @@ Nếu không có lỗi nào, trả về: []
 
 on:
   push:
-    branches: [ main, master, '**' ]
-    tags:
-      - 'v*'
-  pull_request:
+    branches: [ '**' ]
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   build:
@@ -465,33 +459,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Web Dependencies
-        run: npm ci || npm install
-
-      - name: Build Web App Bundle
-        run: npm run build
-
-      - name: Copy Web Bundle to Android Assets
-        run: |
-          mkdir -p android/app/src/main/assets/www
-          cp -r dist/* android/app/src/main/assets/www/
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Setup Gradle 8.7
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-          cache-read-only: false
 
       - name: Make Gradlew Executable
         run: |
@@ -499,42 +471,16 @@ jobs:
             chmod +x android/gradlew
           fi
 
-      - name: Build Debug APK with Gradle
+      - name: Build Debug APK
         run: |
           cd android
-          if [ -f ./gradlew ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace
-          else
-            gradle assembleDebug --no-daemon --stacktrace
-          fi
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Locate Generated APK
-        id: find_apk
-        run: |
-          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
-          if [ -z "$APK_PATH" ]; then
-            echo "Error: APK not found!"
-            exit 1
-          fi
-          echo "Found APK: $APK_PATH"
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
-
-      - name: Upload Debug APK Artifact
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: DroidTranslator-Debug-APK
-          path: \${{ steps.find_apk.outputs.apk_path }}
-          retention-days: 30
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: \${{ steps.find_apk.outputs.apk_path }}
-          name: Release \${{ github.ref_name }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/*.apk
 `},{path:`gradle.properties`,language:`properties`,description:`Cấu hình JVM 2GB và AndroidX`,content:`org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8 -XX:+UseParallelGC
 android.useAndroidX=true
 android.nonTransitiveRClass=true
