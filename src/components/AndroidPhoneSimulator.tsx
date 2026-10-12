@@ -362,36 +362,156 @@ const STORAGE_ADVANCED_SETTINGS = 'droid_advanced_settings_v10';
 const STORAGE_SELECTED_MODEL = 'droid_selected_model_v10';
 const STORAGE_POLISH_MODEL = 'droid_polish_model_v10';
 
-// Web Audio Keep-Alive engine for uninterrupted background translation
+// Web Audio + HTML5 Silent Media Session + Web Worker Heartbeat engine for 100% uninterrupted background translation
 let globalKeepAliveCtx: any = null;
 let globalKeepAliveOsc: any = null;
+let globalSilentAudio: HTMLAudioElement | null = null;
+let globalKeepAliveWorker: Worker | null = null;
+let globalWakeLockSentinel: any = null;
+
+// Silent 1-second 8kHz WAV loop
+const SILENT_WAV_DATA_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+// Bộ hẹn giờ không bị bóp nghẹt (Unthrottled sleep) dùng Web Worker tick độc lập với main thread
+export const sleepUnthrottled = (ms: number): Promise<void> => {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    let settled = false;
+    const done = () => {
+      if (!settled) {
+        settled = true;
+        if (workerListener) window.removeEventListener('droid-worker-tick', workerListener);
+        clearTimeout(timeoutId);
+        resolve();
+      }
+    };
+    const timeoutId = setTimeout(done, ms);
+    const workerListener = () => {
+      if (Date.now() - start >= ms) {
+        done();
+      }
+    };
+    window.addEventListener('droid-worker-tick', workerListener);
+  });
+};
 
 const startBackgroundKeepAlive = () => {
   if (typeof window === 'undefined') return;
+
+  // 1. Khởi chạy Web Worker Heartbeat riêng biệt:
+  // Web Worker chạy trên luồng cách ly, KHÔNG bị Chromium kẹp timer 1 phút khi chuyển app
+  try {
+    if (!globalKeepAliveWorker) {
+      const workerCode = `
+        let timer = null;
+        self.onmessage = function(e) {
+          if (e.data === 'START') {
+            if (!timer) {
+              timer = setInterval(function() {
+                self.postMessage('TICK');
+              }, 500);
+            }
+          } else if (e.data === 'STOP') {
+            if (timer) {
+              clearInterval(timer);
+              timer = null;
+            }
+          }
+        };
+      `;
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      globalKeepAliveWorker = new Worker(URL.createObjectURL(blob));
+      globalKeepAliveWorker.onmessage = (e) => {
+        if (e.data === 'TICK') {
+          window.dispatchEvent(new CustomEvent('droid-worker-tick'));
+        }
+      };
+    }
+    globalKeepAliveWorker.postMessage('START');
+  } catch (e) {}
+
+  // 2. Silent HTML5 Audio Element gắn vào DOM + MediaSession API:
+  // Bắt buộc hệ điều hành Android và AudioFlinger phân loại app là ACTIVE MEDIA PLAYER.
+  // Khi có MediaSession đang phát, Android và Chromium CẤM đóng băng hoặc dừng tiến trình!
+  try {
+    if (!globalSilentAudio) {
+      let existingAudio = document.getElementById('droid-silent-keepalive-audio') as HTMLAudioElement;
+      if (!existingAudio) {
+        existingAudio = document.createElement('audio');
+        existingAudio.id = 'droid-silent-keepalive-audio';
+        existingAudio.src = SILENT_WAV_DATA_URI;
+        existingAudio.loop = true;
+        existingAudio.volume = 0.001;
+        (existingAudio as any).playsInline = true;
+        existingAudio.style.display = 'none';
+        document.body.appendChild(existingAudio);
+      }
+      globalSilentAudio = existingAudio;
+    }
+    const p = globalSilentAudio.play();
+    if (p !== undefined) {
+      p.catch(() => {});
+    }
+
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: 'DroidTranslator God-Mode Đang Dịch',
+        artist: 'Tiến trình dịch ngầm 5 lớp siêu liên tục',
+        album: 'DroidTranslator Engine'
+      });
+      navigator.mediaSession.playbackState = 'playing';
+    }
+  } catch (e) {}
+
+  // 3. Screen Wake Lock API chuẩn W3C
+  try {
+    if ('wakeLock' in navigator && !globalWakeLockSentinel) {
+      (navigator as any).wakeLock.request('screen').then((sentinel: any) => {
+        globalWakeLockSentinel = sentinel;
+      }).catch(() => {});
+    }
+  } catch (e) {}
+
+  // 4. Web Audio Oscillator phụ trợ
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    if (!globalKeepAliveCtx) {
-      globalKeepAliveCtx = new AudioCtx();
-    }
-    if (globalKeepAliveCtx.state === 'suspended') {
-      globalKeepAliveCtx.resume();
-    }
-    if (!globalKeepAliveOsc && globalKeepAliveCtx) {
-      const osc = globalKeepAliveCtx.createOscillator();
-      const gain = globalKeepAliveCtx.createGain();
-      gain.gain.value = 0.00001; // Silent inaudible carrier keeps mobile audio subsystem & JS runtime active
-      osc.frequency.value = 40;
-      osc.connect(gain);
-      gain.connect(globalKeepAliveCtx.destination);
-      osc.start();
-      globalKeepAliveOsc = osc;
+    if (AudioCtx) {
+      if (!globalKeepAliveCtx) {
+        globalKeepAliveCtx = new AudioCtx();
+      }
+      if (globalKeepAliveCtx.state === 'suspended') {
+        globalKeepAliveCtx.resume();
+      }
+      if (!globalKeepAliveOsc && globalKeepAliveCtx) {
+        const osc = globalKeepAliveCtx.createOscillator();
+        const gain = globalKeepAliveCtx.createGain();
+        gain.gain.value = 0.00001;
+        osc.frequency.value = 40;
+        osc.connect(gain);
+        gain.connect(globalKeepAliveCtx.destination);
+        osc.start();
+        globalKeepAliveOsc = osc;
+      }
     }
   } catch (e) {}
 };
 
 const stopBackgroundKeepAlive = () => {
   try {
+    if (globalKeepAliveWorker) {
+      globalKeepAliveWorker.postMessage('STOP');
+    }
+    if (globalSilentAudio) {
+      globalSilentAudio.pause();
+      globalSilentAudio.currentTime = 0;
+    }
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+    }
+    if (globalWakeLockSentinel) {
+      globalWakeLockSentinel.release().catch(() => {});
+      globalWakeLockSentinel = null;
+    }
     if (globalKeepAliveOsc) {
       globalKeepAliveOsc.stop();
       globalKeepAliveOsc.disconnect();
@@ -1715,6 +1835,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   // Translation Loop Simulation & Execution (Hỗ trợ độc lập 6 Mode Dịch)
   useEffect(() => {
     let timer: any;
+    let onTickHandler: any = null;
     if (isTranslating && !isPaused && project && project.chapters.length > 0) {
       const targetEnd = Math.min(toChapInput || project.chapters.length, project.chapters.length);
       
@@ -1761,9 +1882,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           setLastAttachedSnippet('');
         }
 
-        setLiveStreamText(`[${strategyLabel}] Đang xử lý: ${titleLine} (${project.model})${previousSnippet ? ` [🔗 Kèm ${snippetLimit} ký tự ngữ cảnh]` : ''}...`);
+        const startChapterDelay = (delaySecInput || 2) * 1000;
+        const startDelayTime = Date.now();
+        let chapterFired = false;
 
-        timer = setTimeout(async () => {
+        const executeChapterProcess = async () => {
+          if (chapterFired) return;
+          chapterFired = true;
+          if (onTickHandler) {
+            window.removeEventListener('droid-worker-tick', onTickHandler);
+          }
+          clearTimeout(timer);
           if (isProcessingChapterRef.current) return;
           isProcessingChapterRef.current = true;
           try {
@@ -2188,10 +2317,23 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         } finally {
           isProcessingChapterRef.current = false;
         }
-      }, (delaySecInput || 2) * 1000);
+      };
+
+      onTickHandler = () => {
+        if (Date.now() - startDelayTime >= startChapterDelay) {
+          executeChapterProcess();
+        }
+      };
+      window.addEventListener('droid-worker-tick', onTickHandler);
+      timer = setTimeout(executeChapterProcess, startChapterDelay);
       }
     }
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (onTickHandler) {
+        window.removeEventListener('droid-worker-tick', onTickHandler);
+      }
+    };
   }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, advancedSettings.translationPipelineMode, advancedSettings.batchGlossarySize]);
 
   // Hàm thực hiện Làm Mượt Cuốn Chiếu (Semantic JSON Patch) với cơ chế Thử Lại Nhiều Lần & Không Bỏ Rơi
@@ -2686,9 +2828,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     }
 
     if (savedNative) {
-      addLog(`📥 [XUẤT TỆP THÀNH CÔNG] Đã lưu "${fileName}" (${sortedIndices.length} chương) vào Download/DroidTranslator của thiết bị!`);
+      addLog(`📥 [ĐÃ LƯU BỘ NHỚ MÁY] Đã lưu tệp "${fileName}" (${sortedIndices.length} chương) thành công vào thư mục Download/DroidTranslator và Download của điện thoại!`);
     } else {
-      addLog(`📥 Đã xuất tệp ${fmt.toUpperCase()} "${fileName}" (${sortedIndices.length} chương) thành công!`);
+      addLog(`📥 [ĐÃ XUẤT TỆP ${fmt.toUpperCase()}] "${fileName}" (${sortedIndices.length} chương). Đã kích hoạt tải xuống & mở bảng cứu hộ nhận tệp.`);
     }
 
     // Hiển thị Modal Xác Nhận & Cứu Hộ Tải Xuống

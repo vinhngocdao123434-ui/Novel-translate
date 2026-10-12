@@ -45,6 +45,7 @@ import androidx.core.content.ContextCompat;
 import com.droidtranslator.app.engine.RootController;
 import com.droidtranslator.app.service.TranslationForegroundService;
 
+import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.content.ContentResolver;
 import android.provider.MediaStore;
@@ -103,8 +104,30 @@ public class MainActivity extends AppCompatActivity {
         ));
         rootLayout.setBackgroundColor(Color.parseColor("#08090C"));
 
-        // Khởi tạo WebView cao cấp
-        webView = new WebView(this);
+        // Khởi tạo WebView cao cấp với cơ chế Miễn Nhiễm Background Throttling 5 Lớp
+        webView = new WebView(this) {
+            @Override
+            protected void onWindowVisibilityChanged(int visibility) {
+                // Giữ cho Chromium luôn nhận diện là VISIBLE, vô hiệu hóa hoàn toàn cơ chế Background Tab Discard và Timer Throttling
+                super.onWindowVisibilityChanged(View.VISIBLE);
+            }
+
+            @Override
+            public void onWindowFocusChanged(boolean hasWindowFocus) {
+                // Luôn duy trì focus ảo để Event Loop JavaScript và Network chạy 100% tốc độ dù chuyển app khác
+                super.onWindowFocusChanged(true);
+            }
+
+            @Override
+            protected void onVisibilityChanged(View changedView, int visibility) {
+                super.onVisibilityChanged(changedView, View.VISIBLE);
+            }
+
+            @Override
+            public boolean hasWindowFocus() {
+                return true;
+            }
+        };
         webView.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -133,6 +156,18 @@ public class MainActivity extends AppCompatActivity {
 
         // Yêu cầu quyền thông báo và chạy ngầm
         checkAndRequestPermissions();
+
+        // Tự động kích hoạt 5 Lớp Miễn Nhiễm Root God-Mode ngay khi mở app
+        new Thread(() -> {
+            try {
+                if (RootController.isRootAvailable()) {
+                    RootController.applyGodModeKernelProtection();
+                    Log.d(TAG, "God-Mode Kernel Protection auto-applied on startup");
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Auto God-Mode check failed: " + e.getMessage());
+            }
+        }).start();
 
         // Tải bộ Web App Studio từ Assets cục bộ
         webView.loadUrl("file:///android_asset/www/index.html");
@@ -179,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onConsoleMessage(ConsoleMessage consoleMessage) {
+            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
                 Log.d("DroidTransWeb", consoleMessage.message() + " -- From line "
                         + consoleMessage.lineNumber() + " of "
                         + consoleMessage.sourceId());
@@ -213,10 +248,8 @@ public class MainActivity extends AppCompatActivity {
         });
 
         webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                if (url.startsWith("file:///android_asset/")) {
+            private boolean handleUrl(String url) {
+                if (url == null || url.startsWith("file:///android_asset/")) {
                     return false;
                 }
                 try {
@@ -226,6 +259,20 @@ public class MainActivity extends AppCompatActivity {
                 } catch (Exception e) {
                     return false;
                 }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (request != null && request.getUrl() != null) {
+                    return handleUrl(request.getUrl().toString());
+                }
+                return false;
+            }
+
+            @Deprecated
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return handleUrl(url);
             }
 
             @Override
@@ -329,7 +376,46 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (webView != null) {
+            webView.resumeTimers();
+        }
+    }
+
+    private PowerManager.WakeLock activityWakeLock;
+
+    private synchronized void acquireActivityWakeLock() {
+        try {
+            if (activityWakeLock == null) {
+                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                if (pm != null) {
+                    activityWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DroidTranslator:ActivityWakeLock");
+                }
+            }
+            if (activityWakeLock != null && !activityWakeLock.isHeld()) {
+                activityWakeLock.acquire(48 * 60 * 60 * 1000L); // 48 giờ xuyên đêm
+                Log.d(TAG, "Activity PARTIAL_WAKE_LOCK acquired");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error acquiring WakeLock: " + e.getMessage());
+        }
+    }
+
+    private synchronized void releaseActivityWakeLock() {
+        try {
+            if (activityWakeLock != null && activityWakeLock.isHeld()) {
+                activityWakeLock.release();
+                Log.d(TAG, "Activity PARTIAL_WAKE_LOCK released");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error releasing WakeLock: " + e.getMessage());
+        }
+    }
+
+    @Override
     protected void onDestroy() {
+        releaseActivityWakeLock();
         if (webView != null) {
             webView.destroy();
         }
@@ -359,6 +445,14 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void startForegroundService(final String info) {
+            acquireActivityWakeLock();
+            // Tái kích hoạt 5 Lớp Kernel Root
+            new Thread(() -> {
+                if (RootController.isRootAvailable()) {
+                    RootController.applyGodModeKernelProtection();
+                }
+            }).start();
+
             new Handler(Looper.getMainLooper()).post(() -> {
                 try {
                     Intent serviceIntent = new Intent(MainActivity.this, TranslationForegroundService.class);
@@ -373,6 +467,7 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void stopForegroundService() {
+            releaseActivityWakeLock();
             new Handler(Looper.getMainLooper()).post(() -> {
                 try {
                     Intent serviceIntent = new Intent(MainActivity.this, TranslationForegroundService.class);
@@ -459,9 +554,9 @@ public class MainActivity extends AppCompatActivity {
         public void openExportDirectory() {
             new Handler(Looper.getMainLooper()).post(() -> {
                 try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setDataAndType(Uri.parse(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()), "*/*");
-                    startActivity(Intent.createChooser(intent, "Mở thư mục Tải về (Download)"));
+                    Intent intent = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
                 } catch (Exception e) {
                     showToast("Tệp được lưu trong thư mục Download/DroidTranslator của máy");
                 }
@@ -549,6 +644,10 @@ public class MainActivity extends AppCompatActivity {
                     contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/DroidTranslator");
 
                     Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues);
+                    if (uri == null) {
+                        contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                        uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues);
+                    }
                     if (uri != null) {
                         OutputStream os = resolver.openOutputStream(uri);
                         if (os != null) {
@@ -564,7 +663,21 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            // 2. Dự phòng: Ghi trực tiếp vào thư mục công khai Download/DroidTranslator
+            // 2. Dự phòng cấp cao qua Root (Nếu máy có Root): Ghi thẳng vào /sdcard/Download/ và /sdcard/Download/DroidTranslator/
+            if (RootController.isRootAvailable()) {
+                String dtDir = "/sdcard/Download/DroidTranslator";
+                String rootPath1 = dtDir + "/" + filename;
+                String rootPath2 = "/sdcard/Download/" + filename;
+                boolean r1 = RootController.writeBytesWithRoot(rootPath1, bytes);
+                boolean r2 = RootController.writeBytesWithRoot(rootPath2, bytes);
+                if (r1 || r2) {
+                    success = true;
+                    savedLocation = r1 ? rootPath1 : rootPath2;
+                    MediaScannerConnection.scanFile(MainActivity.this, new String[]{rootPath1, rootPath2}, null, null);
+                }
+            }
+
+            // 3. Dự phòng: Ghi trực tiếp vào thư mục công khai Download/DroidTranslator
             if (!success) {
                 try {
                     File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
@@ -582,16 +695,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 } catch (Exception e) {
                     Log.w(TAG, "Direct Download write failed: " + e.getMessage());
-                }
-            }
-
-            // 3. Dự phòng qua Root (Nếu máy có Root): Ghi thẳng vào /sdcard/Download/DroidTranslator/
-            if (!success && RootController.isRootAvailable()) {
-                String rootPath = "/sdcard/Download/DroidTranslator/" + filename;
-                if (RootController.writeBytesWithRoot(rootPath, bytes)) {
-                    success = true;
-                    savedLocation = rootPath;
-                    MediaScannerConnection.scanFile(MainActivity.this, new String[]{rootPath}, null, null);
                 }
             }
 
