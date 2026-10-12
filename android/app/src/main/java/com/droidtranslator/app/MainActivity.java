@@ -45,10 +45,15 @@ import androidx.core.content.ContextCompat;
 import com.droidtranslator.app.engine.RootController;
 import com.droidtranslator.app.service.TranslationForegroundService;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
+import android.content.ContentValues;
+import android.content.ContentResolver;
+import android.provider.MediaStore;
+import android.webkit.DownloadListener;
+import androidx.core.content.FileProvider;
+import java.io.OutputStream;
+import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import android.util.Base64;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -233,6 +238,20 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+        // Bắt sự kiện tải xuống từ trình duyệt WebView (blob, data URL, http URL)
+        webView.setDownloadListener(new DownloadListener() {
+            @Override
+            public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setData(Uri.parse(url));
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Log.w(TAG, "WebView onDownloadStart: " + e.getMessage());
+                }
+            }
+        });
     }
 
     @Override
@@ -353,21 +372,120 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public boolean saveFile(final String filename, final String content) {
+            if (filename == null || content == null) return false;
             try {
-                File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                if (!dir.exists()) {
-                    dir.mkdirs();
-                }
-                File file = new File(dir, filename);
-                FileOutputStream fos = new FileOutputStream(file);
-                OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
-                writer.write(content);
-                writer.flush();
-                writer.close();
-                showToast("Đã lưu tệp vào thư mục Tải về: " + filename);
-                return true;
+                byte[] bytes = content.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                return writeBytesToStorage(filename, bytes, "text/plain");
             } catch (Exception e) {
-                Log.e(TAG, "Lỗi khi lưu tệp: " + e.getMessage());
+                Log.e(TAG, "Lỗi saveFile: " + e.getMessage());
+                showToast("Lỗi khi lưu tệp: " + e.getMessage());
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public boolean saveFileBase64(final String filename, final String base64Content, final String mimeType) {
+            if (filename == null || base64Content == null) return false;
+            try {
+                byte[] bytes = Base64.decode(base64Content, Base64.DEFAULT);
+                return writeBytesToStorage(filename, bytes, mimeType != null ? mimeType : "application/octet-stream");
+            } catch (Exception e) {
+                Log.e(TAG, "Lỗi saveFileBase64: " + e.getMessage());
+                showToast("Lỗi khi lưu tệp: " + e.getMessage());
+                return false;
+            }
+        }
+
+        @JavascriptInterface
+        public void openExportDirectory() {
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setDataAndType(Uri.parse(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()), "*/*");
+                    startActivity(Intent.createChooser(intent, "Mở thư mục Tải về (Download)"));
+                } catch (Exception e) {
+                    showToast("Tệp được lưu trong thư mục Download của máy");
+                }
+            });
+        }
+
+        private boolean writeBytesToStorage(String filename, byte[] bytes, String mimeType) {
+            boolean success = false;
+            String savedLocation = "";
+
+            // 1. Dùng MediaStore API hiện đại cho Android 10+ (API 29+) -> Tệp xuất hiện 100% trong Download
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    ContentResolver resolver = MainActivity.this.getContentResolver();
+                    ContentValues contentValues = new ContentValues();
+                    contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
+                    contentValues.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+                    contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/DroidTranslator");
+
+                    Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues);
+                    if (uri != null) {
+                        OutputStream os = resolver.openOutputStream(uri);
+                        if (os != null) {
+                            os.write(bytes);
+                            os.flush();
+                            os.close();
+                            success = true;
+                            savedLocation = "Download/DroidTranslator/" + filename;
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "MediaStore insert failed, falling back: " + e.getMessage());
+                }
+            }
+
+            // 2. Dự phòng: Ghi trực tiếp vào thư mục công khai Download
+            if (!success) {
+                try {
+                    java.io.File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    if (downloadDir != null) {
+                        if (!downloadDir.exists()) downloadDir.mkdirs();
+                        java.io.File target = new java.io.File(downloadDir, filename);
+                        java.io.FileOutputStream fos = new java.io.FileOutputStream(target);
+                        fos.write(bytes);
+                        fos.flush();
+                        fos.close();
+                        success = true;
+                        savedLocation = target.getAbsolutePath();
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Direct Download write failed: " + e.getMessage());
+                }
+            }
+
+            // 3. Dự phòng cấp 3: Ghi vào externalFilesDir của App (Android/data/com.droidtranslator.app/files/Download)
+            if (!success) {
+                try {
+                    java.io.File appExtDir = MainActivity.this.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                    if (appExtDir != null) {
+                        if (!appExtDir.exists()) appExtDir.mkdirs();
+                        java.io.File target = new java.io.File(appExtDir, filename);
+                        java.io.FileOutputStream fos = new java.io.FileOutputStream(target);
+                        fos.write(bytes);
+                        fos.flush();
+                        fos.close();
+                        success = true;
+                        savedLocation = target.getAbsolutePath();
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "App externalFilesDir write failed: " + e.getMessage());
+                }
+            }
+
+            if (success) {
+                final String finalLoc = savedLocation;
+                new Handler(Looper.getMainLooper()).post(() ->
+                    Toast.makeText(MainActivity.this, "✅ Đã lưu tệp vào: " + finalLoc, Toast.LENGTH_LONG).show()
+                );
+                return true;
+            } else {
+                new Handler(Looper.getMainLooper()).post(() ->
+                    Toast.makeText(MainActivity.this, "❌ Không thể ghi tệp vào bộ nhớ", Toast.LENGTH_SHORT).show()
+                );
                 return false;
             }
         }

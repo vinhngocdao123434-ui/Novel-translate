@@ -1816,31 +1816,26 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
               if (!isTranslatingRef.current || isPausedRef.current) return;
 
-              // Gửi Request Pass 1 với AbortController
-              abortControllerRef.current = new AbortController();
-              const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: abortControllerRef.current.signal,
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: promptSb }] }],
-                  generationConfig: { temperature: 0.25, maxOutputTokens: 8192 }
-                })
-              });
+              // Gửi Request Pass 1 qua hàm tự xoay tua Key & Retry backoff thông minh
+              const apiRes = await callGeminiApiWithRetryAndRotation(
+                promptSb,
+                project.model,
+                4,
+                addLog,
+                { temperature: 0.25, maxOutputTokens: 8192 },
+                abortControllerRef.current?.signal
+              );
 
               if (!isTranslatingRef.current || isPausedRef.current) return;
 
-              if (resp.ok) {
-                const data = await resp.json();
-                const outText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                
+              if (apiRes.ok && apiRes.text) {
+                const outText = apiRes.text;
                 let pass1Parsed = parseDualTaskOutput(outText, rawContent);
                 let pass1Text = pass1Parsed.translation;
 
                 // Xử lý loại bỏ thẻ <analysis> của CoT
                 if (isCoTStrategy) {
                   pass1Text = pass1Text.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '').trim();
-                  // Trường hợp thiếu thẻ đóng </analysis>
                   if (pass1Text.includes('<analysis>')) {
                     const transIdx = pass1Text.search(/===+\s*TRANSLATION\s*===+/i);
                     if (transIdx !== -1) {
@@ -1858,33 +1853,27 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   addLog(`🔬 [DÒNG 1 - PASS 2 BIÊN TẬP] Đang gửi [Raw Gốc + Pass 1] sang Pass 2 để Tổng Biên Tập đối soát phản biện...`);
                   
                   const pass2Prompt = buildPass2Prompt(targetLang, rawContent, pass1Text);
-                  abortControllerRef.current = new AbortController();
-                  const respPass2 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: abortControllerRef.current.signal,
-                    body: JSON.stringify({
-                      contents: [{ parts: [{ text: pass2Prompt }] }],
-                      generationConfig: { temperature: 0.15 }
-                    })
-                  });
+                  const pass2Res = await callGeminiApiWithRetryAndRotation(
+                    pass2Prompt,
+                    project.model,
+                    3,
+                    addLog,
+                    { temperature: 0.15 },
+                    abortControllerRef.current?.signal
+                  );
 
                   if (!isTranslatingRef.current || isPausedRef.current) return;
 
-                  if (respPass2.ok) {
-                    const dataPass2 = await respPass2.json();
-                    const outPass2 = dataPass2?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                    if (outPass2.trim().length > 30) {
-                      pass1Text = outPass2.trim();
-                      addLog(`✨ [PASS 2 BIÊN TẬP HOÀN TẤT] Bản dịch Pass 2 đã được trau chuốt hoàn hảo không còn lỗi ngữ nghĩa!`);
-                    }
+                  if (pass2Res.ok && pass2Res.text && pass2Res.text.trim().length > 30) {
+                    pass1Text = pass2Res.text.trim();
+                    addLog(`✨ [PASS 2 BIÊN TẬP HOÀN TẤT] Bản dịch Pass 2 đã được trau chuốt hoàn hảo không còn lỗi ngữ nghĩa!`);
                   }
                 }
 
                 translatedText = pass1Text;
                 aiExtractedGlossary = isDualTaskStrategy ? pass1Parsed.newGlossary : {};
               } else {
-                throw new Error(`HTTP ${resp.status}`);
+                throw new Error(apiRes.text || `Mã phản hồi HTTP ${apiRes.status}`);
               }
             } catch (err: any) {
               if (err.name === 'AbortError' || !isTranslatingRef.current || isPausedRef.current) {
@@ -1962,22 +1951,19 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 const rescuePrompt = buildRescuePrompt(curTargetLang, rawContent, currentChapterIndex, currentRatio);
 
                 try {
-                  abortControllerRef.current = new AbortController();
-                  const retryResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${selectedKey.key}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: abortControllerRef.current.signal,
-                    body: JSON.stringify({
-                      contents: [{ parts: [{ text: rescuePrompt }] }],
-                      generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
-                    })
-                  });
+                  const retryRes = await callGeminiApiWithRetryAndRotation(
+                    rescuePrompt,
+                    project.model,
+                    2,
+                    undefined,
+                    { temperature: 0.2, maxOutputTokens: 8192 },
+                    abortControllerRef.current?.signal
+                  );
 
                   if (!isTranslatingRef.current || isPausedRef.current) break;
 
-                  if (retryResp.ok) {
-                    const retryData = await retryResp.json();
-                    const retryOut = retryData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                  if (retryRes.ok && retryRes.text) {
+                    const retryOut = retryRes.text;
                     const cleanedRetry = ChapterAuditor.cleanChapterOffline(retryOut, project.masterGlossary);
                     const retryAudit = ChapterAuditor.auditChapter(
                       rawContent,
@@ -2002,7 +1988,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       await new Promise(r => setTimeout(r, 1200));
                     }
                   } else {
-                    addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} LỖI HTTP ${retryResp.status}]. Tiếp tục thử lại...`);
+                    addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} LỖI ${retryRes.status}]: ${retryRes.text || 'Lỗi mạng'}. Tiếp tục thử lại...`);
                     await new Promise(r => setTimeout(r, 1200));
                   }
                 } catch (reErr: any) {
@@ -2477,6 +2463,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     const sortedIndices = Object.keys(project.translatedChapters).map(Number).sort((a, b) => a - b);
     const safeName = project.name.replace(/[^a-zA-Z0-9._-]/g, '_');
 
+    const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
+
     if (fmt === 'txt') {
       let fullText = `=== TOÀN VĂN TÁC PHẨM: ${project.name} ===\n`;
       fullText += `Biên dịch tự động bởi: DroidTranslator God-Mode\n`;
@@ -2489,14 +2477,38 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         fullText += `${project.translatedChapters[idx]}\n`;
       }
 
-      const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeName}_FULL_TRANSLATED.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      addLog(`📥 Đã xuất tệp TXT (${sortedIndices.length} chương) thành công!`);
+      const fileName = `${safeName}_FULL_TRANSLATED.txt`;
+      let savedNative = false;
+
+      // 1. Nếu đang chạy trên ứng dụng Android APK -> Gọi Native Bridge ghi thẳng vào Bộ nhớ máy (Download / MediaStore)
+      if (bridge && typeof bridge.saveFile === 'function') {
+        try {
+          savedNative = bridge.saveFile(fileName, fullText);
+        } catch (e) {
+          console.warn('Native saveFile error:', e);
+        }
+      }
+
+      // 2. Tải xuống trình duyệt (hỗ trợ Web Browser, PWA và WebView)
+      try {
+        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        console.warn('Web download trigger error:', e);
+      }
+
+      if (savedNative) {
+        addLog(`📥 [XUẤT TỆP THÀNH CÔNG] Đã lưu "${fileName}" (${sortedIndices.length} chương) vào thư mục Download của thiết bị!`);
+      } else {
+        addLog(`📥 Đã xuất tệp TXT "${fileName}" (${sortedIndices.length} chương) thành công!`);
+      }
     } else if (fmt === 'html') {
       let html = `<!DOCTYPE html>\n<html lang="vi">\n<head>\n`;
       html += `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
@@ -2526,14 +2538,36 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       }
       html += `</div>\n</body>\n</html>`;
 
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeName}_READER.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-      addLog(`🌐 Đã xuất tệp HTML Offline Reader (${sortedIndices.length} chương) thành công!`);
+      const fileName = `${safeName}_READER.html`;
+      let savedNative = false;
+
+      if (bridge && typeof bridge.saveFile === 'function') {
+        try {
+          savedNative = bridge.saveFile(fileName, html);
+        } catch (e) {
+          console.warn('Native saveFile error:', e);
+        }
+      }
+
+      try {
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        console.warn('Web download trigger error:', e);
+      }
+
+      if (savedNative) {
+        addLog(`🌐 [XUẤT TỆP THÀNH CÔNG] Đã lưu Offline Reader "${fileName}" vào thư mục Download của thiết bị!`);
+      } else {
+        addLog(`🌐 Đã xuất tệp HTML Offline Reader (${sortedIndices.length} chương) thành công!`);
+      }
     } else {
       // EPUB, MOBI, AZW3
       let content = `=== TÁC PHẨM: ${project.name} (${fmt.toUpperCase()}) ===\n`;
@@ -2545,20 +2579,42 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         content += `${project.translatedChapters[idx]}\n`;
       }
 
+      const fileName = `${safeName}.${fmt}`;
       const mimeMap: Record<string, string> = {
         epub: 'application/epub+zip',
         mobi: 'application/x-mobipocket-ebook',
         azw3: 'application/vnd.amazon.ebook'
       };
+      const mimeType = mimeMap[fmt] || 'application/octet-stream';
+      let savedNative = false;
 
-      const blob = new Blob([content], { type: mimeMap[fmt] || 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeName}.${fmt}`;
-      a.click();
-      URL.revokeObjectURL(url);
-      addLog(`📚 Đã đóng gói và tải xuống tệp ${fmt.toUpperCase()} (${sortedIndices.length} chương) thành công!`);
+      if (bridge && typeof bridge.saveFile === 'function') {
+        try {
+          savedNative = bridge.saveFile(fileName, content);
+        } catch (e) {
+          console.warn('Native saveFile error:', e);
+        }
+      }
+
+      try {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        console.warn('Web download trigger error:', e);
+      }
+
+      if (savedNative) {
+        addLog(`📚 [XUẤT TỆP THÀNH CÔNG] Đã lưu tệp ${fmt.toUpperCase()} "${fileName}" vào thư mục Download của thiết bị!`);
+      } else {
+        addLog(`📚 Đã đóng gói và tải xuống tệp ${fmt.toUpperCase()} (${sortedIndices.length} chương) thành công!`);
+      }
     }
 
     setShowExportModal(false);
