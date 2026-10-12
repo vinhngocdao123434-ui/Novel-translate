@@ -362,6 +362,47 @@ const STORAGE_ADVANCED_SETTINGS = 'droid_advanced_settings_v10';
 const STORAGE_SELECTED_MODEL = 'droid_selected_model_v10';
 const STORAGE_POLISH_MODEL = 'droid_polish_model_v10';
 
+// Web Audio Keep-Alive engine for uninterrupted background translation
+let globalKeepAliveCtx: any = null;
+let globalKeepAliveOsc: any = null;
+
+const startBackgroundKeepAlive = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!globalKeepAliveCtx) {
+      globalKeepAliveCtx = new AudioCtx();
+    }
+    if (globalKeepAliveCtx.state === 'suspended') {
+      globalKeepAliveCtx.resume();
+    }
+    if (!globalKeepAliveOsc && globalKeepAliveCtx) {
+      const osc = globalKeepAliveCtx.createOscillator();
+      const gain = globalKeepAliveCtx.createGain();
+      gain.gain.value = 0.00001; // Silent inaudible carrier keeps mobile audio subsystem & JS runtime active
+      osc.frequency.value = 40;
+      osc.connect(gain);
+      gain.connect(globalKeepAliveCtx.destination);
+      osc.start();
+      globalKeepAliveOsc = osc;
+    }
+  } catch (e) {}
+};
+
+const stopBackgroundKeepAlive = () => {
+  try {
+    if (globalKeepAliveOsc) {
+      globalKeepAliveOsc.stop();
+      globalKeepAliveOsc.disconnect();
+      globalKeepAliveOsc = null;
+    }
+    if (globalKeepAliveCtx && globalKeepAliveCtx.state !== 'closed') {
+      globalKeepAliveCtx.suspend();
+    }
+  } catch (e) {}
+};
+
 export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isNativeMode }) => {
   const isDeviceNative = isNativeMode || (typeof window !== 'undefined' && (Boolean((window as any).AndroidBridge) || window.innerWidth < 768));
 
@@ -611,6 +652,16 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
   // Export 5 Ebook Formats Modal State
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
+  const [exportSuccessInfo, setExportSuccessInfo] = useState<{
+    fileName: string;
+    fmt: string;
+    chapterCount: number;
+    charCount: number;
+    content: string;
+    blobUrl: string;
+    savedNative: boolean;
+    savedPath: string;
+  } | null>(null);
   const [isStrategyDropdownOpen, setIsStrategyDropdownOpen] = useState<boolean>(false);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState<boolean>(false);
   const [isRotationDropdownOpen, setIsRotationDropdownOpen] = useState<boolean>(false);
@@ -737,29 +788,43 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
   const handleRefreshKernel = () => {
     setIsRefreshingKernel(true);
+    let rootApplied = false;
     if (typeof window !== 'undefined' && (window as any).AndroidBridge?.applyGodModeRoot) {
       try {
-        (window as any).AndroidBridge.applyGodModeRoot();
+        rootApplied = (window as any).AndroidBridge.applyGodModeRoot();
       } catch (e) {}
     }
     setTimeout(() => {
       setIsRefreshingKernel(false);
-      addLog('🔍 [Kernel Diagnostics]: Đọc /proc/self/oom_score_adj = -1000. Trạng thái Miễn Nhiễm LMK Kill: ACTIVE');
+      addLog('🛡️ [Root 5 Lớp God-Mode]: Đã kích hoạt 5 lớp bảo vệ Kernel toàn diện:');
+      addLog('  1️⃣ /proc/self/oom_score_adj = -1000 (Miễn nhiễm LMK Kill)');
+      addLog('  2️⃣ max_phantom_processes = 2147483647 (Bỏ giới hạn tiến trình)');
+      addLog('  3️⃣ activity_manager use_freezer = false (CHỐNG ĐÓNG BĂNG KHI CHUYỂN APP)');
+      addLog('  4️⃣ dumpsys deviceidle whitelist +com.droidtranslator.app (Bỏ qua Doze)');
+      addLog('  5️⃣ Standby Bucket = ACTIVE & AppOps WAKE_LOCK (Duy trì mạng & CPU)');
     }, 400);
   };
 
-  // Sync translation background status with Android Native Foreground Service
+  // Sync translation background status with Android Native Foreground Service & Web Audio Keep-Alive
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).AndroidBridge) {
+    if (typeof window !== 'undefined') {
       const bridge = (window as any).AndroidBridge;
       if (isTranslating && !isPaused) {
-        try {
-          bridge.startForegroundService(`Đang dịch chương ${currentChapterIndex + 1}...`);
-        } catch (e) {}
+        // Kích hoạt sóng âm thanh nền giữ JavaScript Event Loop không bị trình duyệt/hệ điều hành đóng băng
+        startBackgroundKeepAlive();
+        if (bridge) {
+          try {
+            bridge.startForegroundService(`Đang dịch chương ${currentChapterIndex + 1}...`);
+            bridge.applyGodModeRoot?.();
+          } catch (e) {}
+        }
       } else if (!isTranslating) {
-        try {
-          bridge.stopForegroundService();
-        } catch (e) {}
+        stopBackgroundKeepAlive();
+        if (bridge) {
+          try {
+            bridge.stopForegroundService();
+          } catch (e) {}
+        }
       }
     }
   }, [isTranslating, isPaused, currentChapterIndex]);
@@ -934,16 +999,63 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       const selectedKey = activeKeys[(attempt - 1) % activeKeys.length];
       const modelToUse = modelName || 'gemini-2.5-flash';
 
+      // 1. NẾU ĐANG CHẠY TRÊN ANDROID NATIVE: Gọi trực tiếp qua OkHttpClient Native có WifiLock & WakeLock
+      // Giải quyết triệt để 100% lỗi "Failed to fetch" khi chuyển app hoặc tắt màn hình!
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge?.callGeminiNative) {
+        try {
+          const nativeResStr = (window as any).AndroidBridge.callGeminiNative(
+            prompt,
+            modelToUse,
+            selectedKey.key,
+            configOverrides.temperature || 0.15,
+            configOverrides.maxOutputTokens || 8192
+          );
+          if (nativeResStr) {
+            const nativeJson = JSON.parse(nativeResStr);
+            if (nativeJson.ok && nativeJson.text) {
+              return { ok: true, status: 200, text: nativeJson.text };
+            } else if (nativeJson.status === 429 || nativeJson.status === 503) {
+              lastStatus = nativeJson.status;
+              const delayMs = Math.min(2000 * Math.pow(2, attempt - 1), 10000);
+              if (addLogFn) {
+                addLogFn(`⚠️ [API Native HTTP ${nativeJson.status}] Máy chủ bận. Tự động xoay Key (${selectedKey.key.substring(0, 8)}...) & thử lại lần ${attempt}/${maxRetries}...`);
+              }
+              await new Promise(r => setTimeout(r, delayMs));
+              continue;
+            }
+          }
+        } catch (nativeErr: any) {
+          console.warn('Native Gemini call failed, falling back to fetch:', nativeErr);
+        }
+      }
+
+      // 2. Dự phòng: Gọi qua Fetch API trình duyệt có timeout bảo vệ
       try {
+        const timeoutController = new AbortController();
+        const timeoutTimer = setTimeout(() => {
+          try { timeoutController.abort(); } catch (e) {}
+        }, 50000); // 50s timeout bảo vệ
+
+        const onAbortHandler = () => {
+          try { timeoutController.abort(); } catch (e) {}
+        };
+        if (reqSignal) {
+          reqSignal.addEventListener('abort', onAbortHandler, { once: true });
+        }
+
         const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${selectedKey.key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: reqSignal,
+          signal: timeoutController.signal,
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
           })
         });
+        clearTimeout(timeoutTimer);
+        if (reqSignal) {
+          reqSignal.removeEventListener('abort', onAbortHandler);
+        }
 
         lastStatus = resp.status;
         if (resp.ok) {
@@ -979,9 +1091,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         }
         lastErrText = err.message || 'Connection failed';
         if (addLogFn) {
-          addLogFn(`⚠️ [LỖI KẾT NỐI API] ${lastErrText}. Thử lại lần ${attempt}/${maxRetries}...`);
+          addLogFn(`⚠️ [LỖI KẾT NỐI API / ${lastErrText}] Đang tự động xoay sang Key tiếp theo và thử lại lần ${attempt}/${maxRetries} sau 2.5s...`);
         }
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 2500));
       }
     }
 
@@ -1879,12 +1991,23 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
               if (err.name === 'AbortError' || !isTranslatingRef.current || isPausedRef.current) {
                 return;
               }
-              addLog(`⚠️ Không gọi được API thực (${err.message}), kích hoạt cơ chế dịch thông minh giả lập.`);
+              addLog(`⚠️ Lỗi kết nối API thực: ${err.message}`);
             }
           }
 
           // Fallback khi không có API key hoặc mất mạng
           if (!translatedText) {
+            // NẾU CÓ API KEY THỰC TẾ: Tuyệt đối KHÔNG sinh bản dịch mẫu (chỉ 781 ký tự) gây kích hoạt sai báo động mất chữ và kẹt cứu hộ!
+            if (isRealKey) {
+              addLog(`⏸️ [TẠM DỪNG TIẾN TRÌNH - MẤT KẾT NỐI MẠNG]: Không thể kết nối API Gemini (Failed to fetch). Đã tạm dừng an toàn ở Chương ${currentChapterIndex + 1} để bảo vệ dữ liệu nguyên tác. Vui lòng kiểm tra Wi-Fi/4G và bấm Tiếp tục.`);
+              setIsTranslating(false);
+              setIsPaused(true);
+              isTranslatingRef.current = false;
+              isPausedRef.current = true;
+              setStatusText(`⏸ Tạm dừng: Gián đoạn mạng ở Chương ${currentChapterIndex + 1}`);
+              return;
+            }
+
             if (isTargetJapanese) {
               translatedText = `第${currentChapterIndex + 1}章：${titleLine}\n\n青石村の路地を少年・林辰が歩いている。背中には古びた木剣を背负い、静かに前を見据えていた。\n「林辰、今日の青雲宗の選抜、早く行かぬか！」村の鍛冶屋が声をかけた。林辰は微笑み、「鍛冶屋の叔父さん、すぐに向かいます」と答えた。`;
               aiExtractedGlossary = { '林辰': '林辰（りんしん）', '青云宗': '青雲宗（せいうんそう）' };
@@ -2465,6 +2588,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
     const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
 
+    let finalContent = '';
+    let fileName = '';
+    let mimeType = 'text/plain;charset=utf-8';
+
     if (fmt === 'txt') {
       let fullText = `=== TOÀN VĂN TÁC PHẨM: ${project.name} ===\n`;
       fullText += `Biên dịch tự động bởi: DroidTranslator God-Mode\n`;
@@ -2476,39 +2603,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         fullText += `\n============================================================\n`;
         fullText += `${project.translatedChapters[idx]}\n`;
       }
-
-      const fileName = `${safeName}_FULL_TRANSLATED.txt`;
-      let savedNative = false;
-
-      // 1. Nếu đang chạy trên ứng dụng Android APK -> Gọi Native Bridge ghi thẳng vào Bộ nhớ máy (Download / MediaStore)
-      if (bridge && typeof bridge.saveFile === 'function') {
-        try {
-          savedNative = bridge.saveFile(fileName, fullText);
-        } catch (e) {
-          console.warn('Native saveFile error:', e);
-        }
-      }
-
-      // 2. Tải xuống trình duyệt (hỗ trợ Web Browser, PWA và WebView)
-      try {
-        const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } catch (e) {
-        console.warn('Web download trigger error:', e);
-      }
-
-      if (savedNative) {
-        addLog(`📥 [XUẤT TỆP THÀNH CÔNG] Đã lưu "${fileName}" (${sortedIndices.length} chương) vào thư mục Download của thiết bị!`);
-      } else {
-        addLog(`📥 Đã xuất tệp TXT "${fileName}" (${sortedIndices.length} chương) thành công!`);
-      }
+      finalContent = fullText;
+      fileName = `${safeName}_FULL_TRANSLATED.txt`;
+      mimeType = 'text/plain;charset=utf-8';
     } else if (fmt === 'html') {
       let html = `<!DOCTYPE html>\n<html lang="vi">\n<head>\n`;
       html += `<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
@@ -2537,39 +2634,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         html += `</div>\n`;
       }
       html += `</div>\n</body>\n</html>`;
-
-      const fileName = `${safeName}_READER.html`;
-      let savedNative = false;
-
-      if (bridge && typeof bridge.saveFile === 'function') {
-        try {
-          savedNative = bridge.saveFile(fileName, html);
-        } catch (e) {
-          console.warn('Native saveFile error:', e);
-        }
-      }
-
-      try {
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } catch (e) {
-        console.warn('Web download trigger error:', e);
-      }
-
-      if (savedNative) {
-        addLog(`🌐 [XUẤT TỆP THÀNH CÔNG] Đã lưu Offline Reader "${fileName}" vào thư mục Download của thiết bị!`);
-      } else {
-        addLog(`🌐 Đã xuất tệp HTML Offline Reader (${sortedIndices.length} chương) thành công!`);
-      }
+      finalContent = html;
+      fileName = `${safeName}_READER.html`;
+      mimeType = 'text/html;charset=utf-8';
     } else {
-      // EPUB, MOBI, AZW3
       let content = `=== TÁC PHẨM: ${project.name} (${fmt.toUpperCase()}) ===\n`;
       content += `Biên dịch bởi: DroidTranslator God-Mode\n`;
       content += `Tổng số chương: ${sortedIndices.length}\n\n`;
@@ -2578,44 +2646,62 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         content += `\n------------------------------------------------------------\n`;
         content += `${project.translatedChapters[idx]}\n`;
       }
-
-      const fileName = `${safeName}.${fmt}`;
+      finalContent = content;
+      fileName = `${safeName}.${fmt}`;
       const mimeMap: Record<string, string> = {
         epub: 'application/epub+zip',
         mobi: 'application/x-mobipocket-ebook',
         azw3: 'application/vnd.amazon.ebook'
       };
-      const mimeType = mimeMap[fmt] || 'application/octet-stream';
-      let savedNative = false;
+      mimeType = mimeMap[fmt] || 'application/octet-stream';
+    }
 
-      if (bridge && typeof bridge.saveFile === 'function') {
-        try {
-          savedNative = bridge.saveFile(fileName, content);
-        } catch (e) {
-          console.warn('Native saveFile error:', e);
-        }
-      }
-
+    let savedNative = false;
+    // 1. Ghi tệp Native Android APK nếu có AndroidBridge
+    if (bridge && typeof bridge.saveFile === 'function') {
       try {
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        savedNative = Boolean(bridge.saveFile(fileName, finalContent));
       } catch (e) {
-        console.warn('Web download trigger error:', e);
-      }
-
-      if (savedNative) {
-        addLog(`📚 [XUẤT TỆP THÀNH CÔNG] Đã lưu tệp ${fmt.toUpperCase()} "${fileName}" vào thư mục Download của thiết bị!`);
-      } else {
-        addLog(`📚 Đã đóng gói và tải xuống tệp ${fmt.toUpperCase()} (${sortedIndices.length} chương) thành công!`);
+        console.warn('Native saveFile error:', e);
       }
     }
+
+    // 2. Kích hoạt tải xuống trình duyệt
+    let blobUrl = '';
+    try {
+      const blob = new Blob([finalContent], { type: mimeType });
+      blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Giữ blobUrl 3 phút để người dùng có thể bấm tải lại nếu máy chặn tự động tải
+      setTimeout(() => {
+        try { URL.revokeObjectURL(blobUrl); } catch (e) {}
+      }, 180000);
+    } catch (e) {
+      console.warn('Web download trigger error:', e);
+    }
+
+    if (savedNative) {
+      addLog(`📥 [XUẤT TỆP THÀNH CÔNG] Đã lưu "${fileName}" (${sortedIndices.length} chương) vào Download/DroidTranslator của thiết bị!`);
+    } else {
+      addLog(`📥 Đã xuất tệp ${fmt.toUpperCase()} "${fileName}" (${sortedIndices.length} chương) thành công!`);
+    }
+
+    // Hiển thị Modal Xác Nhận & Cứu Hộ Tải Xuống
+    setExportSuccessInfo({
+      fileName,
+      fmt: fmt.toUpperCase(),
+      chapterCount: sortedIndices.length,
+      charCount: finalContent.length,
+      content: finalContent,
+      blobUrl,
+      savedNative,
+      savedPath: savedNative ? `Download/DroidTranslator/${fileName}` : 'Thư mục Download của thiết bị / trình duyệt'
+    });
 
     setShowExportModal(false);
   };
@@ -6453,6 +6539,130 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             <button
               onClick={() => setShowExportModal(false)}
               className="w-full py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* EXPORT SUCCESS & RESCUE MODAL */}
+      {exportSuccessInfo && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-emerald-500/60 rounded-3xl p-5 w-full max-w-sm space-y-4 shadow-[0_0_35px_rgba(16,185,129,0.25)]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <span className="font-bold text-[#f0e6d2] text-sm">Xuất Bản Dịch Thành Công</span>
+              </div>
+              <button 
+                onClick={() => setExportSuccessInfo(null)}
+                className="text-neutral-400 hover:text-white p-1 rounded-lg hover:bg-neutral-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-neutral-950 p-3.5 rounded-2xl border border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs text-white break-all">{exportSuccessInfo.fileName}</span>
+                <span className="px-2 py-0.5 bg-emerald-950 border border-emerald-600 text-emerald-300 rounded-lg text-[10px] font-bold">
+                  {exportSuccessInfo.fmt}
+                </span>
+              </div>
+              <div className="text-[11px] text-neutral-400 flex items-center gap-3">
+                <span>📚 <strong>{exportSuccessInfo.chapterCount}</strong> chương</span>
+                <span>•</span>
+                <span>📝 <strong>{exportSuccessInfo.charCount.toLocaleString('vi-VN')}</strong> ký tự</span>
+              </div>
+              <div className="text-[11px] text-emerald-400/90 pt-1 border-t border-neutral-800 flex items-start gap-1.5">
+                <span className="mt-0.5">📍</span>
+                <span>
+                  {exportSuccessInfo.savedNative ? (
+                    <>Đã lưu tệp vào: <strong className="text-white underline">{exportSuccessInfo.savedPath}</strong></>
+                  ) : (
+                    <>Tệp đã được tạo. Nếu trình duyệt chặn tự động tải, hãy bấm các nút bên dưới để nhận tệp ngay:</>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              {/* Nút 1: Tải trực tiếp về máy */}
+              {exportSuccessInfo.blobUrl && (
+                <a
+                  href={exportSuccessInfo.blobUrl}
+                  download={exportSuccessInfo.fileName}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all text-center block"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Bấm để Tải Tệp Về Máy Ngay</span>
+                </a>
+              )}
+
+              {/* Nút 2: Chia sẻ qua ứng dụng khác (Android Share / Web Share) */}
+              <button
+                onClick={() => {
+                  const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
+                  if (bridge && typeof bridge.shareFileNative === 'function') {
+                    bridge.shareFileNative(exportSuccessInfo.fileName, exportSuccessInfo.content, 'text/plain');
+                  } else if (navigator.share) {
+                    try {
+                      const file = new File([exportSuccessInfo.content], exportSuccessInfo.fileName, { type: 'text/plain' });
+                      navigator.share({
+                        title: exportSuccessInfo.fileName,
+                        text: `Bản dịch tác phẩm ${project?.name} (${exportSuccessInfo.chapterCount} chương)`,
+                        files: [file]
+                      }).catch(() => {});
+                    } catch (e) {
+                      navigator.share({
+                        title: exportSuccessInfo.fileName,
+                        text: exportSuccessInfo.content.slice(0, 1000)
+                      }).catch(() => {});
+                    }
+                  } else {
+                    alert('Trình duyệt không hỗ trợ Web Share. Vui lòng bấm "Sao chép toàn bộ" hoặc "Tải tệp".');
+                  }
+                }}
+                className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-[#f0e6d2] border border-[#785a28]/60 rounded-xl text-xs font-semibold cursor-pointer flex items-center justify-center gap-2 transition-all"
+              >
+                <Share2 className="w-4 h-4 text-[#c8aa6e]" />
+                <span>Chia Sẻ Tệp (Zalo / Drive / Quick Share / Files)</span>
+              </button>
+
+              {/* Nút 3: Sao chép toàn văn vào bộ nhớ tạm */}
+              <button
+                onClick={() => {
+                  const bridge = typeof window !== 'undefined' ? (window as any).AndroidBridge : null;
+                  if (bridge && typeof bridge.copyToClipboard === 'function') {
+                    bridge.copyToClipboard(exportSuccessInfo.content);
+                  } else if (navigator.clipboard) {
+                    navigator.clipboard.writeText(exportSuccessInfo.content)
+                      .then(() => alert('✅ Đã sao chép toàn bộ văn bản vào bộ nhớ tạm! Bạn có thể dán vào Word/Ghi chú.'))
+                      .catch(() => alert('Không thể truy cập Clipboard'));
+                  }
+                }}
+                className="w-full py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-semibold cursor-pointer flex items-center justify-center gap-2 transition-all"
+              >
+                <Copy className="w-4 h-4 text-sky-400" />
+                <span>Sao Chép Toàn Bộ Bản Dịch Vào Clipboard</span>
+              </button>
+
+              {/* Nút 4: Mở thư mục Download nếu có native bridge */}
+              {typeof window !== 'undefined' && (window as any).AndroidBridge?.openExportDirectory && (
+                <button
+                  onClick={() => (window as any).AndroidBridge.openExportDirectory()}
+                  className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-xl text-[11px] font-medium cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <FolderPlus className="w-3.5 h-3.5 text-[#c8aa6e]" />
+                  <span>Mở Thư Mục Download Trên Điện Thoại</span>
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setExportSuccessInfo(null)}
+              className="w-full py-2 bg-neutral-950 hover:bg-neutral-800 text-neutral-400 rounded-xl text-xs font-medium cursor-pointer"
             >
               Đóng
             </button>

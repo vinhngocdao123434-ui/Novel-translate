@@ -54,6 +54,19 @@ import java.io.OutputStream;
 import java.io.InputStream;
 import java.io.ByteArrayInputStream;
 import android.util.Base64;
+import android.media.MediaScannerConnection;
+
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
+import com.google.gson.Gson;
+import java.util.concurrent.TimeUnit;
+import java.io.File;
+import java.io.FileOutputStream;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -76,27 +89,19 @@ public class MainActivity extends AppCompatActivity {
             getSupportActionBar().hide();
         }
 
-        // Đặt màu status bar và navigation bar đồng bộ màu dark #0a0a0a
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            Window window = getWindow();
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-            window.setStatusBarColor(Color.parseColor("#0a0a0a"));
-            window.setNavigationBarColor(Color.parseColor("#0a0a0a"));
-        }
+        // Đặt màu status bar và navigation bar sang màu đen sâu OLED
+        Window window = getWindow();
+        window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(Color.parseColor("#08090C"));
+        window.setNavigationBarColor(Color.parseColor("#08090C"));
 
-        // Kích hoạt bảo vệ Root & OOM score -1000 ngay khi khởi động
-        if (RootController.isRootAvailable()) {
-            RootController.applyGodModeKernelProtection();
-            Log.d(TAG, "GodMode Kernel Protection Applied (-1000 OOM)");
-        }
-
-        // Khởi tạo Root layout container
         FrameLayout rootLayout = new FrameLayout(this);
         rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         ));
-        rootLayout.setBackgroundColor(Color.parseColor("#09090b"));
+        rootLayout.setBackgroundColor(Color.parseColor("#08090C"));
 
         // Khởi tạo WebView cao cấp
         webView = new WebView(this);
@@ -174,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
-            public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+            public void onConsoleMessage(ConsoleMessage consoleMessage) {
                 Log.d("DroidTransWeb", consoleMessage.message() + " -- From line "
                         + consoleMessage.lineNumber() + " of "
                         + consoleMessage.sourceId());
@@ -209,12 +214,11 @@ public class MainActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            public void shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 if (url.startsWith("file:///android_asset/")) {
                     return false;
                 }
-                // Nếu bấm link ngoài (aistudio, github...), mở trình duyệt hệ thống
                 try {
                     Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     startActivity(browserIntent);
@@ -295,6 +299,35 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * VÒNG ĐỜI ỨNG DỤNG (LIFECYCLE) - ĐẢM BẢO DỊCH NGẦM KHÔNG BAO GIỜ BỊ DỪNG:
+     * Tuyệt đối KHÔNG gọi webView.onPause() vì sẽ làm đóng băng toàn bộ JS Timer & Network!
+     * Luôn luôn duy trì webView.resumeTimers() để dịch tiếp khi chuyển sang app khác hoặc tắt màn hình!
+     */
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (webView != null) {
+            webView.resumeTimers();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (webView != null) {
+            webView.resumeTimers();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.resumeTimers();
+        }
+    }
+
     @Override
     protected void onDestroy() {
         if (webView != null) {
@@ -305,7 +338,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Cầu nối JavaScript Interface:
-     * Cho phép giao diện Web gọi trực tiếp các tính năng Native của Android (Foreground Service, Root, File I/O, Toast)
+     * Cho phép giao diện Web gọi trực tiếp các tính năng Native của Android
      */
     public class AndroidNativeBridge {
 
@@ -329,7 +362,7 @@ public class MainActivity extends AppCompatActivity {
             new Handler(Looper.getMainLooper()).post(() -> {
                 try {
                     Intent serviceIntent = new Intent(MainActivity.this, TranslationForegroundService.class);
-                    serviceIntent.putExtra("INFO", info != null ? info : "Tiến trình dịch ngầm DroidTranslator đang chạy");
+                    serviceIntent.putExtra("INFO", info != null ? info : "Tiến trình dịch ngầm DroidTranslator God-Mode đang chạy");
                     ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
                     Log.d(TAG, "Foreground service started from Web: " + info);
                 } catch (Exception e) {
@@ -397,6 +430,32 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @JavascriptInterface
+        public void shareFileNative(final String filename, final String content, final String mimeType) {
+            if (filename == null || content == null) return;
+            new Handler(Looper.getMainLooper()).post(() -> {
+                try {
+                    File exportDir = new File(getCacheDir(), "exports");
+                    if (!exportDir.exists()) exportDir.mkdirs();
+                    File file = new File(exportDir, filename);
+                    FileOutputStream fos = new FileOutputStream(file);
+                    fos.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    fos.flush();
+                    fos.close();
+
+                    Uri uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".fileprovider", file);
+                    Intent intent = new Intent(Intent.ACTION_SEND);
+                    intent.setType(mimeType != null ? mimeType : "text/plain");
+                    intent.putExtra(Intent.EXTRA_STREAM, uri);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(intent, "Chia sẻ tác phẩm"));
+                } catch (Exception e) {
+                    Log.e(TAG, "Lỗi shareFileNative: " + e.getMessage());
+                    showToast("Lỗi khi chia sẻ: " + e.getMessage());
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void openExportDirectory() {
             new Handler(Looper.getMainLooper()).post(() -> {
                 try {
@@ -404,16 +463,83 @@ public class MainActivity extends AppCompatActivity {
                     intent.setDataAndType(Uri.parse(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath()), "*/*");
                     startActivity(Intent.createChooser(intent, "Mở thư mục Tải về (Download)"));
                 } catch (Exception e) {
-                    showToast("Tệp được lưu trong thư mục Download của máy");
+                    showToast("Tệp được lưu trong thư mục Download/DroidTranslator của máy");
                 }
             });
+        }
+
+        /**
+         * Gọi Gemini API trực tiếp qua OkHttpClient Native của Android:
+         * Chạy trên thread pool Native có WifiLock và WakeLock, miễn nhiễm 100% với lỗi WebView "Failed to fetch" khi chuyển app
+         */
+        @JavascriptInterface
+        public String callGeminiNative(final String prompt, final String model, final String apiKey, final float temperature, final int maxTokens) {
+            try {
+                OkHttpClient client = new OkHttpClient.Builder()
+                        .connectTimeout(45, TimeUnit.SECONDS)
+                        .readTimeout(120, TimeUnit.SECONDS)
+                        .writeTimeout(45, TimeUnit.SECONDS)
+                        .build();
+
+                JsonObject root = new JsonObject();
+                JsonArray contents = new JsonArray();
+                JsonObject contentObj = new JsonObject();
+                JsonArray parts = new JsonArray();
+                JsonObject partObj = new JsonObject();
+                partObj.addProperty("text", prompt);
+                parts.add(partObj);
+                contentObj.add("parts", parts);
+                contents.add(contentObj);
+                root.add("contents", contents);
+
+                JsonObject genConfig = new JsonObject();
+                genConfig.addProperty("temperature", temperature > 0 ? temperature : 0.2);
+                genConfig.addProperty("maxOutputTokens", maxTokens > 0 ? maxTokens : 8192);
+                root.add("generationConfig", genConfig);
+
+                String actualModel = (model != null && !model.trim().isEmpty()) ? model.trim() : "gemini-2.5-flash";
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + actualModel + ":generateContent?key=" + apiKey;
+
+                RequestBody body = RequestBody.create(root.toString(), MediaType.parse("application/json"));
+                Request request = new Request.Builder().url(url).post(body).build();
+
+                Response response = client.newCall(request).execute();
+                String respBody = response.body() != null ? response.body().string() : "";
+
+                JsonObject result = new JsonObject();
+                result.addProperty("status", response.code());
+                result.addProperty("ok", response.isSuccessful());
+
+                if (response.isSuccessful()) {
+                    JsonObject respJson = new Gson().fromJson(respBody, JsonObject.class);
+                    JsonArray candidates = respJson.getAsJsonArray("candidates");
+                    if (candidates != null && candidates.size() > 0) {
+                        JsonObject firstCand = candidates.get(0).getAsJsonObject();
+                        JsonObject content = firstCand.getAsJsonObject("content");
+                        JsonArray outParts = content.getAsJsonArray("parts");
+                        String outText = outParts.get(0).getAsJsonObject().get("text").getAsString();
+                        result.addProperty("text", outText);
+                    } else {
+                        result.addProperty("text", "");
+                    }
+                } else {
+                    result.addProperty("error", respBody);
+                }
+                return result.toString();
+            } catch (Exception e) {
+                JsonObject err = new JsonObject();
+                err.addProperty("status", 500);
+                err.addProperty("ok", false);
+                err.addProperty("error", e.getMessage());
+                return err.toString();
+            }
         }
 
         private boolean writeBytesToStorage(String filename, byte[] bytes, String mimeType) {
             boolean success = false;
             String savedLocation = "";
 
-            // 1. Dùng MediaStore API hiện đại cho Android 10+ (API 29+) -> Tệp xuất hiện 100% trong Download
+            // 1. Dùng MediaStore API hiện đại cho Android 10+ (API 29+) -> Xuất hiện 100% trong Download
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 try {
                     ContentResolver resolver = MainActivity.this.getContentResolver();
@@ -438,38 +564,51 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            // 2. Dự phòng: Ghi trực tiếp vào thư mục công khai Download
+            // 2. Dự phòng: Ghi trực tiếp vào thư mục công khai Download/DroidTranslator
             if (!success) {
                 try {
-                    java.io.File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                     if (downloadDir != null) {
-                        if (!downloadDir.exists()) downloadDir.mkdirs();
-                        java.io.File target = new java.io.File(downloadDir, filename);
-                        java.io.FileOutputStream fos = new java.io.FileOutputStream(target);
+                        File dtDir = new File(downloadDir, "DroidTranslator");
+                        if (!dtDir.exists()) dtDir.mkdirs();
+                        File target = new File(dtDir, filename);
+                        FileOutputStream fos = new FileOutputStream(target);
                         fos.write(bytes);
                         fos.flush();
                         fos.close();
                         success = true;
                         savedLocation = target.getAbsolutePath();
+                        MediaScannerConnection.scanFile(MainActivity.this, new String[]{target.getAbsolutePath()}, null, null);
                     }
                 } catch (Exception e) {
                     Log.w(TAG, "Direct Download write failed: " + e.getMessage());
                 }
             }
 
-            // 3. Dự phòng cấp 3: Ghi vào externalFilesDir của App (Android/data/com.droidtranslator.app/files/Download)
+            // 3. Dự phòng qua Root (Nếu máy có Root): Ghi thẳng vào /sdcard/Download/DroidTranslator/
+            if (!success && RootController.isRootAvailable()) {
+                String rootPath = "/sdcard/Download/DroidTranslator/" + filename;
+                if (RootController.writeBytesWithRoot(rootPath, bytes)) {
+                    success = true;
+                    savedLocation = rootPath;
+                    MediaScannerConnection.scanFile(MainActivity.this, new String[]{rootPath}, null, null);
+                }
+            }
+
+            // 4. Dự phòng cấp 4: Ghi vào externalFilesDir của App (Android/data/com.droidtranslator.app/files/Download)
             if (!success) {
                 try {
-                    java.io.File appExtDir = MainActivity.this.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                    File appExtDir = MainActivity.this.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
                     if (appExtDir != null) {
                         if (!appExtDir.exists()) appExtDir.mkdirs();
-                        java.io.File target = new java.io.File(appExtDir, filename);
-                        java.io.FileOutputStream fos = new java.io.FileOutputStream(target);
+                        File target = new File(appExtDir, filename);
+                        FileOutputStream fos = new FileOutputStream(target);
                         fos.write(bytes);
                         fos.flush();
                         fos.close();
                         success = true;
                         savedLocation = target.getAbsolutePath();
+                        MediaScannerConnection.scanFile(MainActivity.this, new String[]{target.getAbsolutePath()}, null, null);
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "App externalFilesDir write failed: " + e.getMessage());
