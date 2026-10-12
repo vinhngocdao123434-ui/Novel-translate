@@ -114,7 +114,22 @@ public class ChapterAuditor {
         // 4. Kiểm tra chữ Hán:
         // - Nếu > 60 chữ Hán: AI copy nguyên xi cả đoạn văn bản tiếng Trung mà không dịch -> CRITICAL (Cần gửi online dịch lại)
         // - Nếu từ 1 - 60 chữ Hán: Lỗi nhẹ rải rác (Vài từ tiếng Trung sót, từ lai, tên riêng) -> MILD (Giữ nguyên cho Bộ Quét Làm Mượt Final xử lý)
-        if (targetLanguage != null && targetLanguage.contains("Việt") && antiHanziStrict) {
+        if (targetLanguage != null && (targetLanguage.contains("Nhật") || targetLanguage.toLowerCase().contains("jap"))) {
+            boolean hasKana = false;
+            for (int i = 0; i < cleaned.length(); i++) {
+                char c = cleaned.charAt(i);
+                Character.UnicodeBlock block = Character.UnicodeBlock.of(c);
+                if (block == Character.UnicodeBlock.HIRAGANA || block == Character.UnicodeBlock.KATAKANA) {
+                    hasKana = true;
+                    break;
+                }
+            }
+            if (rawSource != null && rawSource.length() > 150 && !hasKana) {
+                res.hasCriticalError = true;
+                res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch tiếng Nhật bị rò rỉ nguyên văn tiếng Trung (hoàn toàn thiếu chữ Hiragana/Katakana)"));
+                score -= 50;
+            }
+        } else if (targetLanguage != null && targetLanguage.contains("Việt") && antiHanziStrict) {
             if (rawHanzi > 60) {
                 res.hasCriticalError = true;
                 res.issues.add(new AuditIssue("excessive_hanzi", "critical", "Bản dịch bị rò rỉ nguyên đoạn tiếng Trung (" + rawHanzi + " chữ Hán thô chưa dịch)"));

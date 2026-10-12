@@ -22,6 +22,7 @@ export interface AuditResult {
   hasMildError: boolean;
   cleanedText: string;
   healedActions: string[];
+  primaryDefectMessage?: string;
 }
 
 /**
@@ -36,6 +37,9 @@ const AI_REFUSAL_PATTERNS = [
   /safety guidelines/i,
   /content policy/i,
   /không thể hỗ trợ yêu cầu này/i,
+  /翻訳できません/i,
+  /安全ガイドライン/i,
+  /コンテンツポリシー/i,
 ];
 
 /**
@@ -189,7 +193,9 @@ export class ChapterAuditor {
   public static auditChapter(
     rawText: string,
     translatedText: string,
-    glossary: Record<string, string> = {}
+    glossary: Record<string, string> = {},
+    targetLanguage: string = 'Tiếng Việt',
+    antiHanziStrict: boolean = true
   ): AuditResult {
     const issues: AuditIssue[] = [];
     let score = 100;
@@ -212,6 +218,7 @@ export class ChapterAuditor {
         hasMildError: false,
         cleanedText: '',
         healedActions,
+        primaryDefectMessage: 'Bản dịch trống rỗng hoàn toàn hoặc chỉ có khoảng trắng.',
       };
     }
 
@@ -256,29 +263,63 @@ export class ChapterAuditor {
       }
     }
 
-    // 5. Kiểm tra chữ Hán:
-    // - Nếu > 60 chữ Hán: AI copy nguyên xi cả đoạn văn bản tiếng Trung mà không dịch -> CRITICAL (Cần dịch lại)
-    // - Nếu <= 60 chữ Hán: Vài từ tiếng Trung sót, từ lai, tên riêng -> MILD / Bình thường (Giữ nguyên cho Bộ Quét Làm Mượt Final xử lý)
-    const hanziCount = this.countChineseChars(formattedText);
-    if (hanziCount > 60) {
-      issues.push({
-        type: 'excessive_hanzi',
-        severity: 'critical',
-        message: `Bản dịch bị rò rỉ nguyên đoạn tiếng Trung (${hanziCount} chữ Hán thô chưa dịch).`,
-      });
-      score -= 50;
-    } else if (hanziCount > 0) {
-      issues.push({
-        type: 'excessive_hanzi',
-        severity: 'mild',
-        message: `Sót nhẹ ${hanziCount} chữ Hán/từ lai (Giữ nguyên cho chức năng Làm Mượt Final xử lý).`,
-      });
-      score -= Math.min(10, Math.ceil(hanziCount / 5));
+    // 5. Kiểm tra ký tự theo từng ngôn ngữ đích cụ thể:
+    const langLower = (targetLanguage || 'Tiếng Việt').toLowerCase();
+    const isJapanese = langLower.includes('nhật') || langLower.includes('japan') || targetLanguage.includes('日本語');
+    const isVietnamese = langLower.includes('việt');
+    const isEnglish = langLower.includes('anh') || langLower.includes('eng');
+    const isKorean = langLower.includes('hàn') || langLower.includes('korean') || targetLanguage.includes('한국어');
+
+    if (isJapanese) {
+      // Tiếng Nhật: Chữ Hán (Kanji \u4e00-\u9fa5) là một phần cốt lõi tự nhiên của chữ viết Nhật Bản (kết hợp cùng Hiragana & Katakana).
+      // TUYỆT ĐỐI KHÔNG phạt chữ Hán trong tiếng Nhật!
+      // Dấu hiệu AI chưa dịch sang tiếng Nhật: Văn bản gốc tiếng Trung dài > 150 ký tự nhưng bản dịch KHÔNG hề có bất kỳ chữ Kana nào (Hiragana \u3040-\u309f hoặc Katakana \u30a0-\u30ff).
+      const hasKana = /[\u3040-\u309f\u30a0-\u30ff]/.test(formattedText);
+      if (rawLen > 150 && !hasKana) {
+        issues.push({
+          type: 'excessive_hanzi',
+          severity: 'critical',
+          message: 'Bản dịch tiếng Nhật bị rò rỉ nguyên văn tiếng Trung (hoàn toàn thiếu chữ Hiragana/Katakana của tiếng Nhật).',
+        });
+        score -= 50;
+      }
+    } else if (isVietnamese && antiHanziStrict) {
+      // Tiếng Việt: Chữ Hán không được phép xuất hiện nếu bật Bộ lọc chống chữ Hán
+      const hanziCount = this.countChineseChars(formattedText);
+      if (hanziCount > 60) {
+        issues.push({
+          type: 'excessive_hanzi',
+          severity: 'critical',
+          message: `Bản dịch bị rò rỉ nguyên đoạn tiếng Trung (${hanziCount} chữ Hán thô chưa dịch).`,
+        });
+        score -= 50;
+      } else if (hanziCount > 0) {
+        issues.push({
+          type: 'excessive_hanzi',
+          severity: 'mild',
+          message: `Sót nhẹ ${hanziCount} chữ Hán/từ lai (Giữ nguyên cho chức năng Làm Mượt Final xử lý).`,
+        });
+        score -= Math.min(10, Math.ceil(hanziCount / 5));
+      }
+    } else if ((isEnglish || isKorean) && antiHanziStrict) {
+      // Tiếng Anh / Tiếng Hàn: Không được rò rỉ nguyên đoạn chữ Hán tiếng Trung
+      const hanziCount = this.countChineseChars(formattedText);
+      if (hanziCount > 60) {
+        issues.push({
+          type: 'excessive_hanzi',
+          severity: 'critical',
+          message: `Bản dịch ${targetLanguage} bị rò rỉ nguyên đoạn tiếng Trung (${hanziCount} chữ Hán thô chưa dịch).`,
+        });
+        score -= 50;
+      }
     }
 
     const hasCriticalError = issues.some((i) => i.severity === 'critical');
     const hasMildError = issues.some((i) => i.severity === 'mild');
     const finalScore = Math.max(0, Math.min(100, score));
+
+    const crit = issues.find(i => i.severity === 'critical');
+    const primaryDefectMessage = crit ? crit.message : (issues[0] ? issues[0].message : undefined);
 
     return {
       isValid: !hasCriticalError && finalScore >= 40,
@@ -288,6 +329,7 @@ export class ChapterAuditor {
       hasMildError,
       cleanedText: formattedText,
       healedActions,
+      primaryDefectMessage,
     };
   }
 }

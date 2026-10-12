@@ -46,9 +46,21 @@ public class GlossaryManager {
         if (chineseCount < min || chineseCount > max) return false;
         if (trimmed.length() > max) return false;
 
-        // Loại bỏ ký tự đặc biệt, dấu câu
-        if (trimmed.matches(".*[，。！？：“”、《》；…—\\s,\\.?!:\"'\\-_\050\051\\[\\]{}~/\\\\|`@#$%^&*+=<>].*")) {
-            return false;
+        // Loại bỏ ký tự đặc biệt, dấu câu, khoảng trắng
+        for (int idx = 0; idx < trimmed.length(); idx++) {
+            char ch = trimmed.charAt(idx);
+            if (Character.isWhitespace(ch)) return false;
+            if (ch == ',' || ch == '.' || ch == '?' || ch == '!' || ch == ':' || ch == ';' ||
+                ch == 34 || ch == 39 || ch == '-' || ch == '_' || ch == '(' || ch == ')' ||
+                ch == '[' || ch == ']' || ch == '{' || ch == '}' || ch == '~' || ch == '/' ||
+                ch == '\\' || ch == '|' || ch == '`' || ch == '@' || ch == '#' || ch == '$' ||
+                ch == '%' || ch == '^' || ch == '&' || ch == '*' || ch == '+' || ch == '=' ||
+                ch == '<' || ch == '>' || ch == '\uFF0C' || ch == '\u3002' || ch == '\uFF01' ||
+                ch == '\uFF1F' || ch == '\uFF1A' || ch == '\u201C' || ch == '\u201D' ||
+                ch == '\u3001' || ch == '\u300A' || ch == '\u300B' || ch == '\uFF1B' ||
+                ch == '\u2026' || ch == '\u2014') {
+                return false;
+            }
         }
 
         // Loại trừ các tiền tố, cụm đàm thoại đời thường không phải danh từ riêng

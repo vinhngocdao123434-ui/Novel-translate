@@ -23,26 +23,239 @@ interface Props {
   isNativeMode?: boolean;
 }
 
-const DEFAULT_PROMPTS: PromptCardItem[] = [
-  {
-    id: 1,
-    title: "Tiên Hiệp / Cổ Trang (Chuẩn mực)",
-    content: "Dịch sang tiếng Việt tiểu thuyết cổ trang, tiên hiệp trôi chảy, đúng ngữ pháp tiếng Việt. Động từ, miêu tả dịch nghĩa tự nhiên, tuyệt đối không phiên âm Hán-Việt thô từng chữ (Ví dụ: '背着' dịch là 'cõng', cấm dịch 'bối trước'; '在巷子里' dịch là 'trong ngõ hẻm', cấm dịch 'tại hạng tử lí'). Đại từ xưng hô dùng: hắn, nàng, ta, ngươi, huynh, đệ, muội, tỷ, thúc, bá. Tên riêng, địa danh giữ âm Hán-Việt chuẩn 100%. TUYỆT ĐỐI KHÔNG để sót chữ Hán, không gõ sai telex (như 'Đangk' -> 'Đăng'), không trộn lẫn nửa Hán nửa Việt.",
-    active: true
-  },
-  {
-    id: 2,
-    title: "Đô Thị / Hiện Đại (Mượt mà)",
-    content: "Dịch sang tiếng Việt hiện đại, câu cú tự nhiên, văn phong đời thường mượt mà. Giữ nguyên tên nhân vật Hán-Việt chuẩn. Không dùng từ ngữ thô tục. TUYỆT ĐỐI KHÔNG để sót chữ Hán hay lỗi gõ phím telex.",
-    active: false
-  },
-  {
-    id: 3,
-    title: "Huyền Huyễn / Tây Phương Kỳ Ảo",
-    content: "Dịch sang tiếng Việt tiểu thuyết kỳ ảo phương Tây, giữ nguyên thuật ngữ ma pháp, cấp bậc ma pháp sư, kỵ sĩ. Câu từ hào hùng, chuẩn sắc thái sử thi.",
-    active: false
+export const LANGUAGE_PROMPT_PRESETS: Record<string, PromptCardItem[]> = {
+  'Tiếng Việt': [
+    {
+      id: 1,
+      title: "Tiên Hiệp / Cổ Trang (Chuẩn mực)",
+      content: "Dịch sang tiếng Việt tiểu thuyết cổ trang, tiên hiệp trôi chảy, đúng ngữ pháp tiếng Việt. Động từ, miêu tả dịch nghĩa tự nhiên, tuyệt đối không phiên âm Hán-Việt thô từng chữ (Ví dụ: '背着' dịch là 'cõng', cấm dịch 'bối trước'; '在巷子里' dịch là 'trong ngõ hẻm', cấm dịch 'tại hạng tử lí'). Đại từ xưng hô dùng: hắn, nàng, ta, ngươi, huynh, đệ, muội, tỷ, thúc, bá. Tên riêng, địa danh giữ âm Hán-Việt chuẩn 100%. TUYỆT ĐỐI KHÔNG để sót chữ Hán, không gõ sai telex (như 'Đangk' -> 'Đăng'), không trộn lẫn nửa Hán nửa Việt.",
+      active: true
+    },
+    {
+      id: 2,
+      title: "Đô Thị / Hiện Đại (Mượt mà)",
+      content: "Dịch sang tiếng Việt hiện đại, câu cú tự nhiên, văn phong đời thường mượt mà. Giữ nguyên tên nhân vật Hán-Việt chuẩn. Không dùng từ ngữ thô tục. TUYỆT ĐỐI KHÔNG để sót chữ Hán hay lỗi gõ phím telex.",
+      active: false
+    },
+    {
+      id: 3,
+      title: "Huyền Huyễn / Tây Phương Kỳ Ảo",
+      content: "Dịch sang tiếng Việt tiểu thuyết kỳ ảo phương Tây, giữ nguyên thuật ngữ ma pháp, cấp bậc ma pháp sư, kỵ sĩ. Câu từ hào hùng, chuẩn sắc thái sử thi.",
+      active: false
+    }
+  ],
+  '日本語': [
+    {
+      id: 'ja_1',
+      title: "ライトノベル・ファンタジー風 (Chuẩn kịch tính)",
+      content: "中国語小説の原文を、日本のライトノベル・ファンタジー小説の自然で流暢な日本語に翻訳してください。漢字・ひらがな・カタカナを適切に組み合わせ、人物の口調や一人称（俺、私、僕など）・二人称（お前、貴様、君など）を文脈に合わせて統一してください。技名や固有名詞には必要に応じて読み仮名（ルビ）を付与し、生き生きとした描写にしてください。",
+      active: true
+    },
+    {
+      id: 'ja_2',
+      title: "武侠・仙侠格調風 (Tiên hiệp cổ phong)",
+      content: "中国の伝統的な仙侠・修仙・武侠の世界観を重視し、重厚で格調高い日本語に翻訳してください。宗派、修行の階級、道号、法宝などの専門用語は漢字表記を尊重し、日本の読者にわかりやすく自然な表現に仕上げてください。",
+      active: false
+    },
+    {
+      id: 'ja_3',
+      title: "現代・日常会話風 (Đô thị / Đời thường)",
+      content: "現代ドラマやミステリー小説に適した、テンポの良い自然な現代日本語に翻訳してください。会話文は日常的な日本語の話し言葉を意識し、不自然な直訳表現を排除してください。",
+      active: false
+    }
+  ],
+  'English': [
+    {
+      id: 'en_1',
+      title: "Xianxia / Cultivation Fantasy (Standard)",
+      content: "Translate the Chinese novel into immersive, natural, and evocative English. Use standard Xianxia conventions (Qi, Dantian, Spirit Stones, Sect Elders, Daoist techniques). Render dialogue sharply with character voice and preserve martial arts action pacing.",
+      active: true
+    },
+    {
+      id: 'en_2',
+      title: "Modern / Urban Fiction (Conversational)",
+      content: "Translate into contemporary, conversational English. Prioritize natural dialogue, fluid scene transitions, and idiomatic phrasing over literal translation.",
+      active: false
+    },
+    {
+      id: 'en_3',
+      title: "High Fantasy / Epic (Literary)",
+      content: "Translate with elevated, epic fantasy prose. Enhance atmospheric descriptions and maintain dignified character mannerisms suitable for heroic fiction.",
+      active: false
+    }
+  ],
+  '한국어': [
+    {
+      id: 'ko_1',
+      title: "무협 / 선협 웹소설 스타일 (Chuẩn mực)",
+      content: "원문의 선협/무협 세계관을 한국 웹소설 문법에 맞게 매끄럽고 몰입감 있게 번역해 주세요. 기경팔맥, 단전, 문파, 영초 등 무협 용어의 표준 한자 표기를 준수하고 대화와 서술을 자연스럽게 다듬어 주세요.",
+      active: true
+    },
+    {
+      id: 'ko_2',
+      title: "현대 / 판타지 스타일 (Tự nhiên)",
+      content: "자연스러운 한국어 구어체와 현대 웹소설 문체로 번역해 주세요. 어색한 직역을 배제하고 인물의 감정선과 대사를 생동감 있게 표현해 주세요.",
+      active: false
+    }
+  ]
+};
+
+const DEFAULT_PROMPTS: PromptCardItem[] = LANGUAGE_PROMPT_PRESETS['Tiếng Việt'];
+
+export const getLanguageSystemInstruction = (targetLang: string): string => {
+  const langLower = (targetLang || 'Tiếng Việt').toLowerCase();
+  if (langLower.includes('nhật') || langLower.includes('japan') || targetLang.includes('日本語')) {
+    return `あなたはプロの中国語・日本語文学翻訳家です。\n任務：原文を自然で流暢な日本語に完全翻訳すること。\n\n必須規則：\n1. 用語集の遵守：付属の用語集（Glossary）の対訳を正確に使用すること。\n2. 自然な日本語表現：漢字・ひらがな・カタカナを適切に使い分け、小説として読みやすい自然な日本語にすること。人名・地名の読み仮名やルビも適切に表現すること。\n3. 原文の段落形式を維持：改行や段落構造を原文通りに保つこと。\n4. 直接出力：完成した翻訳本文のみを出力すること。解説やマークダウンのコードブロックは一切含めないこと。`;
   }
-];
+  if (langLower.includes('anh') || langLower.includes('eng')) {
+    return `You are a professional Chinese-to-English literary translator.\nTask: Translate the source text completely into natural, fluent, and immersive English.\n\nMANDATORY RULES:\n1. ADHERE TO GLOSSARY: Strictly use the term pairs provided in the attached Glossary.\n2. PURE ENGLISH: No untranslated Chinese characters. Keep character names and proper nouns consistent.\n3. PRESERVE FORMATTING: Maintain original paragraph breaks and line formatting.\n4. DIRECT OUTPUT ONLY: Output only the translated text. Do not include notes, intros, explanations, or markdown codeblocks.`;
+  }
+  if (langLower.includes('hàn') || langLower.includes('korean') || targetLang.includes('한국어')) {
+    return `당신은 전문적인 중한 문학 번역가입니다.\n임무: 원문을 자연스럽고 매끄러운 한국어로 완벽하게 번역하는 것입니다.\n\n필수 규칙:\n1. 용어집 준수: 첨부된 용어집(Glossary)의 단어 쌍을 정확하게 사용할 것.\n2. 자연스러운 한국어: 원문의 한자 단어를 한국어 어문 규범에 맞게 자연스럽게 번역할 것.\n3. 형식 유지: 원문의 줄바꿈과 문단 구조를 원본 그대로 유지할 것.\n4. 직접 출력: 완성된 번역 본문만 출력할 것. 설명이나 마크다운 코드블록을 포함하지 말 것.`;
+  }
+  // Mặc định: Tiếng Việt chuẩn theo đúng văn bản người dùng yêu cầu
+  return `Bạn là dịch giả văn học Trung - Việt chuyên nghiệp.\nNhiệm vụ: Dịch hoàn chỉnh văn bản gốc sang Tiếng Việt thuần túy, tự nhiên, mượt mà.\n\nQUY TẮC BẮT BUỘC:\n- TUÂN THỦ TỪ ĐIỂN: Sử dụng chính xác các cặp từ trong Bảng Từ Điển đi kèm.\n- TIẾNG VIỆT THUẦN TÚY (ZERO CHỮ HÁN): Không để lại bất kỳ chữ Hán hay từ lai dính chữ Hán nào trong bản dịch. Nếu gặp tên riêng chưa có trong từ điển, tự phiên âm Hán-Việt chuẩn. Chú ý không gõ sai chính tả từ Hán-Việt (ví dụ: không gõ "Bộ khoái" thành "Bộ khoai").\n- GIỮ NGUYÊN ĐỊNH DẠNG: Giữ nguyên cấu trúc xuống dòng, ngắt đoạn của văn bản gốc.\n- ĐẦU RA TRỰC TIẾP: Chỉ trả về nội dung bản dịch hoàn chỉnh. Không thêm lời giải thích, không dùng thẻ cấu trúc hay markdown codeblock.`;
+};
+
+export const buildBatchGlossaryPrompt = (
+  subChapters: string[],
+  subStartChap: number,
+  maxRawLen: number,
+  minFreq: number,
+  targetLang: string
+): string => {
+  const langLower = (targetLang || 'Tiếng Việt').toLowerCase();
+  const isJapanese = langLower.includes('nhật') || langLower.includes('japan') || targetLang.includes('日本語');
+  const isEnglish = langLower.includes('anh') || langLower.includes('eng');
+  const isKorean = langLower.includes('hàn') || langLower.includes('korean') || targetLang.includes('한국어');
+
+  let p = '';
+  if (isJapanese) {
+    p += `あなたは中国語文学の固有名詞抽出および日本語ローカライズの専門家です。\n`;
+    p += `任務：以下の中国語の小説テキストを分析し、重要な固有名詞（人名、地名、宗派名、技名・アイテム名）のみを抽出して、自然な日本語の対訳を作成してください。\n`;
+    p += `1. 人物名・二つ名（例: 林辰 ➔ 林辰（りんしん）, 赵霸天 ➔ 趙覇天）\n`;
+    p += `2. 地名・宗派・組織名（例: 青云宗 ➔ 青雲宗, 青石村 ➔ 青石村）\n`;
+    p += `3. 固有の武術・功法・神兵（例: 斩灵剑 ➔ 斬霊剣）\n\n`;
+    p += `[必須ルール]:\n`;
+    p += `- 一般名詞（店主、服、日常品など）は除外すること。\n`;
+    p += `- 原語の長さ: ${maxRawLen}文字以内。\n`;
+    p += `- 頻度: 1章に${minFreq}回以上登場するもの。\n`;
+    p += `- 各行の形式: [中国語原語] = [日本語訳語]（必要に応じて読み仮名やルビ表記）\n`;
+    p += `- 出力は極めて簡潔に、用語ペアのみを記載すること。\n\n`;
+  } else if (isEnglish) {
+    p += `You are an expert Chinese novel terminologist and English localizer.\n`;
+    p += `Task: Analyze the Chinese raw novel chapters and extract ONLY fixed Proper Nouns with consistent English translations:\n`;
+    p += `1. Character names & titles (e.g. 林辰 = Lin Chen, 赵霸天 = Zhao Batian)\n`;
+    p += `2. Sects, Clans & Locations (e.g. 青云宗 = Azure Cloud Sect, 青石村 = Qingshi Village)\n`;
+    p += `3. Exclusive Artifacts & Techniques (e.g. 斩灵剑 = Spirit Severing Sword)\n\n`;
+    p += `[MANDATORY RULES]:\n`;
+    p += `- Strict Proper Nouns only. No common nouns, dialogue, or everyday items.\n`;
+    p += `- Source term length: ≤ ${maxRawLen} Chinese characters.\n`;
+    p += `- Frequency: appears ≥ ${minFreq} times in a chapter.\n`;
+    p += `- Format: [ChineseTerm] = [EnglishTranslation]\n`;
+    p += `- Output concise term pairs only.\n\n`;
+  } else if (isKorean) {
+    p += `당신은 중국 소설 고유명사 추출 및 한국어 로컬라이징 전문가입니다.\n`;
+    p += `임무: 다음 중국어 소설 텍스트에서 주요 고유명사(인물명, 지명, 문파명, 무공명)만 추출하여 표준 한국어/한자음으로 번역해 주세요.\n`;
+    p += `규칙: [원문] = [한국어번역] 형식으로 작성하세요. (단어 길이 ≤ ${maxRawLen}자, 빈도 ≥ ${minFreq}회).\n\n`;
+  } else {
+    p += `Bạn là chuyên gia trích xuất Danh Từ Riêng (Proper Nouns) cho tiểu thuyết văn học.\n`;
+    p += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và TUYỆT ĐỐI CHỈ TRÍCH XUẤT CÁC DANH TỪ RIÊNG CỐ ĐỊNH (Strict Proper Nouns Only):\n`;
+    p += `1. TÊN RIÊNG NHÂN VẬT & BIỆT DANH (VD: 林辰 ➔ Lâm Thần, 赵霸天 ➔ Triệu Bá Thiên)\n`;
+    p += `2. ĐỊA DANH RIÊNG & TÔNG MÔN RIÊNG (VD: 青云宗 ➔ Thanh Vân Tông, 青石村 ➔ Thôn Thanh Thạch, 大河府 ➔ Phủ Đại Hà)\n`;
+    p += `3. THẦN BINH & CÔNG PHÁP ĐỘC QUYỀN CÓ TÊN RIÊNG (VD: 斩灵剑 ➔ Trảm Linh Kiếm, 梵圣真魔功 ➔ Phạn Thánh Chân Ma Công)\n\n`;
+    p += `[QUY TẮC BẮT BUỘC - CỰC CỲ CÔ ĐỌNG & TINH LỌC]:\n`;
+    p += `- TUYỆT ĐỐI CHỈ LỌC DANH TỪ RIÊNG. NGHIÊM CẤM đưa danh từ chung (như chưởng quỹ, tri huyện, bổ khoái, gia đinh, hắc y nhân), từ vựng đời thường, đồ vật (quần áo, bàn ghế, chén trà), bộ phận cơ thể (tay, chân, mắt, mũi, mày, tim), động từ, tính từ hoặc câu thoại vào danh sách!\n`;
+    p += `- GIỚI HẠN ĐỘ DÀI TỪ GỐC: Từ gốc tiếng Trung KHÔNG ĐƯỢC VƯỢT QUÁ ${maxRawLen} CHỮ HÁN (≤ ${maxRawLen} ký tự).\n`;
+    p += `- ĐIỀU KIỆN TẦN SUẤT XUẤT HIỆN: CHỈ TRÍCH XUẤT những từ xuất hiện lặp lại từ ${minFreq} LẦN TRỞ LÊN trong cùng một chương. Bỏ qua các từ chỉ xuất hiện thoáng qua.\n`;
+    p += `- Định dạng mỗi dòng: [TừGốcTiếngTrung] = [NghĩaHánViệtChuẩn]\n`;
+    p += `- PHẦN NGHĨA DỊCH TIẾNG VIỆT PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT (TUYỆT ĐỐI KHÔNG CHỨA BẤT KỲ CHỮ HÁN NÀO).\n`;
+    p += `- VÍ DỤ CHUẨN: 十里坡 = Thập Lý Bi Pha (CẤM VIẾT: 十里坡 = Thập Lý Bi坡)\n`;
+    p += `- Trả về danh sách cực kỳ ngắn gọn, cô đọng, chỉ gồm các Danh Từ Riêng thực sự trọng yếu.\n\n`;
+  }
+  p += `[CÁC CHƯƠNG THÔ]:\n` + subChapters.map((c, i) => `--- CHƯƠNG ${subStartChap + i} ---\n${c}`).join('\n\n');
+  return p;
+};
+
+export const buildRescuePrompt = (
+  targetLang: string,
+  rawContent: string,
+  currentChapterIndex: number,
+  currentRatio: number
+): string => {
+  const langLower = (targetLang || 'Tiếng Việt').toLowerCase();
+  const isJapanese = langLower.includes('nhật') || langLower.includes('japan') || targetLang.includes('日本語');
+  const isEnglish = langLower.includes('anh') || langLower.includes('eng');
+
+  if (isJapanese) {
+    return `[CHỈ THỊ CỨU HỘ KHẨN CẤP - BẮT BUỘC DỊCH ĐỦ 100% TOÀN BỘ CHƯƠNG]:\n` +
+      `CẢNH BÁO: Lần dịch trước chưa đạt chuẩn hoặc bị mất chữ (${Math.round(currentRatio * 100)}% độ dài nguyên tác).\n` +
+      `Nhiệm vụ: Dịch toàn bộ chương sau sang Tiếng Nhật (日本語) chuẩn văn học tiểu thuyết:\n` +
+      `1. BẮT BUỘC DỊCH ĐẦY ĐỦ 100% TOÀN BỘ VĂN BẢN TỪ ĐẦU ĐẾN CUỐI. TUYỆT ĐỐI KHÔNG ĐƯỢC TÓM TẮT, KHÔNG CẮT BỎ ĐOẠN, KHÔNG BỎ QUA BẤT KỲ CHI TIẾT NÀO.\n` +
+      `2. Dịch chi tiết từng câu thoại, tâm lý và hành động nhân vật, kết hợp tự nhiên giữa Kanji, Hiragana và Katakana.\n` +
+      `3. TUYỆT ĐỐI KHÔNG từ chối dịch, không gửi lời chào, không gửi câu chúc, không lặp từ.\n\n` +
+      `[NGUYÊN TÁC CHƯƠNG ${currentChapterIndex + 1} CẦN DỊCH ĐẦY ĐỦ 100%]:\n${rawContent}\n\n` +
+      `[ĐẦU RA BẮT BUỘC]: Toàn bộ bản dịch tiếng Nhật (日本語) hoàn chỉnh đầy đủ không thiếu một chữ.`;
+  }
+
+  if (isEnglish) {
+    return `[EMERGENCY RESCUE DIRECTIVE - FULL 100% CHAPTER TRANSLATION]:\n` +
+      `WARNING: The previous attempt was incomplete or truncated (${Math.round(currentRatio * 100)}% of source length).\n` +
+      `Task: Translate the entire chapter into natural, immersive literary English:\n` +
+      `1. MUST TRANSLATE 100% OF THE SOURCE TEXT FROM START TO END. DO NOT SUMMARIZE OR OMIT ANY SCENES.\n` +
+      `2. Translate every dialogue and descriptive passage faithfully.\n` +
+      `3. No AI conversational filler, no refusal, no repetition.\n` +
+      `4. No untranslated Chinese text.\n\n` +
+      `[SOURCE CHAPTER ${currentChapterIndex + 1}]:\n${rawContent}\n\n` +
+      `[DIRECT OUTPUT]: Complete English translation.`;
+  }
+
+  return `[CHỈ THỊ CỨU HỘ KHẨN CẤP - BẮT BUỘC DỊCH ĐỦ 100% TOÀN BỘ CHƯƠNG]:\n` +
+    `CẢNH BÁO: Lần dịch trước đã bị lỗi mất chữ hoặc nội dung bị cắt cụt nghiêm trọng (chỉ đạt ${Math.round(currentRatio * 100)}% độ dài nguyên tác).\n` +
+    `Nhiệm vụ: Dịch toàn bộ chương sau sang Tiếng Việt chuẩn văn học tiểu thuyết:\n` +
+    `1. BẮT BUỘC DỊCH ĐẦY ĐỦ 100% TOÀN BỘ VĂN BẢN TỪ ĐẦU ĐẾN CUỐI. TUYỆT ĐỐI KHÔNG ĐƯỢC TÓM TẮT, KHÔNG CẮT BỎ ĐOẠN, KHÔNG BỎ QUA BẤT KỲ CHI TIẾT NÀO.\n` +
+    `2. Dịch chi tiết từng câu thoại, từng cảnh hành động và tâm lý nhân vật, bảo đảm độ dài tương đương nguyên tác.\n` +
+    `3. TUYỆT ĐỐI KHÔNG từ chối dịch, không gửi lời chào, không gửi câu chúc, không lặp từ.\n` +
+    `4. TUYỆT ĐỐI KHÔNG để sót chữ Hán trong bản dịch.\n\n` +
+    `[NGUYÊN TÁC CHƯƠNG ${currentChapterIndex + 1} CẦN DỊCH ĐẦY ĐỦ 100%]:\n${rawContent}\n\n` +
+    `[ĐẦU RA BẮT BUỘC]: Toàn bộ bản dịch tiếng Việt hoàn chỉnh đầy đủ không thiếu một chữ.`;
+};
+
+export const buildPass2Prompt = (targetLang: string, rawContent: string, pass1Text: string): string => {
+  const langLower = (targetLang || 'Tiếng Việt').toLowerCase();
+  const isJapanese = langLower.includes('nhật') || langLower.includes('japan') || targetLang.includes('日本語');
+  const isEnglish = langLower.includes('anh') || langLower.includes('eng');
+
+  if (isJapanese) {
+    return `あなたは日本語文学の総編集長および校正の専門家です。\n\n` +
+      `任務: [中国語原文] と [Pass 1 翻訳ドラフト] を照合し、より自然で洗練された日本語小説本文へと校正・完成させてください:\n` +
+      `1. 誤訳や不自然な直訳の修正。\n` +
+      `2. 漢字・ひらがな・カタカナの自然なバランスと人名表記の統一。\n` +
+      `3. 文学的な描写力の向上。\n\n` +
+      `[中国語原文]:\n${rawContent}\n\n` +
+      `[Pass 1 翻訳ドラフト]:\n${pass1Text}\n\n` +
+      `[出力]: 完成した日本語翻訳本文のみを出力してください（解説やコードブロックは不要）。`;
+  }
+
+  if (isEnglish) {
+    return `You are a senior literary editor.\n\n` +
+      `Task: Compare the [CHINESE SOURCE] and [PASS 1 ENGLISH DRAFT] below, edit and polish it into publishing-quality English fiction:\n` +
+      `1. Fix mistranslations, awkward phrasing, and inconsistent terminology.\n` +
+      `2. Ensure prose flows naturally with rich descriptive rhythm.\n\n` +
+      `[CHINESE SOURCE]:\n${rawContent}\n\n` +
+      `[PASS 1 ENGLISH DRAFT]:\n${pass1Text}\n\n` +
+      `[MANDATORY OUTPUT]: Output only the finalized English translation text.`;
+  }
+
+  return `Bạn là Tổng biên tập văn học và chuyên gia hiệu đính tiểu thuyết dịch cao cấp.\n\n` +
+    `Nhiệm vụ: Đối chiếu trực tiếp giữa [VĂN BẢN GỐC TIẾNG TRUNG] và [BẢN DỊCH THÔ PASS 1] dưới đây để tiến hành biên soạn, sửa chữa và xuất ra bản dịch hoàn mỹ cuối cùng:\n` +
+    `1. SỬA CHỮA DỊCH SAI NGHĨA: Đối chiếu bản gốc để sửa toàn bộ các câu dịch sai ngữ cảnh, hiểu nhầm thành ngữ hoặc từ ngữ cảnh (VD: '万分不舍' dịch nhầm thành 'không nỗ lực' -> sửa chuẩn thành 'vô cùng không nỡ / tiếc tiền'; '诚惶诚恐' -> sửa thành 'nơm nớp lo sợ / thấp thỏm lo âu').\n` +
+    `2. QUÉT SẠCH 100% CHỮ HÁN SÓT: Khử sạch các chữ Hán dính trong câu (nội院 -> nội viện, Tuần抚 -> Tuần phủ, trạch邸 -> trạch đệ).\n` +
+    `3. CHUỐT LẠI VĂN PHONG TIỂU THUYẾT: Đại từ nhân xưng chuẩn mực (hắn, nàng, ta, ngươi), câu cú mượt mà, tự nhiên.\n\n` +
+    `[VĂN BẢN GỐC TIẾNG TRUNG]:\n${rawContent}\n\n` +
+    `[BẢN DỊCH THÔ PASS 1]:\n${pass1Text}\n\n` +
+    `[ĐẦU RA BẮT BUỘC]: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh sau khi đã biên tập hoàn mỹ (không xuất giải thích hay markdown codeblock).`;
+};
 
 const PRESET_MODELS = [
   { id: 'gemini-3.6-flash', name: '3.6 Flash', badge: 'Model Siêu Cấp 2026', desc: 'Chuyên gia xử lý Hán Việt & Làm mượt toàn văn tuyệt đối' },
@@ -483,6 +696,22 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   const [isPolishing, setIsPolishing] = useState<boolean>(false);
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number>(0);
   const isProcessingChapterRef = useRef<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isPausedRef = useRef<boolean>(false);
+  const isTranslatingRef = useRef<boolean>(false);
+  const isPolishingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useEffect(() => {
+    isTranslatingRef.current = isTranslating;
+  }, [isTranslating]);
+
+  useEffect(() => {
+    isPolishingRef.current = isPolishing;
+  }, [isPolishing]);
   const [liveStreamText, setLiveStreamText] = useState<string>('');
   const [statusText, setStatusText] = useState<string>('● Sẵn sàng');
   const [lastAttachedSnippet, setLastAttachedSnippet] = useState<string>('');
@@ -685,7 +914,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     modelName: string,
     maxRetries: number = 4,
     addLogFn?: (msg: string) => void,
-    configOverrides: Record<string, any> = {}
+    configOverrides: Record<string, any> = {},
+    signal?: AbortSignal
   ): Promise<{ ok: boolean; status: number; text: string; data?: any }> => {
     const activeKeys = globalApiKeys.filter(k => k.state === 'ACTIVE' && k.key.startsWith('AIzaSy') && !k.key.includes('DemoSampleKey'));
     if (activeKeys.length === 0) {
@@ -694,8 +924,13 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
     let lastStatus = 500;
     let lastErrText = '';
+    const reqSignal = signal || configOverrides.signal || abortControllerRef.current?.signal;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
+        return { ok: false, status: 499, text: 'Yêu cầu đã bị hủy hoặc tạm dừng.' };
+      }
+
       const selectedKey = activeKeys[(attempt - 1) % activeKeys.length];
       const modelToUse = modelName || 'gemini-2.5-flash';
 
@@ -703,6 +938,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${selectedKey.key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: reqSignal,
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
@@ -714,6 +950,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           const data = await resp.json();
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
           return { ok: true, status: 200, text, data };
+        }
+
+        if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
+          return { ok: false, status: 499, text: 'Yêu cầu đã bị dừng.' };
         }
 
         // Handle 503 Overloaded, 429 Rate Limit, 500/502/504 Server Error
@@ -734,6 +974,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           }
         }
       } catch (err: any) {
+        if (err.name === 'AbortError' || reqSignal?.aborted) {
+          return { ok: false, status: 499, text: 'Yêu cầu đã được ngắt kết nối theo lệnh hủy.' };
+        }
         lastErrText = err.message || 'Connection failed';
         if (addLogFn) {
           addLogFn(`⚠️ [LỖI KẾT NỐI API] ${lastErrText}. Thử lại lần ${attempt}/${maxRetries}...`);
@@ -1189,9 +1432,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         if (rawKey.length > maxLen) continue;
         if (!isValidGlossaryKey(rawKey)) continue;
 
-        // 3. LỌC NGHĨA DỊCH TIẾNG VIỆT (PHẢI LÀ DANH TỪ RIÊNG GỌN GÀNG, KHÔNG PHẢI CÂU DÀI MIÊU TẢ)
-        if (val.length > 35 || val.split(/\s+/).length > 6) continue;
-        if (/[.,!?:;"'(){}[\]]/.test(val)) continue;
+        // 3. LỌC NGHĨA DỊCH (PHẢI LÀ DANH TỪ RIÊNG GỌN GÀNG, KHÔNG PHẢI CÂU DÀI MIÊU TẢ)
+        const isTargetJapanese = (advancedSettings.targetLanguage || '').toLowerCase().includes('nhật') || (advancedSettings.targetLanguage || '').toLowerCase().includes('japan') || (advancedSettings.targetLanguage || '').includes('日本語');
+        if (val.length > 40 || (!isTargetJapanese && val.split(/\s+/).length > 6)) continue;
+        if (isTargetJapanese) {
+          if (/[.,!?:;"'\[\]]/.test(val)) continue;
+        } else {
+          if (/[.,!?:;"'(){}[\]]/.test(val)) continue;
+        }
         const lowerVal = val.toLowerCase();
         if (lowerVal.startsWith('là ') || lowerVal.startsWith('chính là ') || lowerVal.startsWith('có nghĩa là ') || lowerVal.startsWith('được gọi là ')) continue;
 
@@ -1218,7 +1466,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
         if (rawKey.toLowerCase() !== val.toLowerCase()) {
           const sanitizedVal = sanitizeGlossaryTargetValue(val);
-          if (sanitizedVal && !/[\u4e00-\u9fa5]/.test(sanitizedVal)) {
+          if (sanitizedVal && (isTargetJapanese || !/[\u4e00-\u9fa5]/.test(sanitizedVal))) {
             parsedMap[rawKey] = sanitizedVal;
           }
         }
@@ -1279,6 +1527,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     const maxLen = advancedSettings.maxTermLength || 8;
     const minLen = advancedSettings.minTermLength || 2;
     const minFreq = advancedSettings.minFrequency || 2;
+    const isTargetJapanese = (advancedSettings.targetLanguage || '').toLowerCase().includes('nhật') || (advancedSettings.targetLanguage || '').toLowerCase().includes('japan') || (advancedSettings.targetLanguage || '').includes('日本語');
 
     for (const [key, val] of Object.entries(aiGlossary)) {
       const trimmedKey = key.trim();
@@ -1290,8 +1539,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       if (trimmedKey.length > maxLen) continue;
       if (!isValidGlossaryKey(trimmedKey)) continue;
       if (trimmedKey.toLowerCase() === trimmedVal.toLowerCase()) continue;
-      if (trimmedVal.length > 35 || trimmedVal.split(/\s+/).length > 6) continue;
-      if (/[\u4e00-\u9fa5]/.test(trimmedVal)) continue;
+      if (trimmedVal.length > 40 || (!isTargetJapanese && trimmedVal.split(/\s+/).length > 6)) continue;
+      if (!isTargetJapanese && /[\u4e00-\u9fa5]/.test(trimmedVal)) continue;
 
       if (chapterRawContent) {
         if (typeof chapterRawContent === 'string') {
@@ -1447,22 +1696,24 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                     addLog(`📦 [BÓC LÔ PHÂN ĐOẠN] Đang trích xuất Phân đoạn Chương ${subStartChap} ➔ ${subEndChap}...`);
                   }
 
-                  let batchPrompt = `Bạn là chuyên gia trích xuất Danh Từ Riêng (Proper Nouns) cho tiểu thuyết văn học.\n`;
-                  batchPrompt += `Nhiệm vụ: Phân tích kỹ toàn bộ nội dung các chương thô tiếng Trung dưới đây và TUYỆT ĐỐI CHỈ TRÍCH XUẤT CÁC DANH TỪ RIÊNG CỐ ĐỊNH (Strict Proper Nouns Only):\n`;
-                  batchPrompt += `1. TÊN RIÊNG NHÂN VẬT & BIỆT DANH (VD: 林辰 ➔ Lâm Thần, 赵霸天 ➔ Triệu Bá Thiên)\n`;
-                  batchPrompt += `2. ĐỊA DANH RIÊNG & TÔNG MÔN RIÊNG (VD: 青云宗 ➔ Thanh Vân Tông, 青石村 ➔ Thôn Thanh Thạch, 大河府 ➔ Phủ Đại Hà)\n`;
-                  batchPrompt += `3. THẦN BINH & CÔNG PHÁP ĐỘC QUYỀN CÓ TÊN RIÊNG (VD: 斩灵剑 ➔ Trảm Linh Kiếm, 梵圣真魔功 ➔ Phạn Thánh Chân Ma Công)\n\n`;
-                  batchPrompt += `[QUY TẮC BẮT BUỘC - CỰC CỲ CÔ ĐỌNG & TINH LỌC]:\n`;
-                  batchPrompt += `- TUYỆT ĐỐI CHỈ LỌC DANH TỪ RIÊNG. NGHIÊM CẤM đưa danh từ chung (như chưởng quỹ, tri huyện, bổ khoái, gia đinh, hắc y nhân), từ vựng đời thường, đồ vật (quần áo, bàn ghế, chén trà), bộ phận cơ thể (tay, chân, mắt, mũi, mày, tim), động từ, tính từ hoặc câu thoại vào danh sách!\n`;
-                  batchPrompt += `- GIỚI HẠN ĐỘ DÀI TỪ GỐC: Từ gốc tiếng Trung KHÔNG ĐƯỢC VƯỢT QUÁ ${maxRawLen} CHỮ HÁN (≤ ${maxRawLen} ký tự).\n`;
-                  batchPrompt += `- ĐIỀU KIỆN TẦN SUẤT XUẤT HIỆN: CHỈ TRÍCH XUẤT những từ xuất hiện lặp lại từ ${minFreq} LẦN TRỞ LÊN trong cùng một chương. Bỏ qua các từ chỉ xuất hiện thoáng qua.\n`;
-                  batchPrompt += `- Định dạng mỗi dòng: [TừGốcTiếngTrung] = [NghĩaHánViệtChuẩn]\n`;
-                  batchPrompt += `- PHẦN NGHĨA DỊCH TIẾNG VIỆT PHẢI LÀ 100% CHỮ CÁI TIẾNG VIỆT LATIN/HÁN VIỆT (TUYỆT ĐỐI KHÔNG CHỨA BẤT KỲ CHỮ HÁN NÀO).\n`;
-                  batchPrompt += `- VÍ DỤ CHUẨN: 十里坡 = Thập Lý Bi Pha (CẤM VIẾT: 十里坡 = Thập Lý Bi坡)\n`;
-                  batchPrompt += `- Trả về danh sách cực kỳ ngắn gọn, cô đọng, chỉ gồm các Danh Từ Riêng thực sự trọng yếu.\n\n`;
-                  batchPrompt += `[CÁC CHƯƠNG THÔ]:\n` + subChapters.map((c, i) => `--- CHƯƠNG ${subStartChap + i} ---\n${c}`).join('\n\n');
+                  if (!isTranslatingRef.current || isPausedRef.current) break;
 
-                  const apiRes = await callGeminiApiWithRetryAndRotation(batchPrompt, project.model, 4, addLog);
+                  let batchPrompt = buildBatchGlossaryPrompt(
+                    subChapters,
+                    subStartChap,
+                    maxRawLen,
+                    minFreq,
+                    advancedSettings.targetLanguage || 'Tiếng Việt'
+                  );
+
+                  const apiRes = await callGeminiApiWithRetryAndRotation(
+                    batchPrompt,
+                    project.model,
+                    4,
+                    addLog,
+                    {},
+                    abortControllerRef.current?.signal
+                  );
                   if (apiRes.ok && apiRes.text) {
                     const subExtracted = parseGlossaryText(apiRes.text, subChapters);
                     aggregatedExtracted = { ...aggregatedExtracted, ...subExtracted };
@@ -1503,6 +1754,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             try {
               const activePromptObj = globalPrompts.find(p => p.active) || globalPrompts[0];
               
+              const targetLang = advancedSettings.targetLanguage || 'Tiếng Việt';
+              const isTargetViet = targetLang.toLowerCase().includes('việt');
+              const sysInst = getLanguageSystemInstruction(targetLang);
+
               // LỌC TỪ ĐIỂN TỐI ƯU THEO CHƯƠNG (RELEVANT GLOSSARY FILTERING - 100% CÁC MODE)
               const relevantGlossary = getRelevantGlossary(project.masterGlossary, rawContent);
               const relevantCount = Object.keys(relevantGlossary).length;
@@ -1513,9 +1768,11 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 addLog(`🎯 [LỌC TỪ ĐIỂN CHƯƠNG ${currentChapterIndex + 1}] Quét ${totalMasterCount} từ Master Glossary ➔ Lọc được ${relevantCount} thuật ngữ có trong chương để đính kèm AI.`);
               }
 
-              let promptSb = `Bạn là chuyên gia dịch thuật tiểu thuyết hàng đầu thế giới.\n\n`;
-              promptSb += `[NGÔN NGỮ ĐÍCH]: ${advancedSettings.targetLanguage || 'Tiếng Việt'}\n\n`;
-              promptSb += `[YÊU CẦU PHONG CÁCH]:\n${activePromptObj.content}\n\n`;
+              let promptSb = `${sysInst}\n\n`;
+              promptSb += `[NGÔN NGỮ ĐÍCH]: ${targetLang}\n\n`;
+              if (activePromptObj?.content) {
+                promptSb += `[YÊU CẦU PHONG CÁCH]:\n${activePromptObj.content}\n\n`;
+              }
               promptSb += `[BẢNG TỪ ĐIỂN GLOSSARY BẮT BUỘC TUÂN THỦ TUYỆT ĐỐI (100% ĐỒNG NHẤT XƯNG HÔ & THUẬT NGỮ CHƯƠNG NÀY)]:\n${glossaryStr || '(Không có thuật ngữ trùng khớp trong chương này)'}\n\n`;
               
               if (previousSnippet) {
@@ -1525,50 +1782,53 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
               // ==================== CHIẾN LƯỢC: TIỀN XỬ LÝ GHI ĐÈ RAW INJECTION ====================
               if (isPreInjectStrategy) {
                 const injectedRaw = injectTermsIntoRaw(rawContent, project.masterGlossary);
-                promptSb += `[VĂN BẢN GỐC ĐÃ GHIM CỐ ĐỊNH DANH TỪ RIÊNG, XƯNG HÔ, CHỨC VỤ, ĐỊA DANH, CÔNG PHÁP]:\n${injectedRaw}\n\n`;
+                promptSb += `[VĂN BẢN GỐC ĐÃ GHIM CỐ ĐỊNH THUẬT NGỮ]:\n${injectedRaw}\n\n`;
                 promptSb += `[QUY TẮC BẮT BUỘC - HYBRID RAW INJECTION]:\n`;
-                promptSb += `1. Dịch toàn bộ các câu chữ tiếng Trung còn lại sang tiếng Việt mượt mà, thuần túy, tự nhiên.\n`;
-                promptSb += `2. TUYỆT ĐỐI GIỮ NGUYÊN các danh từ riêng tiếng Việt đã được ghim sẵn trong văn bản trên (không tự ý đổi lại hay dịch khác đi).\n`;
-                promptSb += `3. ĐẦU RA: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh.`;
+                promptSb += `1. Dịch toàn bộ các câu chữ còn lại sang ${targetLang} mượt mà, tự nhiên.\n`;
+                promptSb += `2. TUYỆT ĐỐI GIỮ NGUYÊN các thuật ngữ đã được ghim sẵn trong văn bản trên.\n`;
+                promptSb += `3. ĐẦU RA: Chỉ xuất toàn bộ bản dịch hoàn chỉnh sang ${targetLang}.`;
               } 
               // ==================== CHIẾN LƯỢC: DỊCH SUY LUẬN NGỮ CẢNH COT (DEEP THINKING) ====================
               else if (isCoTStrategy) {
                 promptSb += `[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI]:\n${rawContent}\n\n`;
                 promptSb += `[QUY TẮC BẮT BUỘC - SUY LUẬN SÂU COT (DEEP THINKING TRANSLATION)]:\n`;
                 promptSb += `Thực hiện 2 bước tuần tự bắt buộc:\n`;
-                promptSb += `BƯỚC 1: Trong khối <analysis>, tiến hành 3 bước rà soát ngầm:\n`;
-                promptSb += `  a) Điểm danh 100% các từ xuất hiện trong [BẢNG TỪ ĐIỂN GLOSSARY] có mặt ở chương này để chốt cách dịch và đại từ xưng hô.\n`;
-                promptSb += `  b) Phân tích mối quan hệ nhân vật, giải mã các thành ngữ 4 chữ, khẩu ngữ khó hoặc câu chữ ẩn dụ.\n`;
-                promptSb += `  c) Định hình văn phong theo [YÊU CẦU PHONG CÁCH] (thuần Việt, mượt mà, thoát ý).\n`;
-                promptSb += `BƯỚC 2: Xuất toàn bộ bản dịch tiếng Việt hoàn mỹ nhất trong khối ===TRANSLATION===.\n\n`;
-                promptSb += `ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:\n<analysis>\n(Rà soát Glossary + Phân tích ngữ cảnh, thành ngữ, xưng hô)\n</analysis>\n===TRANSLATION===\n(Toàn bộ bản dịch tiếng Việt mượt mà hoàn chỉnh)`;
+                promptSb += `BƯỚC 1: Trong khối <analysis>, tiến hành rà soát Glossary, xưng hô, thành ngữ và ngữ cảnh.\n`;
+                promptSb += `BƯỚC 2: Xuất toàn bộ bản dịch sang ${targetLang} hoàn mỹ nhất trong khối ===TRANSLATION===.\n\n`;
+                promptSb += `ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:\n<analysis>\n(Rà soát Glossary + Phân tích ngữ cảnh, thành ngữ, xưng hô)\n</analysis>\n===TRANSLATION===\n(Toàn bộ bản dịch sang ${targetLang} mượt mà hoàn chỉnh)`;
               }
               // ==================== CHIẾN LƯỢC: DỊCH THUẦN HOẶC DUAL-TASK ====================
               else {
                 promptSb += `[VĂN BẢN GỐC CHƯƠNG HIỆN TẠI]:\n${rawContent}\n\n`;
 
-                if (isTargetVietnamese && advancedSettings.antiHanziStrict) {
+                if (isTargetViet && advancedSettings.antiHanziStrict) {
                   promptSb += `[QUY TẮC BẮT BUỘC - CHỐNG LỌT CHỮ HÁN CHO TIẾNG VIỆT]:\n`;
                   promptSb += `- TUYỆT ĐỐI KHÔNG để sót bất kỳ ký tự chữ Hán (Hanzi) nào trong bản dịch tiếng Việt. 100% tên nhân vật, địa danh, môn phái, chiêu thức, chức vị bắt buộc phải phiên âm Hán-Việt hoặc dịch nghĩa tiếng Việt thuần túy.\n`;
                   promptSb += `- TUYỆT ĐỐI KHÔNG trộn lẫn nửa chữ Hán nửa tiếng Việt (ví dụ: '林辰' phải dịch hẳn là 'Lâm Thần', không được viết '林 Thần').\n`;
                 }
 
                 if (isDualTaskStrategy) {
-                  promptSb += `[QUY TẮC ĐẦU RA - 1 REQUEST 2 TÁC VỤ]:\n===TRANSLATION===\n(Toàn bộ bản dịch trôi chảy hoàn chỉnh)\n===NEW_GLOSSARY===\n(TUYỆT ĐỐI CHỈ TRÍCH XUẤT CÁC DANH TỪ RIÊNG CỐ ĐỊNH MỚI như Tên người, Địa danh riêng, Tông môn riêng xuất hiện từ ${advancedSettings.minFrequency || 2} lần trở lên trong chương này chưa có trong Glossary trên. NGHIÊM CẤM bóc danh từ chung, đồ vật, bộ phận cơ thể, từ vựng đời thường. Nếu không có từ mới đạt chuẩn, để trống phần này:\n[TừGốc] = [NghĩaDịch])`;
+                  promptSb += `[QUY TẮC ĐẦU RA - 1 REQUEST 2 TÁC VỤ]:\n===TRANSLATION===\n(Toàn bộ bản dịch sang ${targetLang} trôi chảy hoàn chỉnh)\n===NEW_GLOSSARY===\n(Chỉ trích xuất danh từ riêng mới sang ${targetLang} nếu có, định dạng: [TừGốc] = [NghĩaDịch])`;
                 } else {
-                  promptSb += `[QUY TẮC ĐẦU RA BẮT BUỘC]:\n===TRANSLATION===\n(Toàn bộ bản dịch tiếng Việt trôi chảy hoàn chỉnh)`;
+                  promptSb += `[QUY TẮC ĐẦU RA BẮT BUỘC]:\n===TRANSLATION===\n(Toàn bộ bản dịch sang ${targetLang} trôi chảy hoàn chỉnh)`;
                 }
               }
 
-              // Gửi Request Pass 1
+              if (!isTranslatingRef.current || isPausedRef.current) return;
+
+              // Gửi Request Pass 1 với AbortController
+              abortControllerRef.current = new AbortController();
               const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: abortControllerRef.current.signal,
                 body: JSON.stringify({
                   contents: [{ parts: [{ text: promptSb }] }],
                   generationConfig: { temperature: 0.25, maxOutputTokens: 8192 }
                 })
               });
+
+              if (!isTranslatingRef.current || isPausedRef.current) return;
 
               if (resp.ok) {
                 const data = await resp.json();
@@ -1594,25 +1854,22 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
                 // ==================== DÒNG 1: DỊCH KÉP 2-PASS PHẢN BIỆN ĐỐI SOÁT ====================
                 if (isDualPassEnabled && pass1Text.trim().length > 30) {
+                  if (!isTranslatingRef.current || isPausedRef.current) return;
                   addLog(`🔬 [DÒNG 1 - PASS 2 BIÊN TẬP] Đang gửi [Raw Gốc + Pass 1] sang Pass 2 để Tổng Biên Tập đối soát phản biện...`);
                   
-                  let pass2Prompt = `Bạn là Tổng biên tập văn học và chuyên gia hiệu đính tiểu thuyết dịch cao cấp.\n\n`;
-                  pass2Prompt += `Nhiệm vụ: Đối chiếu trực tiếp giữa [VĂN BẢN GỐC TIẾNG TRUNG] và [BẢN DỊCH THÔ PASS 1] dưới đây để tiến hành biên soạn, sửa chữa và xuất ra bản dịch hoàn mỹ cuối cùng:\n`;
-                  pass2Prompt += `1. SỬA CHỮA DỊCH SAI NGHĨA: Đối chiếu bản gốc để sửa toàn bộ các câu dịch sai ngữ cảnh, hiểu nhầm thành ngữ hoặc từ ngữ cảnh (VD: '万分不舍' dịch nhầm thành 'không nỗ lực' -> sửa chuẩn thành 'vô cùng không nỡ / tiếc tiền'; '诚惶诚恐' -> sửa thành 'nơm nớp lo sợ / thấp thỏm lo âu').\n`;
-                  pass2Prompt += `2. QUÉT SẠCH 100% CHỮ HÁN SÓT: Khử sạch các chữ Hán dính trong câu (nội院 -> nội viện, Tuần抚 -> Tuần phủ, trạch邸 -> trạch đệ).\n`;
-                  pass2Prompt += `3. CHUỐT LẠI VĂN PHONG TIỂU THUYẾT: Đại từ nhân xưng chuẩn mực (hắn, nàng, ta, ngươi), câu cú mượt mà, tự nhiên.\n\n`;
-                  pass2Prompt += `[VĂN BẢN GỐC TIẾNG TRUNG]:\n${rawContent}\n\n`;
-                  pass2Prompt += `[BẢN DỊCH THÔ PASS 1]:\n${pass1Text}\n\n`;
-                  pass2Prompt += `[ĐẦU RA BẮT BUỘC]: Chỉ xuất toàn bộ bản dịch tiếng Việt hoàn chỉnh sau khi đã biên tập hoàn mỹ (không xuất giải thích hay markdown codeblock).`;
-
+                  const pass2Prompt = buildPass2Prompt(targetLang, rawContent, pass1Text);
+                  abortControllerRef.current = new AbortController();
                   const respPass2 = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${activeKeyObj.key}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: abortControllerRef.current.signal,
                     body: JSON.stringify({
                       contents: [{ parts: [{ text: pass2Prompt }] }],
                       generationConfig: { temperature: 0.15 }
                     })
                   });
+
+                  if (!isTranslatingRef.current || isPausedRef.current) return;
 
                   if (respPass2.ok) {
                     const dataPass2 = await respPass2.json();
@@ -1630,6 +1887,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                 throw new Error(`HTTP ${resp.status}`);
               }
             } catch (err: any) {
+              if (err.name === 'AbortError' || !isTranslatingRef.current || isPausedRef.current) {
+                return;
+              }
               addLog(`⚠️ Không gọi được API thực (${err.message}), kích hoạt cơ chế dịch thông minh giả lập.`);
             }
           }
@@ -1650,10 +1910,19 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             }
           }
 
+          if (!isTranslatingRef.current || isPausedRef.current) return;
+
           // =========================================================================
           // KIỂM ĐỊNH CHẤT LƯỢNG & QUY TRÌNH GỬI AI DỊCH LẠI NGHIÊM NGẶT (STRICT QUALITY GATE)
           // =========================================================================
-          let auditResult = ChapterAuditor.auditChapter(rawContent, translatedText, project.masterGlossary);
+          const curTargetLang = advancedSettings.targetLanguage || 'Tiếng Việt';
+          let auditResult = ChapterAuditor.auditChapter(
+            rawContent,
+            translatedText,
+            project.masterGlossary,
+            curTargetLang,
+            advancedSettings.antiHanziStrict
+          );
           let sanitizedText = auditResult.cleanedText;
           const rawLen = rawContent ? rawContent.trim().length : 0;
           const transLen = sanitizedText.length;
@@ -1664,71 +1933,90 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           let chapterPassed = !hasCriticalDefect;
 
           if (hasCriticalDefect && isRealKey) {
-            const defectReasons = auditResult.issues
+            const defectReasons = auditResult.primaryDefectMessage || auditResult.issues
               .filter(i => i.severity === 'critical')
               .map(i => i.message)
               .join('; ') || `Bản dịch bị mất chữ nghiêm trọng (${transLen}/${rawLen} ký tự, chỉ đạt ${Math.round(currentRatio * 100)}%)`;
 
             addLog(`⚠️ [PHÁT HIỆN LỖI CHƯƠNG ${currentChapterIndex + 1}]: ${defectReasons}.`);
-            addLog(`🚨 [KHÓA TIẾN TRÌNH - BẮT BUỘC DỊCH LẠI]: Tuyệt đối không qua chương mới khi Chương ${currentChapterIndex + 1} chưa đạt tiêu chuẩn. Bắt đầu quy trình gửi AI dịch lại...`);
 
-            const maxRetries = Math.max(3, advancedSettings.maxRetries || 3);
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
-              addLog(`🔄 [DỊCH LẠI LẦN ${attempt}/${maxRetries} - CHƯƠNG ${currentChapterIndex + 1}]: Đang gửi AI yêu cầu dịch đủ 100% không cắt tỉa...`);
-              
-              // Xoay tua API Key để tránh key bị nghẽn
-              const candidateKeys = globalApiKeys.filter(k => k.state === 'ACTIVE');
-              const selectedKey = candidateKeys[attempt % candidateKeys.length] || activeKeyObj;
+            // KIỂM TRA CÀI ĐẶT DÒNG 6: CỨU HỘ TRỰC TUYẾN
+            if (advancedSettings.autoHealOnlineEnabled === false) {
+              addLog(`⚙️ [CỨU HỘ TRỰC TUYẾN ĐÃ TẮT]: Dòng 6 đang TẮT. Bỏ qua quy trình gửi AI dịch lại theo cài đặt của bạn.`);
+            } else {
+              addLog(`🚨 [KHÓA TIẾN TRÌNH - BẮT BUỘC DỊCH LẠI]: Tuyệt đối không qua chương mới khi Chương ${currentChapterIndex + 1} chưa đạt tiêu chuẩn. Bắt đầu quy trình gửi AI dịch lại...`);
 
-              const rescuePrompt = `[CHỈ THỊ CỨU HỘ KHẨN CẤP - BẮT BUỘC DỊCH ĐỦ 100% TOÀN BỘ CHƯƠNG]:\n` +
-                `CẢNH BÁO: Lần dịch trước đã bị lỗi mất chữ hoặc nội dung bị cắt cụt nghiêm trọng (chỉ đạt ${Math.round(currentRatio * 100)}% độ dài nguyên tác).\n` +
-                `Nhiệm vụ: Dịch toàn bộ chương sau sang ${advancedSettings.targetLanguage || 'Tiếng Việt'} chuẩn văn học tiểu thuyết:\n` +
-                `1. BẮT BUỘC DỊCH ĐẦY ĐỦ 100% TOÀN BỘ VĂN BẢN TỪ ĐẦU ĐẾN CUỐI. TUYỆT ĐỐI KHÔNG ĐƯỢC TÓM TẮT, KHÔNG CẮT BỎ ĐOẠN, KHÔNG BỎ QUA BẤT KỲ CHI TIẾT NÀO.\n` +
-                `2. Dịch chi tiết từng câu thoại, từng cảnh hành động và tâm lý nhân vật, bảo đảm độ dài tương đương nguyên tác.\n` +
-                `3. TUYỆT ĐỐI KHÔNG từ chối dịch, không gửi lời chào, không gửi câu chúc, không lặp từ.\n` +
-                `4. TUYỆT ĐỐI KHÔNG để sót chữ Hán trong bản dịch.\n\n` +
-                `[NGUYÊN TÁC CHƯƠNG ${currentChapterIndex + 1} CẦN DỊCH ĐẦY ĐỦ 100%]:\n${rawContent}\n\n` +
-                `[ĐẦU RA BẮT BUỘC]: Toàn bộ bản dịch tiếng Việt hoàn chỉnh đầy đủ không thiếu một chữ.`;
+              const maxRetries = Math.max(3, advancedSettings.maxRetries || 3);
+              for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                if (!isTranslatingRef.current || isPausedRef.current) {
+                  addLog(`⏹ Đã ngừng quy trình thử lại do bạn đã tạm dừng hoặc hủy tiến trình.`);
+                  break;
+                }
 
-              try {
-                const retryResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${selectedKey.key}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: [{ parts: [{ text: rescuePrompt }] }],
-                    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
-                  })
-                });
+                addLog(`🔄 [DỊCH LẠI LẦN ${attempt}/${maxRetries} - CHƯƠNG ${currentChapterIndex + 1}]: Đang gửi AI yêu cầu dịch đủ 100% không cắt tỉa...`);
+                
+                // Xoay tua API Key để tránh key bị nghẽn
+                const candidateKeys = globalApiKeys.filter(k => k.state === 'ACTIVE');
+                const selectedKey = candidateKeys[attempt % candidateKeys.length] || activeKeyObj;
 
-                if (retryResp.ok) {
-                  const retryData = await retryResp.json();
-                  const retryOut = retryData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                  const cleanedRetry = ChapterAuditor.cleanChapterOffline(retryOut, project.masterGlossary);
-                  const retryAudit = ChapterAuditor.auditChapter(rawContent, cleanedRetry.cleaned, project.masterGlossary);
-                  const retryLen = cleanedRetry.cleaned.length;
-                  const retryRatio = rawLen > 200 ? retryLen / rawLen : 1;
+                const rescuePrompt = buildRescuePrompt(curTargetLang, rawContent, currentChapterIndex, currentRatio);
 
-                  // Chỉ công nhận đạt tiêu chuẩn khi không còn lỗi critical VÀ độ dài đạt >= 35%
-                  if (!retryAudit.hasCriticalError && retryRatio >= 0.35 && retryLen > 50) {
-                    sanitizedText = retryAudit.cleanedText;
-                    auditResult = retryAudit;
-                    chapterPassed = true;
-                    addLog(`✅ [CỨU HỘ THÀNH CÔNG LẦN ${attempt}]: Chương ${currentChapterIndex + 1} đã được AI dịch lại hoàn chỉnh đạt chuẩn 100% (${sanitizedText.length}/${rawLen} ký tự, tỉ lệ ${Math.round(retryRatio * 100)}%)!`);
-                    break;
+                try {
+                  abortControllerRef.current = new AbortController();
+                  const retryResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${project.model}:generateContent?key=${selectedKey.key}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: abortControllerRef.current.signal,
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: rescuePrompt }] }],
+                      generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+                    })
+                  });
+
+                  if (!isTranslatingRef.current || isPausedRef.current) break;
+
+                  if (retryResp.ok) {
+                    const retryData = await retryResp.json();
+                    const retryOut = retryData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                    const cleanedRetry = ChapterAuditor.cleanChapterOffline(retryOut, project.masterGlossary);
+                    const retryAudit = ChapterAuditor.auditChapter(
+                      rawContent,
+                      cleanedRetry.cleaned,
+                      project.masterGlossary,
+                      curTargetLang,
+                      advancedSettings.antiHanziStrict
+                    );
+                    const retryLen = cleanedRetry.cleaned.length;
+                    const retryRatio = rawLen > 200 ? retryLen / rawLen : 1;
+
+                    // Chỉ công nhận đạt tiêu chuẩn khi không còn lỗi critical VÀ độ dài đạt >= 35%
+                    if (!retryAudit.hasCriticalError && retryRatio >= 0.35 && retryLen > 50) {
+                      sanitizedText = retryAudit.cleanedText;
+                      auditResult = retryAudit;
+                      chapterPassed = true;
+                      addLog(`✅ [CỨU HỘ THÀNH CÔNG LẦN ${attempt}]: Chương ${currentChapterIndex + 1} đã được AI dịch lại hoàn chỉnh đạt chuẩn 100% (${sanitizedText.length}/${rawLen} ký tự, tỉ lệ ${Math.round(retryRatio * 100)}%)!`);
+                      break;
+                    } else {
+                      const reason = retryAudit.primaryDefectMessage || `Nội dung chưa đủ dài (${retryLen}/${rawLen} kt, chỉ đạt ${Math.round(retryRatio * 100)}%)`;
+                      addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} CHƯA ĐẠT]: ${reason}. Tiếp tục thử lại...`);
+                      await new Promise(r => setTimeout(r, 1200));
+                    }
                   } else {
-                    addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} CHƯA ĐẠT]: AI vẫn trả về nội dung chưa đủ dài (${retryLen}/${rawLen} kt, chỉ đạt ${Math.round(retryRatio * 100)}%). Tiếp tục thử lại...`);
+                    addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} LỖI HTTP ${retryResp.status}]. Tiếp tục thử lại...`);
                     await new Promise(r => setTimeout(r, 1200));
                   }
-                } else {
-                  addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} LỖI HTTP ${retryResp.status}]. Tiếp tục thử lại...`);
+                } catch (reErr: any) {
+                  if (reErr.name === 'AbortError' || !isTranslatingRef.current || isPausedRef.current) {
+                    break;
+                  }
+                  addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} NGOẠI LỆ]: ${reErr.message}`);
                   await new Promise(r => setTimeout(r, 1200));
                 }
-              } catch (reErr: any) {
-                addLog(`⚠️ [DỊCH LẠI LẦN ${attempt} NGOẠI LỆ]: ${reErr.message}`);
-                await new Promise(r => setTimeout(r, 1200));
               }
             }
           }
+
+          if (!isTranslatingRef.current || isPausedRef.current) return;
 
           // =========================================================================
           // CHỐT CHẶN BẢO VỆ TUYỆT ĐỐI: CHƯƠNG CHƯA ĐẠT -> DỪNG LẠI, KHÔNG QUA CHƯƠNG KẾ
@@ -1737,6 +2025,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             addLog(`❌ [DỪNG TIẾN TRÌNH - BẢO VỆ CHƯƠNG ${currentChapterIndex + 1}]: Bản dịch Chương ${currentChapterIndex + 1} chưa đạt tiêu chuẩn sau các lần thử lại. HỆ THỐNG TẠM DỪNG TIẾN TRÌNH ĐỂ TRÁNH BỎ TRỐNG CHƯƠNG! TUYỆT ĐỐI KHÔNG chuyển sang chương kế tiếp khi chương hiện tại chưa hoàn thành!`);
             setIsTranslating(false);
             setIsPaused(true);
+            isTranslatingRef.current = false;
+            isPausedRef.current = true;
             setStatusText(`⏸ Tạm dừng: Chương ${currentChapterIndex + 1} chưa đạt chuẩn (${sanitizedText.length}/${rawLen} kt)`);
             return;
           }
