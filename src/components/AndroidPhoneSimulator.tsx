@@ -1118,8 +1118,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     configOverrides: Record<string, any> = {},
     signal?: AbortSignal
   ): Promise<{ ok: boolean; status: number; text: string; data?: any }> => {
-    const activeKeys = globalApiKeys.filter(k => k.state === 'ACTIVE' && k.key.startsWith('AIzaSy') && !k.key.includes('DemoSampleKey'));
+    // 1. Thu thập toàn bộ Key hợp lệ từ kho Key (Ưu tiên Key ACTIVE, nếu không có thì lấy tất cả Key hợp lệ)
+    const validKeys = globalApiKeys
+      .filter(k => k.key && k.key.trim().length >= 8 && !k.key.includes('DemoSampleKey'))
+      .map(k => ({ ...k, key: k.key.trim() }));
+
+    const activeKeys = validKeys.filter(k => k.state === 'ACTIVE').length > 0
+      ? validKeys.filter(k => k.state === 'ACTIVE')
+      : validKeys;
+
     if (activeKeys.length === 0) {
+      if (addLogFn) addLogFn('⚠️ Không tìm thấy API Key Gemini hợp lệ nào trong kho Key. Vui lòng thêm Key tại tab Cấu hình.');
       return { ok: false, status: 401, text: 'No active real API key found' };
     }
 
@@ -1133,6 +1142,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     if (LITE_CASCADE.includes(modelName)) {
       candidateModels = [modelName, ...LITE_CASCADE.filter(m => m !== modelName)];
     } else if (modelName && modelName.trim().length > 0) {
+      // Nếu model hiện tại là non-lite (ví dụ 2.5 Flash), thử model hiện tại 1 lượt rồi chuyển hẳn sang chuỗi Flash Lite
       candidateModels = [modelName, ...LITE_CASCADE];
     } else {
       candidateModels = [...LITE_CASCADE];
@@ -1141,6 +1151,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     let lastStatus = 500;
     let lastErrText = '';
     let cycleCount = 0;
+
+    // Bộ lọc an toàn: Mở rộng tối đa (BLOCK_NONE) để truyện kiếm hiệp/tiên hiệp/ngôn tình không bao giờ bị AI chặn nhầm
+    const defaultSafetySettings = [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' }
+    ];
 
     // Vòng lặp Bất Tử (Chạy liên tục xuyên đêm cho đến khi dịch thành công hoặc người dùng bấm Dừng/Hủy)
     while (true) {
@@ -1154,6 +1173,10 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
         const currentModel = candidateModels[mIdx];
         if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
           return { ok: false, status: 499, text: 'Yêu cầu đã bị hủy hoặc tạm dừng.' };
+        }
+
+        if (addLogFn && mIdx > 0) {
+          addLogFn(`🔄 [XOAY MODEL] Đang chuyển sang Model: ${currentModel}`);
         }
 
         let modelHit404 = false;
@@ -1171,7 +1194,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             const timeoutController = new AbortController();
             const timeoutTimer = setTimeout(() => {
               try { timeoutController.abort(); } catch (e) {}
-            }, 35000); // 35s timeout bảo vệ
+            }, 28000); // 28s timeout bảo vệ
 
             const onAbortHandler = () => {
               try { timeoutController.abort(); } catch (e) {}
@@ -1180,13 +1203,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
               reqSignal.addEventListener('abort', onAbortHandler, { once: true });
             }
 
-            let resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${selectedKey.key}`, {
+            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${selectedKey.key}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               signal: timeoutController.signal,
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: 8192,
+                  ...configOverrides
+                },
+                safetySettings: defaultSafetySettings
               })
             });
 
@@ -1198,11 +1226,18 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             lastStatus = resp.status;
 
             if (resp.ok) {
-              const data = await resp.json();
+              const data = await resp.json().catch(() => null);
               const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
               if (text && text.trim().length > 0) {
                 return { ok: true, status: 200, text, data };
               }
+              const finishReason = data?.candidates?.[0]?.finishReason || 'NỘI DUNG RỖNG';
+              lastErrText = `Phản hồi rỗng (${finishReason})`;
+              if (addLogFn) {
+                addLogFn(`⚠️ [Key #${kIdx + 1} (${keyShort}) / ${currentModel}] Phản hồi rỗng (${finishReason}). Đổi ngay sang Key tiếp theo...`);
+              }
+              await new Promise(r => setTimeout(r, 200));
+              continue;
             }
 
             if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
@@ -1212,8 +1247,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             // Nếu model trả về 404 (Endpoint không hỗ trợ model name này)
             if (resp.status === 404) {
               lastErrText = `Model ${currentModel} trả về 404`;
-              if (addLogFn && kIdx === 0) {
-                addLogFn(`ℹ️ Model "${currentModel}" không khả dụng (404). Chuyển ngay sang model Lite tiếp theo...`);
+              if (addLogFn) {
+                addLogFn(`ℹ️ Model "${currentModel}" không khả dụng (404). Chuyển ngay sang model Lite tiếp theo trong chu kỳ...`);
               }
               modelHit404 = true;
               break; // Bỏ qua model này, chuyển ngay sang model tiếp theo trong cascade
@@ -1222,30 +1257,37 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             // Các lỗi HTTP 429 Rate Limit, 503 Quá tải, 500 Server Error
             const errData = await resp.json().catch(() => ({}));
             lastErrText = errData?.error?.message || `HTTP ${resp.status}`;
+            const nextKeyLabel = kIdx + 1 < activeKeys.length ? `Key #${kIdx + 2}` : 'xoay vòng';
             if (addLogFn) {
-              addLogFn(`⚠️ [Key ${keyShort} / ${currentModel}] HTTP ${resp.status}. Đổi ngay sang Key tiếp theo...`);
+              addLogFn(`⚠️ [Key #${kIdx + 1} (${keyShort}) / ${currentModel}] HTTP ${resp.status}: ${lastErrText.substring(0, 80)}. Đổi ngay sang ${nextKeyLabel}...`);
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 250));
 
           } catch (err: any) {
             if (err.name === 'AbortError' || reqSignal?.aborted) {
               if (!isTranslatingRef.current || isPausedRef.current) {
                 return { ok: false, status: 499, text: 'Yêu cầu đã được ngắt kết nối theo lệnh hủy.' };
               }
-              lastErrText = 'Yêu cầu quá hạn 35s (Timeout)';
+              lastErrText = 'Yêu cầu quá hạn 28s (Timeout)';
             } else {
               lastErrText = err.message || 'Mất kết nối mạng (Failed to fetch)';
             }
 
+            const nextKeyLabel = kIdx + 1 < activeKeys.length ? `Key #${kIdx + 2}` : 'xoay vòng';
             if (addLogFn) {
-              addLogFn(`⚠️ [LỖI KẾT NỐI - Key ${keyShort} / ${currentModel}] ${lastErrText}. Đổi ngay sang Key tiếp theo...`);
+              addLogFn(`⚠️ [LỖI KẾT NỐI - Key #${kIdx + 1} (${keyShort}) / ${currentModel}] ${lastErrText}. Đổi ngay sang ${nextKeyLabel}...`);
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 250));
           }
         } // Hết vòng lặp Keys cho currentModel
 
         if (modelHit404) {
           continue;
+        }
+
+        // Báo chuyển model khi đã thử hết keys cho model này
+        if (mIdx + 1 < candidateModels.length && addLogFn) {
+          addLogFn(`🔄 [XOAY MODEL] Đã thử qua ${activeKeys.length} Key với model ${currentModel}. Đang chuyển sang Model: ${candidateModels[mIdx + 1]}...`);
         }
       } // Hết vòng lặp Models
 
@@ -1261,7 +1303,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       }
 
       if (addLogFn) {
-        addLogFn(`⏳ [CHẾ ĐỘ BẤT TỬ - NGỦ ĐÔNG 60s]: Toàn bộ ${activeKeys.length} Key & Model Lite (3.5, 3.1, 2.5) tạm cạn quota hoặc mạng gián đoạn. Đang giữ tiến trình, đếm ngược 60s để tự động hồi sinh...`);
+        addLogFn(`⏳ [DỊCH BẤT TỬ - NGHỈ 60s]: Toàn bộ ${activeKeys.length} Key & Model Lite (3.5, 3.1, 2.5) tạm cạn quota hoặc mạng gián đoạn. Đang giữ tiến trình, đếm ngược 60s để tự động hồi sinh...`);
       }
 
       // Đếm ngược 60s với bước kiểm tra 1 giây
@@ -1276,7 +1318,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       }
 
       if (addLogFn) {
-        addLogFn(`⚡ [HỒI SINH TIẾN TRÌNH - CHU KỲ #${cycleCount + 1}]: Hết 60s ngủ đông! Tự động khởi động lại tiến trình dịch với Model 3.5 Lite và xoay vòng Key...`);
+        addLogFn(`⚡ [HỒI SINH TIẾN TRÌNH - CHU KỲ #${cycleCount + 1}]: Hết 60s nghỉ đông! Tự động khởi động lại tiến trình dịch với Model 3.5 Lite và xoay vòng lại từ Key đầu tiên...`);
       }
       setStatusText(`⚡ Đang kết nối lại API Gemini...`);
     }
@@ -1898,6 +1940,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   useEffect(() => {
     let timer: any;
     let onTickHandler: any = null;
+    let immortalWatchdogTimer: any = null;
     if (isTranslating && !isPaused && project && project.chapters.length > 0) {
       const targetEnd = Math.min(toChapInput || project.chapters.length, project.chapters.length);
       
@@ -2194,8 +2237,15 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             if (isRealKey) {
               if (isImmortalModeRef.current) {
                 // Trong Chế Độ Bất Tử: Tuyệt đối KHÔNG dừng tiến trình!
-                // Giữ nguyên isTranslating = true, worker tick sẽ tự động kích hoạt lại chu kỳ cho chương này
-                addLog(`🔄 [BẢO TOÀN BẤT TỬ] Đang giữ tiến trình ở Chương ${currentChapterIndex + 1}. Tiến trình sẽ tự động tiếp tục.`);
+                // Giữ nguyên isTranslating = true, re-arm timer để tự động kích hoạt lại chu kỳ cho chương này
+                addLog(`🔄 [DỊCH BẤT TỬ - TỰ ĐỘNG THỬ LẠI] Đang bảo toàn tiến trình ở Chương ${currentChapterIndex + 1}. Tự động kết nối và dịch lại sau 3 giây...`);
+                setStatusText(`🔄 Tự động thử lại Chương ${currentChapterIndex + 1} sau 3s...`);
+                chapterFired = false;
+                timer = setTimeout(() => {
+                  if (isTranslatingRef.current && !isPausedRef.current) {
+                    executeChapterProcess();
+                  }
+                }, 3000);
                 return;
               }
               addLog(`⏸️ [TẠM DỪNG TIẾN TRÌNH - MẤT KẾT NỐI MẠNG]: Không thể kết nối API Gemini (Failed to fetch). Đã tạm dừng an toàn ở Chương ${currentChapterIndex + 1} để bảo vệ dữ liệu nguyên tác. Vui lòng kiểm tra Wi-Fi/4G và bấm Tiếp tục.`);
@@ -2330,6 +2380,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           // CHỐT CHẶN BẢO VỆ TUYỆT ĐỐI: CHƯƠNG CHƯA ĐẠT -> DỪNG LẠI, KHÔNG QUA CHƯƠNG KẾ
           // =========================================================================
           if (!chapterPassed) {
+            if (isImmortalModeRef.current) {
+              addLog(`🔄 [DỊCH BẤT TỬ - TỰ ĐỘNG THỬ LẠI] Bản dịch Chương ${currentChapterIndex + 1} chưa đạt tiêu chuẩn (${sanitizedText.length}/${rawLen} kt). Tự động kích hoạt chu kỳ dịch lại sau 4 giây...`);
+              setStatusText(`🔄 Tự động dịch lại Chương ${currentChapterIndex + 1} sau 4s...`);
+              chapterFired = false;
+              timer = setTimeout(() => {
+                if (isTranslatingRef.current && !isPausedRef.current) {
+                  executeChapterProcess();
+                }
+              }, 4000);
+              return;
+            }
             addLog(`❌ [DỪNG TIẾN TRÌNH - BẢO VỆ CHƯƠNG ${currentChapterIndex + 1}]: Bản dịch Chương ${currentChapterIndex + 1} chưa đạt tiêu chuẩn sau các lần thử lại. HỆ THỐNG TẠM DỪNG TIẾN TRÌNH ĐỂ TRÁNH BỎ TRỐNG CHƯƠNG! TUYỆT ĐỐI KHÔNG chuyển sang chương kế tiếp khi chương hiện tại chưa hoàn thành!`);
             setIsTranslating(false);
             setIsPaused(true);
@@ -2390,21 +2451,35 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       };
 
       onTickHandler = () => {
-        if (Date.now() - startDelayTime >= startChapterDelay) {
-          executeChapterProcess();
+        if (!isProcessingChapterRef.current && isTranslatingRef.current && !isPausedRef.current) {
+          if (Date.now() - startDelayTime >= startChapterDelay) {
+            chapterFired = false;
+            executeChapterProcess();
+          }
         }
       };
       window.addEventListener('droid-worker-tick', onTickHandler);
       timer = setTimeout(executeChapterProcess, startChapterDelay);
+
+      // Watchdog Bất Tử: Cứ mỗi 5s kiểm tra tiến trình một lần. Nếu trạng thái đang Dịch mà bị đứng hoặc chưa có chương nào chạy, tự động đánh thức lại ngay lập tức!
+      immortalWatchdogTimer = setInterval(() => {
+        if (isTranslatingRef.current && !isPausedRef.current && !isProcessingChapterRef.current) {
+          chapterFired = false;
+          executeChapterProcess();
+        }
+      }, 5000);
       }
     }
     return () => {
       clearTimeout(timer);
+      if (immortalWatchdogTimer) {
+        clearInterval(immortalWatchdogTimer);
+      }
       if (onTickHandler) {
         window.removeEventListener('droid-worker-tick', onTickHandler);
       }
     };
-  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, advancedSettings.translationPipelineMode, advancedSettings.batchGlossarySize]);
+  }, [isTranslating, isPaused, isGapFillingMode, currentChapterIndex, project, currentProjectName, delaySecInput, toChapInput, fromChapInput, polishModel, isImmortalMode, advancedSettings.translationPipelineMode, advancedSettings.batchGlossarySize]);
 
   // Hàm thực hiện Làm Mượt Cuốn Chiếu (Semantic JSON Patch) với cơ chế Thử Lại Nhiều Lần & Không Bỏ Rơi
   const performRollingPolishBatch = async (indices: number[]): Promise<boolean> => {
@@ -4101,7 +4176,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   </button>
 
                   <button
-                    disabled={!isTranslating}
+                    disabled={!isTranslating && !isPaused}
                     onClick={() => {
                       const nextPaused = !isPaused;
                       setIsPaused(nextPaused);
@@ -4111,6 +4186,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                         addLog(`⏸ Đã tạm dừng dịch tại Chương ${currentChapterIndex + 1} (Chương này chưa hoàn thành)`);
                       } else {
                         isProcessingChapterRef.current = false;
+                        setIsTranslating(true);
                         abortControllerRef.current = new AbortController();
                         setStatusText(`⚡ Đang dịch lại Chương ${currentChapterIndex + 1}...`);
                         addLog(`▶ Tiếp tục dịch lại Chương ${currentChapterIndex + 1} (chương đang dở dang)...`);
