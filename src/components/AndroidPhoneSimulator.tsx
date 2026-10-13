@@ -362,6 +362,31 @@ const STORAGE_GLOBAL_PROMPTS = 'droid_global_prompts_v10';
 const STORAGE_ADVANCED_SETTINGS = 'droid_advanced_settings_v10';
 const STORAGE_SELECTED_MODEL = 'droid_selected_model_v10';
 const STORAGE_POLISH_MODEL = 'droid_polish_model_v10';
+const STORAGE_LOGS_KEY = 'droidtranslator_terminal_logs_v10';
+const STORAGE_RUNNING_SESSION_KEY = 'droidtranslator_active_run_v10';
+
+// Helper: Tự động tính toán khoảng chương còn lại cần dịch của một dự án
+const getProjectRemainingRange = (proj?: ProjectData) => {
+  if (!proj || !proj.chapters || proj.chapters.length === 0) {
+    return { from: 1, to: 1, completedCount: 0, total: 0 };
+  }
+  const total = proj.chapters.length;
+  let firstUntranslated = total;
+  let completedCount = 0;
+  for (let i = 0; i < total; i++) {
+    const trans = proj.translatedChapters ? proj.translatedChapters[i] : null;
+    if (trans && typeof trans === 'string' && trans.trim().length > 0) {
+      completedCount++;
+    } else if (firstUntranslated === total) {
+      firstUntranslated = i + 1;
+    }
+  }
+  // Nếu đã dịch hết tất cả các chương, gợi ý lại từ chương 1
+  if (completedCount === total) {
+    firstUntranslated = 1;
+  }
+  return { from: firstUntranslated, to: total, completedCount, total };
+};
 
 // Web Audio + HTML5 Silent Media Session + Web Worker Heartbeat engine for 100% uninterrupted background translation
 let globalKeepAliveCtx: any = null;
@@ -764,9 +789,26 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
   const [splitMode, setSplitMode] = useState<'regex' | 'chunk'>('regex');
   const [chunkSizeInput, setChunkSizeInput] = useState<string>('3500');
-  const [fromChapInput, setFromChapInput] = useState<number>(1);
-  const [toChapInput, setToChapInput] = useState<number>(2);
+  const [fromChapInput, setFromChapInput] = useState<string>(() => {
+    const initProj = projects[currentProjectName] || Object.values(projects)[0];
+    const rem = getProjectRemainingRange(initProj);
+    return String(rem.from);
+  });
+  const [toChapInput, setToChapInput] = useState<string>(() => {
+    const initProj = projects[currentProjectName] || Object.values(projects)[0];
+    const rem = getProjectRemainingRange(initProj);
+    return String(rem.to);
+  });
   const [delaySecInput, setDelaySecInput] = useState<number>(2.0);
+
+  // Tự động đồng bộ khoảng chương còn lại khi chuyển dự án hoặc sau khi nạp tách chương mới
+  useEffect(() => {
+    if (project && project.chapters && project.chapters.length > 0) {
+      const rem = getProjectRemainingRange(project);
+      setFromChapInput(String(rem.from));
+      setToChapInput(String(rem.to));
+    }
+  }, [currentProjectName, project?.chapters?.length]);
 
   // Glossary states & Dedicated Modal
   const [newGlossaryKey, setNewGlossaryKey] = useState<string>('');
@@ -903,11 +945,32 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   const [statusText, setStatusText] = useState<string>('● Sẵn sàng');
   const [lastAttachedSnippet, setLastAttachedSnippet] = useState<string>('');
   
-  // LOGS: Newest is strictly at index 0 (top line)
-  const [logs, setLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] 🚀 DroidTranslator Native Ready`,
-    `[${new Date().toLocaleTimeString()}] 🛡️ 5 Lớp God-Mode: OOM -1000 & Foreground Service ACTIVE`
-  ]);
+  // LOGS: Newest is strictly at index 0 (top line). Khôi phục vĩnh viễn từ localStorage khi mở lại app
+  const [logs, setLogs] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_LOGS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return [
+            `[${new Date().toLocaleTimeString()}] 🚀 Khôi phục nhật ký phiên làm việc (${parsed.length} dòng log)`,
+            ...parsed.slice(0, 99)
+          ];
+        }
+      }
+    } catch (e) {}
+    return [
+      `[${new Date().toLocaleTimeString()}] 🚀 DroidTranslator Native Ready`,
+      `[${new Date().toLocaleTimeString()}] 🛡️ 5 Lớp God-Mode: OOM -1000 & Foreground Service ACTIVE`
+    ];
+  });
+
+  // Tự động lưu trữ nhật ký console vào localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_LOGS_KEY, JSON.stringify(logs.slice(0, 100)));
+    } catch (e) {}
+  }, [logs]);
 
   // Dialogs
   const [showNewProjModal, setShowNewProjModal] = useState<boolean>(false);
@@ -984,10 +1047,55 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   const [showChapterDrawer, setShowChapterDrawer] = useState<boolean>(false);
   const [copiedChapter, setCopiedChapter] = useState<boolean>(false);
 
-  // Add Log: Prepend to the top (newest on top)
+  // Add Log: Prepend to the top (newest on top, giữ tối đa 100 log)
   const addLog = (msg: string) => {
-    setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 49)]);
+    setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 99)]);
   };
+
+  // Lưu trạng thái phiên dịch đang chạy để tự động khôi phục nếu thoát app hoặc tải lại trang
+  useEffect(() => {
+    try {
+      if (isTranslating && !isPaused && project) {
+        localStorage.setItem(STORAGE_RUNNING_SESSION_KEY, JSON.stringify({
+          projectName: currentProjectName,
+          fromChap: parseInt(String(fromChapInput), 10) || 1,
+          toChap: parseInt(String(toChapInput), 10) || project.chapters.length,
+          currentChapterIndex,
+          isImmortalMode,
+          timestamp: Date.now()
+        }));
+      } else if (!isTranslating) {
+        localStorage.removeItem(STORAGE_RUNNING_SESSION_KEY);
+      }
+    } catch (e) {}
+  }, [isTranslating, isPaused, currentChapterIndex, currentProjectName, fromChapInput, toChapInput, isImmortalMode, project]);
+
+  // Tự động khôi phục tiến trình Dịch Bất Tử nếu trước đó bị ngắt do trình duyệt / HĐH tải lại trang
+  useEffect(() => {
+    try {
+      const savedStr = localStorage.getItem(STORAGE_RUNNING_SESSION_KEY);
+      if (savedStr) {
+        const saved = JSON.parse(savedStr);
+        // Kiểm tra phiên còn hạn trong vòng 24h và có kích hoạt Chế độ Bất Tử
+        if (saved && saved.isImmortalMode && saved.projectName && (Date.now() - (saved.timestamp || 0) < 24 * 60 * 60 * 1000)) {
+          const curProj = projects[saved.projectName] || project;
+          if (curProj && curProj.chapters && curProj.chapters.length > 0) {
+            const rem = getProjectRemainingRange(curProj);
+            if (rem.completedCount < curProj.chapters.length) {
+              addLog(`🛡️ [TỰ ĐỘNG KHÔI PHỤC BẤT TỬ] Phát hiện phiên dịch bị gián đoạn do tải lại trang / chuyển ứng dụng.`);
+              addLog(`⚡ Tự động tiếp tục dịch các chương còn lại: Chương ${rem.from} đến ${rem.to}...`);
+              setFromChapInput(String(rem.from));
+              setToChapInput(String(rem.to));
+              setCurrentChapterIndex(Math.max(0, rem.from - 1));
+              setIsTranslating(true);
+              setIsPaused(false);
+              setStatusText(`⚡ Bất tử: Đang tiếp tục Chương ${rem.from}...`);
+            }
+          }
+        }
+      }
+    } catch (e) {}
+  }, []);
 
   // Keyboard navigation for reader
   useEffect(() => {
@@ -1041,8 +1149,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             }
           }));
           setChapterListPage(0);
-          setFromChapInput(1);
-          setToChapInput(parsed.chapters.length);
+          setFromChapInput('1');
+          setToChapInput(String(parsed.chapters.length));
           addLog(`📚 Đã nạp thành công [${parsed.format.toUpperCase()}] "${parsed.title}": Tự động trích xuất ${parsed.chapters.length} chương!`);
         }
       } else {
@@ -1525,8 +1633,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     setRawTextInput('');
     fullRawTextRef.current = '';
     setFileSummary(null);
-    setFromChapInput(1);
-    setToChapInput(1);
+    setFromChapInput('1');
+    setToChapInput('1');
     setChapterListPage(0);
     setNewProjName('');
     setShowNewProjModal(false);
@@ -1566,8 +1674,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     }));
 
     setChapterListPage(0);
-    setFromChapInput(1);
-    setToChapInput(parsedChapters.length);
+    setFromChapInput('1');
+    setToChapInput(String(parsedChapters.length));
     addLog(`✂️ Đã tách thành ${parsedChapters.length} chương (${mode === 'regex' ? 'Theo tác giả' : `Tùy chọn ${chunkSizeStr} ký tự/chương`})!`);
   };
 
@@ -1942,7 +2050,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     let onTickHandler: any = null;
     let immortalWatchdogTimer: any = null;
     if (isTranslating && !isPaused && project && project.chapters.length > 0) {
-      const targetEnd = Math.min(toChapInput || project.chapters.length, project.chapters.length);
+      const targetEnd = Math.min(parseInt(String(toChapInput), 10) || project.chapters.length, project.chapters.length);
       
       if (currentChapterIndex < targetEnd) {
         // BẢO ĐẢM TUẦN TỰ 100%: NẾU ĐANG CÓ CHƯƠNG ĐANG XỬ LÝ -> TUYỆT ĐỐI KHÔNG CHẠY ĐÈ
@@ -1987,7 +2095,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           setLastAttachedSnippet('');
         }
 
-        const isFirstChapterOfRun = currentChapterIndex === Math.max(0, fromChapInput - 1);
+        const runStartNum = parseInt(String(fromChapInput), 10) || 1;
+        const isFirstChapterOfRun = currentChapterIndex === Math.max(0, runStartNum - 1);
         const startChapterDelay = isFirstChapterOfRun ? 50 : Math.max(500, (delaySecInput || 2) * 1000);
         const startDelayTime = Date.now();
         let chapterFired = false;
@@ -4112,27 +4221,72 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   </button>
                 </div>
 
+                {/* Thống kê tiến độ & Nút chọn nhanh khoảng còn lại */}
+                {project && project.chapters && project.chapters.length > 0 && (
+                  <div className="flex items-center justify-between text-[11px] pt-1">
+                    <span className="text-neutral-400">
+                      Tiến độ: <strong className="text-amber-300 font-mono">{Object.keys(project.translatedChapters || {}).length}/{project.chapters.length}</strong> ch.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rem = getProjectRemainingRange(project);
+                        setFromChapInput(String(rem.from));
+                        setToChapInput(String(rem.to));
+                        addLog(`🎯 Đã chọn khoảng còn lại: Chương ${rem.from} đến ${rem.to}`);
+                      }}
+                      className="text-[10px] text-[#0ac8b9] hover:text-[#00f5df] bg-[#0ac8b9]/10 hover:bg-[#0ac8b9]/25 border border-[#0ac8b9]/30 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer font-medium"
+                      title="Nhấn để tự động điền các chương còn lại chưa dịch"
+                    >
+                      <span>🎯 Khoảng còn lại (Ch. {getProjectRemainingRange(project).from} ➔ {getProjectRemainingRange(project).to})</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Range inputs: Từ chương -> Đến chương */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div className="flex items-center bg-[#050505] p-2 rounded-xl border border-[#785a28]/40">
                     <span className="text-[11px] text-[#a09b8c] shrink-0 mr-1.5">Từ chương:</span>
                     <input
-                      type="number"
-                      min={1}
-                      max={project ? project.chapters.length : 1}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={fromChapInput}
-                      onChange={(e) => setFromChapInput(Math.max(1, parseInt(e.target.value) || 1))}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setFromChapInput(val);
+                      }}
+                      onBlur={() => {
+                        if (!fromChapInput || parseInt(fromChapInput, 10) < 1) {
+                          setFromChapInput('1');
+                        } else if (project && parseInt(fromChapInput, 10) > project.chapters.length) {
+                          setFromChapInput(String(project.chapters.length));
+                        }
+                      }}
+                      placeholder="1"
                       className="w-full bg-transparent text-xs text-[#f0e6d2] font-bold font-mono focus:outline-none"
                     />
                   </div>
                   <div className="flex items-center bg-[#050505] p-2 rounded-xl border border-[#785a28]/40">
                     <span className="text-[11px] text-[#a09b8c] shrink-0 mr-1.5">Đến chương:</span>
                     <input
-                      type="number"
-                      min={1}
-                      max={project ? project.chapters.length : 1}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={toChapInput}
-                      onChange={(e) => setToChapInput(parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setToChapInput(val);
+                      }}
+                      onBlur={() => {
+                        const maxCh = project ? project.chapters.length : 1;
+                        if (!toChapInput || parseInt(toChapInput, 10) < 1) {
+                          setToChapInput(String(maxCh));
+                        } else if (parseInt(toChapInput, 10) > maxCh) {
+                          setToChapInput(String(maxCh));
+                        }
+                      }}
+                      placeholder={String(project ? project.chapters.length : 1)}
                       className="w-full bg-transparent text-xs text-[#f0e6d2] font-bold font-mono focus:outline-none"
                     />
                   </div>
@@ -4147,14 +4301,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                         alert('Vui lòng nạp và tách chương truyện trước!');
                         return;
                       }
+                      const numFrom = Math.max(1, parseInt(String(fromChapInput), 10) || 1);
+                      const numTo = Math.min(
+                        project.chapters.length,
+                        Math.max(numFrom, parseInt(String(toChapInput), 10) || project.chapters.length)
+                      );
+                      setFromChapInput(String(numFrom));
+                      setToChapInput(String(numTo));
                       isProcessingChapterRef.current = false;
                       abortControllerRef.current = new AbortController();
-                      setCurrentChapterIndex(Math.max(0, fromChapInput - 1));
+                      setCurrentChapterIndex(Math.max(0, numFrom - 1));
                       setIsGapFillingMode(false);
                       setIsTranslating(true);
                       setIsPaused(false);
-                      setStatusText(`⚡ Đang khởi động dịch Chương ${fromChapInput}...`);
-                      addLog(`▶ Bắt đầu dịch Range từ Chương ${fromChapInput} đến ${toChapInput}...`);
+                      setStatusText(`⚡ Đang khởi động dịch Chương ${numFrom}...`);
+                      addLog(`▶ Bắt đầu dịch Range từ Chương ${numFrom} đến ${numTo}...`);
                     }}
                     className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-black/40 cursor-pointer transition-all ${
                       isTranslating
@@ -4211,7 +4372,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       setIsGapFillingMode(false);
                       setProcessedBatchStarts([]);
                       setStatusText('● Đã hủy tiến trình');
-                      addLog('⏹ Đã hủy tiến trình dịch (Reset trạng thái bóc lô)');
+                      if (project) {
+                        const rem = getProjectRemainingRange(project);
+                        setFromChapInput(String(rem.from));
+                        setToChapInput(String(rem.to));
+                        addLog(`⏹ Đã hủy tiến trình dịch. Tự động chuyển Range sang khoảng còn lại: Chương ${rem.from} đến ${rem.to}`);
+                      } else {
+                        addLog('⏹ Đã hủy tiến trình dịch (Reset trạng thái bóc lô)');
+                      }
                     }}
                     className="py-2.5 bg-red-950/80 hover:bg-red-900 border border-red-800 text-red-300 disabled:opacity-40 rounded-xl font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
@@ -4238,15 +4406,17 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       alert('Vui lòng nạp và tách chương truyện trước!');
                       return;
                     }
-                    const start = Math.max(0, fromChapInput - 1);
-                    const end = Math.min(toChapInput || project.chapters.length, project.chapters.length);
+                    const numFrom = Math.max(1, parseInt(String(fromChapInput), 10) || 1);
+                    const numTo = Math.min(parseInt(String(toChapInput), 10) || project.chapters.length, project.chapters.length);
+                    const start = Math.max(0, numFrom - 1);
+                    const end = numTo;
                     const missing = [];
                     for (let i = start; i < end; i++) {
                       if (!project.translatedChapters[i]) missing.push(i + 1);
                     }
                     if (missing.length === 0) {
-                      addLog(`🎉 Toàn bộ chương từ ${fromChapInput} đến ${toChapInput} đều đã có bản dịch! Không có chương nào bị sót.`);
-                      alert(`Toàn bộ chương từ ${fromChapInput} đến ${toChapInput} đều đã có bản dịch!`);
+                      addLog(`🎉 Toàn bộ chương từ ${numFrom} đến ${numTo} đều đã có bản dịch! Không có chương nào bị sót.`);
+                      alert(`Toàn bộ chương từ ${numFrom} đến ${numTo} đều đã có bản dịch!`);
                       return;
                     }
                     isProcessingChapterRef.current = false;
@@ -6556,8 +6726,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                             isProcessingChapterRef.current = false;
                             abortControllerRef.current = new AbortController();
                             setCurrentChapterIndex(readingChapterIndex);
-                            setFromChapInput(readingChapterIndex + 1);
-                            setToChapInput(readingChapterIndex + 1);
+                            setFromChapInput(String(readingChapterIndex + 1));
+                            setToChapInput(String(readingChapterIndex + 1));
                             setIsTranslating(true);
                             setIsPaused(false);
                             setShowFullScreenReader(false);
