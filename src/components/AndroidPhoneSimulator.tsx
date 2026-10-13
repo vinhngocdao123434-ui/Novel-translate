@@ -1119,42 +1119,13 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       const selectedKey = activeKeys[(attempt - 1) % activeKeys.length];
       const modelToUse = modelName || 'gemini-2.5-flash';
 
-      // 1. NẾU ĐANG CHẠY TRÊN ANDROID NATIVE: Gọi trực tiếp qua OkHttpClient Native có WifiLock & WakeLock
-      // Giải quyết triệt để 100% lỗi "Failed to fetch" khi chuyển app hoặc tắt màn hình!
-      if (typeof window !== 'undefined' && (window as any).AndroidBridge?.callGeminiNative) {
-        try {
-          const nativeResStr = (window as any).AndroidBridge.callGeminiNative(
-            prompt,
-            modelToUse,
-            selectedKey.key,
-            configOverrides.temperature || 0.15,
-            configOverrides.maxOutputTokens || 8192
-          );
-          if (nativeResStr) {
-            const nativeJson = JSON.parse(nativeResStr);
-            if (nativeJson.ok && nativeJson.text) {
-              return { ok: true, status: 200, text: nativeJson.text };
-            } else if (nativeJson.status === 429 || nativeJson.status === 503) {
-              lastStatus = nativeJson.status;
-              const delayMs = Math.min(2000 * Math.pow(2, attempt - 1), 10000);
-              if (addLogFn) {
-                addLogFn(`⚠️ [API Native HTTP ${nativeJson.status}] Máy chủ bận. Tự động xoay Key (${selectedKey.key.substring(0, 8)}...) & thử lại lần ${attempt}/${maxRetries}...`);
-              }
-              await new Promise(r => setTimeout(r, delayMs));
-              continue;
-            }
-          }
-        } catch (nativeErr: any) {
-          console.warn('Native Gemini call failed, falling back to fetch:', nativeErr);
-        }
-      }
-
-      // 2. Dự phòng: Gọi qua Fetch API trình duyệt có timeout bảo vệ
+      // Gọi qua Fetch API bất đồng bộ (non-blocking) chuẩn của trình duyệt/WebView
+      // Tuyệt đối không gọi synchronous blocking native call làm đơ giao diện!
       try {
         const timeoutController = new AbortController();
         const timeoutTimer = setTimeout(() => {
           try { timeoutController.abort(); } catch (e) {}
-        }, 50000); // 50s timeout bảo vệ
+        }, 45000); // 45s timeout bảo vệ
 
         const onAbortHandler = () => {
           try { timeoutController.abort(); } catch (e) {}
@@ -1163,7 +1134,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           reqSignal.addEventListener('abort', onAbortHandler, { once: true });
         }
 
-        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${selectedKey.key}`, {
+        let resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${selectedKey.key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: timeoutController.signal,
@@ -1172,6 +1143,23 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
           })
         });
+
+        // Tự động chuyển model nếu model tùy chỉnh trả về 404 (Not Found)
+        if (resp.status === 404 && modelToUse !== 'gemini-2.5-flash' && modelToUse !== 'gemini-2.0-flash') {
+          if (addLogFn) {
+            addLogFn(`ℹ️ Model "${modelToUse}" không khả dụng (404), tự động chuyển sang "gemini-2.5-flash"...`);
+          }
+          resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${selectedKey.key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: timeoutController.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
+            })
+          });
+        }
+
         clearTimeout(timeoutTimer);
         if (reqSignal) {
           reqSignal.removeEventListener('abort', onAbortHandler);
@@ -1882,7 +1870,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
           setLastAttachedSnippet('');
         }
 
-        const startChapterDelay = (delaySecInput || 2) * 1000;
+        const isFirstChapterOfRun = currentChapterIndex === Math.max(0, fromChapInput - 1);
+        const startChapterDelay = isFirstChapterOfRun ? 50 : Math.max(500, (delaySecInput || 2) * 1000);
         const startDelayTime = Date.now();
         let chapterFired = false;
 
@@ -1916,11 +1905,12 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
           if (isBatchGlossaryEnabled && (!processedBatchStarts.includes(batchStart) || isGlossaryEmpty) && project.chapters.length > 0) {
             setProcessedBatchStarts(prev => [...prev, batchStart]);
-            const batchEnd = Math.min(batchStart + batchSize, project.chapters.length);
+            const batchEnd = Math.min(batchStart + batchSize, targetEnd, project.chapters.length);
             const chaptersInBatch = project.chapters.slice(batchStart, batchEnd);
             const combinedBatchRaw = chaptersInBatch.join('\n\n');
             const maxRawLen = advancedSettings.maxTermLength || 8;
             const minFreq = advancedSettings.minFrequency || 2;
+            setStatusText(`🔍 Đang trích xuất Master Glossary (Chương ${batchStart + 1} ➔ ${batchEnd})...`);
             addLog(`🔍 [BÓC LÔ GLOSSARY 7 NHÓM] Đang gom ${chaptersInBatch.length} chương thô (Chương ${batchStart + 1} ➔ ${batchEnd}) để AI trích xuất Master Glossary (Chỉ lọc Danh từ riêng, từ gốc ≤ ${maxRawLen} ký tự, tần suất ≥ ${minFreq} lần)...`);
 
             if (isRealKey) {
@@ -3965,16 +3955,32 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                         alert('Vui lòng nạp và tách chương truyện trước!');
                         return;
                       }
+                      isProcessingChapterRef.current = false;
+                      abortControllerRef.current = new AbortController();
                       setCurrentChapterIndex(Math.max(0, fromChapInput - 1));
                       setIsGapFillingMode(false);
                       setIsTranslating(true);
                       setIsPaused(false);
+                      setStatusText(`⚡ Đang khởi động dịch Chương ${fromChapInput}...`);
                       addLog(`▶ Bắt đầu dịch Range từ Chương ${fromChapInput} đến ${toChapInput}...`);
                     }}
-                    className="py-2.5 bg-[#005a82] hover:bg-[#0284c7] disabled:opacity-40 text-[#f0e6d2] border border-[#0ac8b9]/40 rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-md shadow-black/40 cursor-pointer transition-all"
+                    className={`py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-black/40 cursor-pointer transition-all ${
+                      isTranslating
+                        ? 'bg-[#005a82]/70 text-amber-300 border border-amber-500/50'
+                        : 'bg-[#005a82] hover:bg-[#0284c7] text-[#f0e6d2] border border-[#0ac8b9]/40'
+                    }`}
                   >
-                    <Play className="w-3.5 h-3.5" />
-                    <span>Dịch Range</span>
+                    {isTranslating ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                        <span>Đang dịch...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 text-[#0ac8b9]" />
+                        <span>Dịch Range</span>
+                      </>
+                    )}
                   </button>
 
                   <button
@@ -3983,9 +3989,12 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       const nextPaused = !isPaused;
                       setIsPaused(nextPaused);
                       if (nextPaused) {
+                        abortControllerRef.current?.abort();
                         setStatusText(`⏸ Đang tạm dừng tại Chương ${currentChapterIndex + 1} (chưa xong)`);
                         addLog(`⏸ Đã tạm dừng dịch tại Chương ${currentChapterIndex + 1} (Chương này chưa hoàn thành)`);
                       } else {
+                        isProcessingChapterRef.current = false;
+                        abortControllerRef.current = new AbortController();
                         setStatusText(`⚡ Đang dịch lại Chương ${currentChapterIndex + 1}...`);
                         addLog(`▶ Tiếp tục dịch lại Chương ${currentChapterIndex + 1} (chương đang dở dang)...`);
                       }
@@ -4001,6 +4010,9 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                   <button
                     disabled={!isTranslating && !isPaused}
                     onClick={() => {
+                      abortControllerRef.current?.abort();
+                      abortControllerRef.current = null;
+                      isProcessingChapterRef.current = false;
                       setIsTranslating(false);
                       setIsPaused(false);
                       setIsGapFillingMode(false);
@@ -4044,16 +4056,28 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       alert(`Toàn bộ chương từ ${fromChapInput} đến ${toChapInput} đều đã có bản dịch!`);
                       return;
                     }
+                    isProcessingChapterRef.current = false;
+                    abortControllerRef.current = new AbortController();
                     setIsGapFillingMode(true);
                     setCurrentChapterIndex(start);
                     setIsTranslating(true);
                     setIsPaused(false);
+                    setStatusText(`⚡ Bắt đầu dịch bù thông minh...`);
                     addLog(`⚡ [DỊCH BÙ THÔNG MINH] Phát hiện ${missing.length} chương chưa dịch (${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '...' : ''}). Tự động né 100% các chương đã có bản dịch!`);
                   }}
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)</span>
+                  {isTranslating && isGapFillingMode ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                      <span>Đang Dịch Bù...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>⚡ Dịch Bù Chương Sót (Né Các Chương Đã Dịch)</span>
+                    </>
+                  )}
                 </button>
 
                 {/* NÚT LÀM MƯỢT BẢN DỊCH FINAL (QUÉT SẠCH CHỮ HÁN) */}
@@ -6336,6 +6360,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       <div className="flex items-center justify-center gap-2 pt-2">
                         <button
                           onClick={() => {
+                            isProcessingChapterRef.current = false;
+                            abortControllerRef.current = new AbortController();
                             setCurrentChapterIndex(readingChapterIndex);
                             setFromChapInput(readingChapterIndex + 1);
                             setToChapInput(readingChapterIndex + 1);
@@ -6343,6 +6369,8 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                             setIsPaused(false);
                             setShowFullScreenReader(false);
                             setActiveBottomTab('translate');
+                            setStatusText(`⚡ Đang chuẩn bị dịch Chương ${readingChapterIndex + 1}...`);
+                            addLog(`▶ Bắt đầu dịch trực tiếp Chương ${readingChapterIndex + 1}...`);
                           }}
                           className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
                         >

@@ -440,7 +440,12 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public boolean applyGodModeRoot() {
-            return RootController.applyGodModeKernelProtection();
+            new Thread(() -> {
+                try {
+                    RootController.applyGodModeKernelProtection();
+                } catch (Exception ignored) {}
+            }).start();
+            return true;
         }
 
         @JavascriptInterface

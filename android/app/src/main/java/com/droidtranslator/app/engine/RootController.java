@@ -9,12 +9,41 @@ public class RootController {
 
     private static final String PKG_NAME = "com.droidtranslator.app";
 
+    private static Boolean sCachedRoot = null;
+
     public static boolean isRootAvailable() {
+        if (sCachedRoot != null) {
+            return sCachedRoot;
+        }
         try {
+            String[] paths = {
+                "/system/bin/su",
+                "/system/xbin/su",
+                "/sbin/su",
+                "/data/local/xbin/su",
+                "/data/local/bin/su",
+                "/system/sd/xbin/su",
+                "/system/bin/failsafe/su",
+                "/data/local/su"
+            };
+            boolean suExists = false;
+            for (String path : paths) {
+                if (new File(path).exists()) {
+                    suExists = true;
+                    break;
+                }
+            }
+            if (!suExists) {
+                sCachedRoot = false;
+                return false;
+            }
+
             java.lang.Process process = Runtime.getRuntime().exec(new String[]{"su", "-c", "id"});
             int exitCode = process.waitFor();
-            return exitCode == 0;
+            sCachedRoot = (exitCode == 0);
+            return sCachedRoot;
         } catch (Exception e) {
+            sCachedRoot = false;
             return false;
         }
     }
@@ -28,6 +57,9 @@ public class RootController {
      * Lớp 5: Unlimited Background Bucket & AppOps (Cho phép chạy ngầm và giữ WakeLock vô hạn định)
      */
     public static boolean applyGodModeKernelProtection() {
+        if (!isRootAvailable()) {
+            return false;
+        }
         try {
             int pid = Process.myPid();
             java.lang.Process process = Runtime.getRuntime().exec("su");
