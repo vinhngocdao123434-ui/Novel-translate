@@ -1,6 +1,6 @@
 {
-  "summary":  "Cập nhật Kế hoạch theo đúng SystemInstruction do người dùng cung cấp cho Tiếng Việt (thêm chú ý không sai chính tả Hán-Việt và giữ nguyên định dạng ngắt đoạn), cùng cơ chế tự động chuyển SystemInstruction phù hợp khi ngôn ngữ đích là Tiếng Anh, Tiếng Nhật... Tích hợp Lọc Từ Điển Tối Ưu Theo Chương (Relevant Glossary Filtering).",
-  "updatedAt":  "2026-10-05T03:40:59.671097757Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Kế hoạch nâng cấp Cơ chế Dịch Bất Tử (Immortal Translation Engine) cho phép dịch xuyên đêm 8 tiếng không bị dừng: tích hợp Gemini 3.1 Flash Lite, xoay vòng siêu tốc đa tầng API Key và Model Flash Lite (3.5 -> 3.1 -> 2.5), tự động ngủ đông 60s và tự hồi sinh khi mất mạng hoặc cạn quota.",
+  "updatedAt": "2026-10-13T01:37:14.391482397Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

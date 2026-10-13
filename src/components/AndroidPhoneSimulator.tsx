@@ -258,10 +258,11 @@ export const buildPass2Prompt = (targetLang: string, rawContent: string, pass1Te
 };
 
 const PRESET_MODELS = [
+  { id: 'gemini-3.5-flash-lite', name: '3.5 Flash Lite', badge: 'Khuyên Dùng 2026', desc: 'Model tối tân siêu nhẹ phản hồi tức thì, quota dồi dào' },
+  { id: 'gemini-3.1-flash-lite', name: '3.1 Flash Lite', badge: 'Tối ưu Quota 2026', desc: 'Model Lite tối ưu chi phí & tốc độ, hạn ngạch RPM cực lớn' },
+  { id: 'gemini-2.5-flash-lite', name: '2.5 Flash Lite', badge: 'Tiết kiệm Quota', desc: 'Rất nhanh, ít tốn RPM/TPM, chuyên dụng xoay tua xuyên đêm' },
+  { id: 'gemini-2.5-flash', name: '2.5 Flash', badge: 'Mặc định - Cân bằng', desc: 'Cân bằng tốc độ và độ mượt văn phong' },
   { id: 'gemini-3.6-flash', name: '3.6 Flash', badge: 'Model Siêu Cấp 2026', desc: 'Chuyên gia xử lý Hán Việt & Làm mượt toàn văn tuyệt đối' },
-  { id: 'gemini-2.5-flash', name: '2.5 Flash', badge: 'Mặc định - Siêu tốc', desc: 'Cân bằng tốc độ và độ mượt văn phong' },
-  { id: 'gemini-2.5-flash-lite', name: '2.5 Flash Lite', badge: 'Tiết kiệm Quota', desc: 'Rất nhanh, ít tốn RPM/TPM' },
-  { id: 'gemini-3.5-flash-lite', name: '3.5 Flash Lite', badge: 'Thế hệ mới 2026', desc: 'Model tối tân siêu nhẹ phản hồi tức thì' },
   { id: 'gemini-2.5-pro', name: '2.5 Pro', badge: 'Văn chương đỉnh cao', desc: 'Văn phong mượt như dịch giả con người' },
   { id: 'gemini-1.5-flash', name: '1.5 Flash', badge: 'Tương thích cao', desc: 'Ổn định, hỗ trợ ngữ cảnh dài' }
 ];
@@ -539,6 +540,21 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
   const [wakeLockActive, setWakeLockActive] = useState<boolean>(true);
   const [batteryOptimizationIgnored, setBatteryOptimizationIgnored] = useState<boolean>(true);
   const [workManagerWatchdog, setWorkManagerWatchdog] = useState<boolean>(true);
+  const [isImmortalMode, setIsImmortalMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('droid_immortal_mode');
+      return saved !== null ? saved === 'true' : true;
+    } catch (e) {
+      return true;
+    }
+  });
+  const isImmortalModeRef = useRef<boolean>(isImmortalMode);
+  useEffect(() => {
+    isImmortalModeRef.current = isImmortalMode;
+    try {
+      localStorage.setItem('droid_immortal_mode', String(isImmortalMode));
+    } catch (e) {}
+  }, [isImmortalMode]);
 
   // Sync with native AndroidBridge if running inside APK
   useEffect(() => {
@@ -1093,7 +1109,7 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
     addLog(`🎉 Hoàn tất kiểm tra Key Pool!`);
   };
 
-  // Call Gemini API with automatic exponential backoff, key rotation, and 503/429 retry
+  // Immortal Translation Engine: Cascading rotation of Lite models and ultra-fast Key hopping with 60s recovery sleep
   const callGeminiApiWithRetryAndRotation = async (
     prompt: string,
     modelName: string,
@@ -1107,105 +1123,163 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
       return { ok: false, status: 401, text: 'No active real API key found' };
     }
 
-    let lastStatus = 500;
-    let lastErrText = '';
     const reqSignal = signal || configOverrides.signal || abortControllerRef.current?.signal;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Chuỗi 3 Model Flash Lite ưu tiên bất tử: 3.5 Lite -> 3.1 Lite -> 2.5 Lite (Không xoay bản non-lite)
+    const LITE_CASCADE = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'];
+
+    // Xây dựng danh sách model candidate:
+    let candidateModels: string[];
+    if (LITE_CASCADE.includes(modelName)) {
+      candidateModels = [modelName, ...LITE_CASCADE.filter(m => m !== modelName)];
+    } else if (modelName && modelName.trim().length > 0) {
+      candidateModels = [modelName, ...LITE_CASCADE];
+    } else {
+      candidateModels = [...LITE_CASCADE];
+    }
+
+    let lastStatus = 500;
+    let lastErrText = '';
+    let cycleCount = 0;
+
+    // Vòng lặp Bất Tử (Chạy liên tục xuyên đêm cho đến khi dịch thành công hoặc người dùng bấm Dừng/Hủy)
+    while (true) {
+      cycleCount++;
       if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
         return { ok: false, status: 499, text: 'Yêu cầu đã bị hủy hoặc tạm dừng.' };
       }
 
-      const selectedKey = activeKeys[(attempt - 1) % activeKeys.length];
-      const modelToUse = modelName || 'gemini-2.5-flash';
-
-      // Gọi qua Fetch API bất đồng bộ (non-blocking) chuẩn của trình duyệt/WebView
-      // Tuyệt đối không gọi synchronous blocking native call làm đơ giao diện!
-      try {
-        const timeoutController = new AbortController();
-        const timeoutTimer = setTimeout(() => {
-          try { timeoutController.abort(); } catch (e) {}
-        }, 45000); // 45s timeout bảo vệ
-
-        const onAbortHandler = () => {
-          try { timeoutController.abort(); } catch (e) {}
-        };
-        if (reqSignal) {
-          reqSignal.addEventListener('abort', onAbortHandler, { once: true });
-        }
-
-        let resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${selectedKey.key}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: timeoutController.signal,
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
-          })
-        });
-
-        // Tự động chuyển model nếu model tùy chỉnh trả về 404 (Not Found)
-        if (resp.status === 404 && modelToUse !== 'gemini-2.5-flash' && modelToUse !== 'gemini-2.0-flash') {
-          if (addLogFn) {
-            addLogFn(`ℹ️ Model "${modelToUse}" không khả dụng (404), tự động chuyển sang "gemini-2.5-flash"...`);
-          }
-          resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${selectedKey.key}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: timeoutController.signal,
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
-            })
-          });
-        }
-
-        clearTimeout(timeoutTimer);
-        if (reqSignal) {
-          reqSignal.removeEventListener('abort', onAbortHandler);
-        }
-
-        lastStatus = resp.status;
-        if (resp.ok) {
-          const data = await resp.json();
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          return { ok: true, status: 200, text, data };
-        }
-
+      // 1. Duyệt qua từng Model Flash Lite
+      for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+        const currentModel = candidateModels[mIdx];
         if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
-          return { ok: false, status: 499, text: 'Yêu cầu đã bị dừng.' };
+          return { ok: false, status: 499, text: 'Yêu cầu đã bị hủy hoặc tạm dừng.' };
         }
 
-        // Handle 503 Overloaded, 429 Rate Limit, 500/502/504 Server Error
-        if ([503, 429, 500, 502, 504].includes(resp.status)) {
-          const delayMs = Math.min(2000 * Math.pow(2, attempt - 1), 10000); // 2s, 4s, 8s, 10s
-          if (addLogFn) {
-            addLogFn(`⚠️ [API BUSY - HTTP ${resp.status}] Máy chủ bận/quá tải. Tự động xoay Key (${selectedKey.key.substring(0, 8)}...) & thử lại lần ${attempt}/${maxRetries} sau ${(delayMs / 1000).toFixed(1)}s...`);
+        let modelHit404 = false;
+
+        // 2. Duyệt qua từng Key (1 lần thử duy nhất cho mỗi key để xoay vòng cực nhanh)
+        for (let kIdx = 0; kIdx < activeKeys.length; kIdx++) {
+          if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
+            return { ok: false, status: 499, text: 'Yêu cầu đã bị hủy hoặc tạm dừng.' };
           }
-          await new Promise(r => setTimeout(r, delayMs));
-        } else {
-          const errData = await resp.json().catch(() => ({}));
-          lastErrText = errData?.error?.message || `HTTP ${resp.status}`;
-          if (addLogFn) {
-            addLogFn(`⚠️ [API ERR HTTP ${resp.status}] Key ${selectedKey.key.substring(0, 8)}...: ${lastErrText}`);
+
+          const selectedKey = activeKeys[kIdx];
+          const keyShort = `${selectedKey.key.substring(0, 8)}...${selectedKey.key.slice(-4)}`;
+
+          try {
+            const timeoutController = new AbortController();
+            const timeoutTimer = setTimeout(() => {
+              try { timeoutController.abort(); } catch (e) {}
+            }, 35000); // 35s timeout bảo vệ
+
+            const onAbortHandler = () => {
+              try { timeoutController.abort(); } catch (e) {}
+            };
+            if (reqSignal) {
+              reqSignal.addEventListener('abort', onAbortHandler, { once: true });
+            }
+
+            let resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${selectedKey.key}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: timeoutController.signal,
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.1, maxOutputTokens: 8192, ...configOverrides }
+              })
+            });
+
+            clearTimeout(timeoutTimer);
+            if (reqSignal) {
+              reqSignal.removeEventListener('abort', onAbortHandler);
+            }
+
+            lastStatus = resp.status;
+
+            if (resp.ok) {
+              const data = await resp.json();
+              const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              if (text && text.trim().length > 0) {
+                return { ok: true, status: 200, text, data };
+              }
+            }
+
+            if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
+              return { ok: false, status: 499, text: 'Yêu cầu đã bị dừng.' };
+            }
+
+            // Nếu model trả về 404 (Endpoint không hỗ trợ model name này)
+            if (resp.status === 404) {
+              lastErrText = `Model ${currentModel} trả về 404`;
+              if (addLogFn && kIdx === 0) {
+                addLogFn(`ℹ️ Model "${currentModel}" không khả dụng (404). Chuyển ngay sang model Lite tiếp theo...`);
+              }
+              modelHit404 = true;
+              break; // Bỏ qua model này, chuyển ngay sang model tiếp theo trong cascade
+            }
+
+            // Các lỗi HTTP 429 Rate Limit, 503 Quá tải, 500 Server Error
+            const errData = await resp.json().catch(() => ({}));
+            lastErrText = errData?.error?.message || `HTTP ${resp.status}`;
+            if (addLogFn) {
+              addLogFn(`⚠️ [Key ${keyShort} / ${currentModel}] HTTP ${resp.status}. Đổi ngay sang Key tiếp theo...`);
+            }
+            await new Promise(r => setTimeout(r, 500));
+
+          } catch (err: any) {
+            if (err.name === 'AbortError' || reqSignal?.aborted) {
+              if (!isTranslatingRef.current || isPausedRef.current) {
+                return { ok: false, status: 499, text: 'Yêu cầu đã được ngắt kết nối theo lệnh hủy.' };
+              }
+              lastErrText = 'Yêu cầu quá hạn 35s (Timeout)';
+            } else {
+              lastErrText = err.message || 'Mất kết nối mạng (Failed to fetch)';
+            }
+
+            if (addLogFn) {
+              addLogFn(`⚠️ [LỖI KẾT NỐI - Key ${keyShort} / ${currentModel}] ${lastErrText}. Đổi ngay sang Key tiếp theo...`);
+            }
+            await new Promise(r => setTimeout(r, 500));
           }
-          if (attempt < maxRetries) {
-            await new Promise(r => setTimeout(r, 1500));
-          }
+        } // Hết vòng lặp Keys cho currentModel
+
+        if (modelHit404) {
+          continue;
         }
-      } catch (err: any) {
-        if (err.name === 'AbortError' || reqSignal?.aborted) {
-          return { ok: false, status: 499, text: 'Yêu cầu đã được ngắt kết nối theo lệnh hủy.' };
-        }
-        lastErrText = err.message || 'Connection failed';
-        if (addLogFn) {
-          addLogFn(`⚠️ [LỖI KẾT NỐI API / ${lastErrText}] Đang tự động xoay sang Key tiếp theo và thử lại lần ${attempt}/${maxRetries} sau 2.5s...`);
-        }
-        await new Promise(r => setTimeout(r, 2500));
+      } // Hết vòng lặp Models
+
+      // Nếu người dùng chủ động tắt Chế độ Dịch Bất Tử: dừng sau chu kỳ thử
+      if (!isImmortalModeRef.current) {
+        return { ok: false, status: lastStatus, text: lastErrText };
       }
-    }
 
-    return { ok: false, status: lastStatus, text: lastErrText };
+      // CHẾ ĐỘ BẤT TỬ: Đã thử hết toàn bộ Key và tất cả Model Lite mà vẫn cạn quota/mất mạng
+      // Vào chế độ ngủ đông 60s, TUYỆT ĐỐI KHÔNG DỪNG TIẾN TRÌNH!
+      if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
+        return { ok: false, status: 499, text: 'Yêu cầu đã bị hủy hoặc tạm dừng.' };
+      }
+
+      if (addLogFn) {
+        addLogFn(`⏳ [CHẾ ĐỘ BẤT TỬ - NGỦ ĐÔNG 60s]: Toàn bộ ${activeKeys.length} Key & Model Lite (3.5, 3.1, 2.5) tạm cạn quota hoặc mạng gián đoạn. Đang giữ tiến trình, đếm ngược 60s để tự động hồi sinh...`);
+      }
+
+      // Đếm ngược 60s với bước kiểm tra 1 giây
+      for (let sec = 60; sec > 0; sec--) {
+        if (reqSignal?.aborted || !isTranslatingRef.current || isPausedRef.current) {
+          return { ok: false, status: 499, text: 'Yêu cầu đã bị hủy hoặc tạm dừng.' };
+        }
+        if (sec % 15 === 0 || sec <= 5) {
+          setStatusText(`⏳ Ngủ đông 60s chờ hồi phục: Tự động thử lại sau ${sec}s...`);
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      if (addLogFn) {
+        addLogFn(`⚡ [HỒI SINH TIẾN TRÌNH - CHU KỲ #${cycleCount + 1}]: Hết 60s ngủ đông! Tự động khởi động lại tiến trình dịch với Model 3.5 Lite và xoay vòng Key...`);
+      }
+      setStatusText(`⚡ Đang kết nối lại API Gemini...`);
+    }
   };
 
   // Add Key to Global Pool
@@ -2116,8 +2190,14 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
 
           // Fallback khi không có API key hoặc mất mạng
           if (!translatedText) {
-            // NẾU CÓ API KEY THỰC TẾ: Tuyệt đối KHÔNG sinh bản dịch mẫu (chỉ 781 ký tự) gây kích hoạt sai báo động mất chữ và kẹt cứu hộ!
+            // NẾU CÓ API KEY THỰC TẾ: Tuyệt đối KHÔNG sinh bản dịch mẫu gây kích hoạt sai báo động mất chữ!
             if (isRealKey) {
+              if (isImmortalModeRef.current) {
+                // Trong Chế Độ Bất Tử: Tuyệt đối KHÔNG dừng tiến trình!
+                // Giữ nguyên isTranslating = true, worker tick sẽ tự động kích hoạt lại chu kỳ cho chương này
+                addLog(`🔄 [BẢO TOÀN BẤT TỬ] Đang giữ tiến trình ở Chương ${currentChapterIndex + 1}. Tiến trình sẽ tự động tiếp tục.`);
+                return;
+              }
               addLog(`⏸️ [TẠM DỪNG TIẾN TRÌNH - MẤT KẾT NỐI MẠNG]: Không thể kết nối API Gemini (Failed to fetch). Đã tạm dừng an toàn ở Chương ${currentChapterIndex + 1} để bảo vệ dữ liệu nguyên tác. Vui lòng kiểm tra Wi-Fi/4G và bấm Tiếp tục.`);
               setIsTranslating(false);
               setIsPaused(true);
@@ -3918,6 +3998,43 @@ export const AndroidPhoneSimulator: React.FC<Props> = ({ onOpenGodModeModal, isN
                       </div>
                     );
                   })()}
+                </div>
+
+                {/* Immortal Mode (Dịch Bất Tử Xuyên Đêm) Banner & Toggle */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-[#091428] via-[#0b1d31] to-[#091428] border border-[#0ac8b9]/50 shadow-[0_0_12px_rgba(10,200,185,0.18)]">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full flex items-center justify-center shrink-0 ${isImmortalMode ? 'bg-[#0ac8b9] shadow-[0_0_8px_#0ac8b9] animate-pulse' : 'bg-neutral-600'}`}>
+                      <span className="text-[7px] text-black font-extrabold">⚡</span>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-bold text-[#f0e6d2] flex items-center gap-1.5">
+                        <span>Chế Độ Dịch Bất Tử (Ngủ 8 Giờ)</span>
+                        <span className={`text-[8.5px] font-mono px-1.5 py-0.2 rounded font-extrabold uppercase ${isImmortalMode ? 'bg-[#0ac8b9]/20 text-[#0ac8b9] border border-[#0ac8b9]/50' : 'bg-neutral-800 text-neutral-400'}`}>
+                          {isImmortalMode ? 'ĐANG BẬT' : 'TẮT'}
+                        </span>
+                      </div>
+                      <div className="text-[9.5px] text-[#a09b8c] leading-tight">
+                        {isImmortalMode
+                          ? 'Tự xoay vòng 3.5 -> 3.1 -> 2.5 Lite, đổi Key siêu tốc, ngủ đông 60s khi lỗi'
+                          : 'Dừng tiến trình khi gặp lỗi mạng hoặc hết Key'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !isImmortalMode;
+                      setIsImmortalMode(next);
+                      addLog(`⚡ Chế độ Dịch Bất Tử đã ${next ? 'BẬT (Bảo vệ xuyên đêm 8 tiếng)' : 'TẮT'}`);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition-all shrink-0 cursor-pointer ${
+                      isImmortalMode
+                        ? 'bg-[#0ac8b9] text-black shadow-[0_0_10px_rgba(10,200,185,0.4)] hover:bg-[#00f5df]'
+                        : 'bg-neutral-800 text-neutral-400 border border-neutral-700 hover:text-white'
+                    }`}
+                  >
+                    {isImmortalMode ? 'BẬT' : 'TẮT'}
+                  </button>
                 </div>
 
                 {/* Range inputs: Từ chương -> Đến chương */}
